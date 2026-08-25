@@ -1,0 +1,109 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Zeitarchiv einrichten",
+        "description": "Verbindung zu einer Zeitarchiv-App. Mehrere benannte Ziele können parallel eingerichtet werden, zum Beispiel Produktiv- und Testsystem. Den API-Token findest du in den App-Einstellungen.",
+        "data": {
+          "name": "Verbindungsname",
+          "host": "Host",
+          "port": "Port",
+          "api_token": "API-Token"
+        }
+      },
+      "reconfigure": {
+        "title": "Zeitarchiv – Verbindung ändern",
+        "description": "Host/Port/Token nachträglich anpassen — z. B. wenn der Token in den App-Einstellungen (Bereich \"Verbindung\") neu generiert oder gelöscht wurde.",
+        "data": {
+          "name": "Verbindungsname",
+          "host": "Host",
+          "port": "Port",
+          "api_token": "API-Token"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Zeitarchiv – Token abgelehnt",
+        "description": "Die App hat den hinterlegten API-Token abgelehnt — vermutlich wurde er in den App-Einstellungen (Bereich \"Verbindung\") neu generiert oder gelöscht. Neuen Token eintragen.",
+        "data": {
+          "api_token": "API-Token"
+        }
+      }
+    },
+    "error": {
+      "invalid_name": "Bitte einen Verbindungsnamen eingeben.",
+      "cannot_connect": "Verbindung zur App fehlgeschlagen. Läuft sie und ist der Port erreichbar?",
+      "invalid_auth": "API-Token wurde von der App abgelehnt.",
+      "unknown": "Unerwarteter Fehler."
+    },
+    "abort": {
+      "reconfigure_successful": "Verbindung aktualisiert.",
+      "reauth_successful": "Neuer Token gespeichert."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Zeitarchiv – Einstellungen",
+        "description": "Archivfilter bearbeiten oder sicher zwischen Home-Assistant-Systemen übertragen.",
+        "menu_options": {
+          "filters": "Archivfilter bearbeiten",
+          "export": "Filter als YAML exportieren",
+          "import": "Filter aus YAML importieren"
+        },
+        "menu_option_descriptions": {
+          "filters": "Domains, Entitäten, Bereiche, Geräte und Ausschlüsse auswählen.",
+          "export": "Aktuelle Filter ohne Host und API-Token kopieren.",
+          "import": "Einen Zeitarchiv-Export einlesen und die aktuellen Filter ersetzen."
+        }
+      },
+      "filters": {
+        "title": "Zeitarchiv – Archivfilter",
+        "description": "Grobe Auswahl, was überhaupt archiviert wird. Auflösung/Aufbewahrung (auch die Standardwerte für neu erkannte Entitäten) stellst du in der Zeitarchiv-Oberfläche selbst ein (Einstellungen → Archivierung).",
+        "data": {
+          "domains": "Domains",
+          "entities": "Einzelne Entitäten",
+          "areas": "Bereiche",
+          "devices": "Geräte",
+          "exclude_entities": "Ausgeschlossene Entitäten"
+        }
+      },
+      "export": {
+        "title": "Zeitarchiv – Filter exportieren",
+        "description": "Kopiere den YAML-Inhalt und speichere ihn als Datei oder füge ihn auf einem anderen System unter „Filter aus YAML importieren“ ein. Host und API-Token sind nicht enthalten. Mit „Absenden“ gelangst du zurück zum Menü.",
+        "data": {
+          "yaml_config": "YAML-Konfiguration"
+        }
+      },
+      "import": {
+        "title": "Zeitarchiv – Filter importieren",
+        "description": "Füge einen zuvor exportierten Zeitarchiv-YAML-Inhalt ein. Der Import ersetzt alle aktuellen Filter. Bereiche und Geräte funktionieren nur, wenn ihre internen IDs auf diesem System übereinstimmen.",
+        "data": {
+          "yaml_config": "YAML-Konfiguration"
+        }
+      }
+    },
+    "error": {
+      "invalid_yaml": "Das YAML ist syntaktisch ungültig.",
+      "invalid_structure": "Der Inhalt ist kein gültiger Zeitarchiv-Filterexport.",
+      "unsupported_format": "Format oder Version dieses Exports wird nicht unterstützt.",
+      "invalid_domain": "Der Export enthält eine nicht unterstützte Domain.",
+      "invalid_entity": "Der Export enthält eine ungültige Entity-ID."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "last_success": {
+        "name": "Letzte Übertragung"
+      },
+      "queue_size": {
+        "name": "Warteschlange"
+      },
+      "sent_count": {
+        "name": "Übertragene Datensätze (seit Start)"
+      },
+      "dropped_count": {
+        "name": "Verworfene Ereignisse (seit Start)"
+      }
+    }
+  }
+}

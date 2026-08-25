@@ -1,0 +1,109 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Zeitarchiv",
+        "description": "Connection to a Zeitarchiv add-on. Multiple named destinations can run in parallel, for example production and test. Find the API token in the add-on's settings.",
+        "data": {
+          "name": "Connection name",
+          "host": "Host",
+          "port": "Port",
+          "api_token": "API token"
+        }
+      },
+      "reconfigure": {
+        "title": "Zeitarchiv – Update connection",
+        "description": "Update host/port/token — e.g. if the token was regenerated or cleared in the add-on's settings (\"Connection\" section).",
+        "data": {
+          "name": "Connection name",
+          "host": "Host",
+          "port": "Port",
+          "api_token": "API token"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Zeitarchiv – Token rejected",
+        "description": "The add-on rejected the stored API token — it was probably regenerated or cleared in the add-on's settings (\"Connection\" section). Enter the new token.",
+        "data": {
+          "api_token": "API token"
+        }
+      }
+    },
+    "error": {
+      "invalid_name": "Enter a connection name.",
+      "cannot_connect": "Failed to connect to the add-on. Is it running and is the port reachable?",
+      "invalid_auth": "The add-on rejected the API token.",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "reconfigure_successful": "Connection updated.",
+      "reauth_successful": "New token saved."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Zeitarchiv – Settings",
+        "description": "Edit archive filters or safely transfer them between Home Assistant systems.",
+        "menu_options": {
+          "filters": "Edit archive filters",
+          "export": "Export filters as YAML",
+          "import": "Import filters from YAML"
+        },
+        "menu_option_descriptions": {
+          "filters": "Select domains, entities, areas, devices, and exclusions.",
+          "export": "Copy the current filters without host or API token.",
+          "import": "Read a Zeitarchiv export and replace the current filters."
+        }
+      },
+      "filters": {
+        "title": "Zeitarchiv – Archive filters",
+        "description": "Coarse selection of what gets archived at all. Resolution/retention (including the defaults for newly detected entities) are set in the Zeitarchiv UI itself (Settings → Archiving).",
+        "data": {
+          "domains": "Domains",
+          "entities": "Individual entities",
+          "areas": "Areas",
+          "devices": "Devices",
+          "exclude_entities": "Excluded entities"
+        }
+      },
+      "export": {
+        "title": "Zeitarchiv – Export filters",
+        "description": "Copy the YAML content and save it as a file, or paste it into “Import filters from YAML” on another system. Host and API token are not included. Select “Submit” to return to the menu.",
+        "data": {
+          "yaml_config": "YAML configuration"
+        }
+      },
+      "import": {
+        "title": "Zeitarchiv – Import filters",
+        "description": "Paste a previously exported Zeitarchiv YAML document. Importing replaces all current filters. Areas and devices only work if their internal IDs match on this system.",
+        "data": {
+          "yaml_config": "YAML configuration"
+        }
+      }
+    },
+    "error": {
+      "invalid_yaml": "The YAML syntax is invalid.",
+      "invalid_structure": "The content is not a valid Zeitarchiv filter export.",
+      "unsupported_format": "This export format or version is not supported.",
+      "invalid_domain": "The export contains an unsupported domain.",
+      "invalid_entity": "The export contains an invalid entity ID."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "last_success": {
+        "name": "Last transmission"
+      },
+      "queue_size": {
+        "name": "Queue"
+      },
+      "sent_count": {
+        "name": "Transferred records (since start)"
+      },
+      "dropped_count": {
+        "name": "Dropped events (since start)"
+      }
+    }
+  }
+}
