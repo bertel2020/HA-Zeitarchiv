@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.12.0 - 2026-08-25
+
+### Behoben
+
+- Das Logo in der von HACS gerenderten README verwendet eine absolute
+  Raw-GitHub-URL und wird dadurch unabhängig vom Basis-Pfad des Renderers
+  geladen.
+
 ## 0.11.0 - 2026-08-25
 
 ### Neu

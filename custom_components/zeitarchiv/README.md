@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="custom_components/zeitarchiv/brand/logo.png" alt="Zeitarchiv" width="160">
+  <img src="https://raw.githubusercontent.com/bertel2020/HA-Zeitarchiv/main/custom_components/zeitarchiv/brand/logo.png" alt="Zeitarchiv" width="160">
 </p>
 
 <h1 align="center">Zeitarchiv Integration</h1>
