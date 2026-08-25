@@ -36,7 +36,11 @@ class OptionsImportError(ValueError):
 def export_options(options: Mapping[str, Any]) -> str:
     """Gibt ausschließlich portable Filteroptionen als stabiles YAML zurück."""
     filters = {
-        key: sorted(set(options.get(key, [])))
+        key: (
+            list(dict.fromkeys(options.get(key, [])))
+            if key in (CONF_ENTITIES, CONF_EXCLUDE_ENTITIES)
+            else sorted(set(options.get(key, [])))
+        )
         for key in FILTER_KEYS
     }
     document = {
@@ -85,6 +89,10 @@ def import_options(raw_yaml: str) -> dict[str, list[str]]:
             not _ENTITY_ID_PATTERN.fullmatch(value) for value in values
         ):
             raise OptionsImportError("invalid_entity")
-        result[key] = sorted(set(values))
+        result[key] = (
+            list(dict.fromkeys(values))
+            if key in (CONF_ENTITIES, CONF_EXCLUDE_ENTITIES)
+            else sorted(set(values))
+        )
 
     return result

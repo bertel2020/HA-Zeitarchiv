@@ -245,7 +245,9 @@ class ZeitarchivOptionsFlow(config_entries.OptionsFlow):
                 ),
                 vol.Optional(
                     CONF_ENTITIES, default=options.get(CONF_ENTITIES, [])
-                ): selector.EntitySelector(selector.EntitySelectorConfig(multiple=True)),
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(multiple=True, reorder=True)
+                ),
                 vol.Optional(
                     CONF_AREAS, default=options.get(CONF_AREAS, [])
                 ): selector.AreaSelector(selector.AreaSelectorConfig(multiple=True)),
@@ -254,7 +256,9 @@ class ZeitarchivOptionsFlow(config_entries.OptionsFlow):
                 ): selector.DeviceSelector(selector.DeviceSelectorConfig(multiple=True)),
                 vol.Optional(
                     CONF_EXCLUDE_ENTITIES, default=options.get(CONF_EXCLUDE_ENTITIES, [])
-                ): selector.EntitySelector(selector.EntitySelectorConfig(multiple=True)),
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(multiple=True, reorder=True)
+                ),
             }
         )
         return self.async_show_form(step_id="filters", data_schema=schema)
