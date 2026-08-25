@@ -37,7 +37,10 @@ def build_event(
         value = 1.0 if normalized_state == "on" else 0.0
     else:
         try:
-            value = float(state)
+            # Die Integration begrenzt die uebertragenen Messwerte bereits an
+            # der Quelle. Dadurch landen weder Anzeige-Artefakte noch mehr als
+            # drei fachlich relevante Nachkommastellen in der App.
+            value = round(float(state), 3)
         except (TypeError, ValueError):
             return None
 

@@ -68,6 +68,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass, entry.options
     )
 
+    def _enqueue_state(state: State) -> bool:
+        """Filtert und uebergibt einen aktuellen oder geaenderten Zustand."""
+        entity_id = state.entity_id
+        domain = entity_id.split(".", 1)[0]
+        if not should_archive(
+            entity_id, domain, included_entities, included_domains, excluded_entities
+        ):
+            return False
+
+        payload = build_event(
+            entity_id=entity_id,
+            domain=domain,
+            state=state.state,
+            state_class=state.attributes.get("state_class"),
+            unit=state.attributes.get("unit_of_measurement"),
+            timestamp=state.last_updated.timestamp() if state.last_updated else time.time(),
+            friendly_name=state.attributes.get("friendly_name"),
+        )
+        if payload is None:
+            return False
+        queue_writer.enqueue(payload)
+        return True
+
     def _handle_state_changed(event: Event[EventStateChangedData]) -> None:
         new_state: State | None = event.data.get("new_state")
         if new_state is None:
@@ -82,27 +105,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             old_state.state if old_state is not None else None, new_state.state
         ):
             return
+        _enqueue_state(new_state)
 
-        entity_id = new_state.entity_id
-        domain = entity_id.split(".", 1)[0]
-        if not should_archive(
-            entity_id, domain, included_entities, included_domains, excluded_entities
-        ):
-            return
-
-        payload = build_event(
-            entity_id=entity_id,
-            domain=domain,
-            state=new_state.state,
-            state_class=new_state.attributes.get("state_class"),
-            unit=new_state.attributes.get("unit_of_measurement"),
-            timestamp=new_state.last_updated.timestamp() if new_state.last_updated else time.time(),
-            friendly_name=new_state.attributes.get("friendly_name"),
-        )
-        if payload is not None:
-            queue_writer.enqueue(payload)
-
+    # Listener bewusst VOR dem Snapshot registrieren: Aendert sich ein Zustand
+    # waehrend des Durchlaufs, geht das Live-Event nicht verloren. Ein eventuell
+    # doppelt gesendeter identischer Zeitstempel wird von der App dedupliziert.
     remove_listener = hass.bus.async_listen(EVENT_STATE_CHANGED, _handle_state_changed)
+
+    initial_events = sum(_enqueue_state(state) for state in hass.states.async_all())
+    _LOGGER.info(
+        "Zeitarchiv-Initialzustand beim Laden vorgemerkt · Ziel=%s · Events=%d",
+        entry.title,
+        initial_events,
+    )
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
         "client": client,
