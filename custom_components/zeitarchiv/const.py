@@ -15,6 +15,8 @@ CONF_ENTITIES = "entities"
 CONF_AREAS = "areas"
 CONF_DEVICES = "devices"
 CONF_EXCLUDE_ENTITIES = "exclude_entities"
+CONF_ENTITY_PATTERNS = "entity_patterns"
+CONF_EXCLUDE_ENTITY_PATTERNS = "exclude_entity_patterns"
 
 # Domains, die sinnvoll archivierbar sind (Vorauswahl im Options-Flow).
 ARCHIVABLE_DOMAINS = [

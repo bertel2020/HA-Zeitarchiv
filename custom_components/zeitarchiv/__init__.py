@@ -33,7 +33,9 @@ from .const import (
     CONF_DEVICES,
     CONF_DOMAINS,
     CONF_ENTITIES,
+    CONF_ENTITY_PATTERNS,
     CONF_EXCLUDE_ENTITIES,
+    CONF_EXCLUDE_ENTITY_PATTERNS,
     DOMAIN,
 )
 from .events import build_event
@@ -64,16 +66,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
     queue_writer.start()
 
-    included_entities, included_domains, excluded_entities = _resolve_filters(
-        hass, entry.options
-    )
+    (
+        included_entities,
+        included_domains,
+        excluded_entities,
+        included_patterns,
+        excluded_patterns,
+    ) = _resolve_filters(hass, entry.options)
 
     def _enqueue_state(state: State) -> bool:
         """Filtert und uebergibt einen aktuellen oder geaenderten Zustand."""
         entity_id = state.entity_id
         domain = entity_id.split(".", 1)[0]
         if not should_archive(
-            entity_id, domain, included_entities, included_domains, excluded_entities
+            entity_id,
+            domain,
+            included_entities,
+            included_domains,
+            excluded_entities,
+            included_patterns,
+            excluded_patterns,
         ):
             return False
 
@@ -129,6 +141,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "included_entities": included_entities,
         "included_domains": included_domains,
         "excluded_entities": excluded_entities,
+        "included_patterns": included_patterns,
+        "excluded_patterns": excluded_patterns,
     }
 
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
@@ -159,7 +173,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 def _resolve_filters(
     hass: HomeAssistant, options: dict
-) -> tuple[set[str], set[str], set[str]]:
+) -> tuple[set[str], set[str], set[str], list[str], list[str]]:
     """Löst Bereiche/Geräte aus den Options einmalig zu konkreten Entity-IDs auf.
 
     Bekannte Phase-1-Grenze: Entitäten, die *nach* diesem Auflösen neu zu einem
@@ -170,6 +184,8 @@ def _resolve_filters(
     included_domains = set(options.get(CONF_DOMAINS, []))
     excluded_entities = set(options.get(CONF_EXCLUDE_ENTITIES, []))
     included_entities = set(options.get(CONF_ENTITIES, []))
+    included_patterns = list(options.get(CONF_ENTITY_PATTERNS, []))
+    excluded_patterns = list(options.get(CONF_EXCLUDE_ENTITY_PATTERNS, []))
 
     entity_registry = er.async_get(hass)
     device_registry = dr.async_get(hass)
@@ -186,4 +202,10 @@ def _resolve_filters(
             if effective_area in selected_areas or entry.device_id in selected_devices:
                 included_entities.add(entry.entity_id)
 
-    return included_entities, included_domains, excluded_entities
+    return (
+        included_entities,
+        included_domains,
+        excluded_entities,
+        included_patterns,
+        excluded_patterns,
+    )

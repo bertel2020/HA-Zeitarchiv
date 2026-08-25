@@ -18,8 +18,8 @@ eigentlichen Zeitreihen, Charts und Tabellen bleiben Aufgabe der App.
 
 | Aufgabe | Verhalten |
 | --- | --- |
-| Auswahl | Domains, einzelne Entitäten, Bereiche und Geräte kombinieren |
-| Ausschluss | Einzelne Entity-IDs haben als Ausschluss immer Vorrang |
+| Auswahl | Domains, einzelne Entitäten, Bereiche, Geräte und Entity-Muster kombinieren |
+| Ausschluss | Einzelne Entity-IDs und Ausschlussmuster haben immer Vorrang |
 | Aufbereitung | Numerische Werte mit maximal drei Nachkommastellen sowie Schalterzustände `on`/`off` |
 | Transport | In-Memory-Queue, Batches, Timeout und dauerhafte Retries |
 | Sicherheit | Bearer-Token; Reauth-Hinweis bei abgelehntem Token |
@@ -114,6 +114,18 @@ bearbeiten** öffnen.
 | Bereiche | Alle beim Speichern zugeordneten Entitäten |
 | Geräte | Alle beim Speichern zugeordneten Entitäten |
 | Ausgeschlossene Entitäten | Werden in jedem Fall verworfen |
+| Entitätsmuster einschließen | `*`-/`?`-Muster; ohne Punkt für Objekt-IDs, mit Punkt für vollständige Entity-IDs |
+| Entitätsmuster ausschließen | Musterbasierte Ausschlüsse mit demselben Vorrang wie einzelne Ausschlüsse |
+
+Nach dem Absenden zeigt ein Prüfschritt die tatsächlich aufgelösten
+Entity-IDs. Die Vorschau unterscheidet aktive Entitäten, registrierte
+Entitäten ohne aktuellen Zustand und durch Ausschlüsse entfernte Entitäten.
+Bei Bereichen und Geräten werden dadurch alle zugehörigen Entitäten sichtbar,
+bevor die Auswahl gespeichert wird.
+
+Über **Konfigurieren → Aktuell erfasste Entitäten** lässt sich derselbe Report
+auch später jederzeit für die gespeicherten Filter öffnen, ohne die Auswahl zu
+verändern.
 
 Beim ersten Öffnen sind `sensor`, `binary_sensor`, `switch`, `climate`,
 `input_number`, `input_boolean` und `counter` vorausgewählt. Bereits
@@ -152,7 +164,7 @@ werden:
 
 ```yaml
 format: zeitarchiv-options
-version: 1
+version: 2
 filters:
   domains:
     - binary_sensor
@@ -163,11 +175,16 @@ filters:
   devices: []
   exclude_entities:
     - sensor.testwert
+  entity_patterns:
+    - sensor.wetter_*
+  exclude_entity_patterns:
+    - "*_id"
 ```
 
 Der Import verwendet einen sicheren YAML-Loader und prüft Formatversion,
-Struktur, Domains und Entity-IDs. Erst nach erfolgreicher Prüfung ersetzt er
-die Optionen und lädt die Integration neu.
+Struktur, Domains, Entity-IDs und Muster. Exporte der vorherigen Formatversion
+1 bleiben importierbar. Erst nach erfolgreicher Prüfung ersetzt der Import die
+Optionen und lädt die Integration neu.
 
 > [!NOTE]
 > Entity-IDs sind zwischen gleich aufgebauten Systemen meist direkt
@@ -236,8 +253,15 @@ und mindestens eine Einschlussregel erfüllt:
 ```text
 nicht ausgeschlossen
         UND
-(Domain gewählt ODER Entity-ID gewählt ODER über Bereich/Gerät aufgelöst)
+(Domain gewählt ODER Entity-ID gewählt ODER über Bereich/Gerät aufgelöst
+ ODER Einschlussmuster trifft)
 ```
+
+Muster ohne Punkt werden auf die Objekt-ID hinter der Domain angewendet:
+`*_id` trifft beispielsweise `sensor.device_id` und `input_number.user_id`.
+Muster mit Punkt prüfen die vollständige Entity-ID, sodass `sensor.*_id` nur
+Sensoren erfasst. Unterstützt werden ausschließlich `*` und `?`; reguläre
+Ausdrücke sind bewusst nicht zugelassen.
 
 Bereiche und Geräte werden beim Speichern der Optionen in konkrete Entity-IDs
 aufgelöst. Entitäten, die später neu zu einem gewählten Bereich oder Gerät

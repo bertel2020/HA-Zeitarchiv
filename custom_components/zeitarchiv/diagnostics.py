@@ -46,6 +46,8 @@ async def async_get_config_entry_diagnostics(
     included_entities: set[str] = data["included_entities"]
     included_domains: set[str] = data["included_domains"]
     excluded_entities: set[str] = data["excluded_entities"]
+    included_patterns: list[str] = data["included_patterns"]
+    excluded_patterns: list[str] = data["excluded_patterns"]
     matching_now = sum(
         1
         for state in hass.states.async_all()
@@ -55,6 +57,8 @@ async def async_get_config_entry_diagnostics(
             included_entities,
             included_domains,
             excluded_entities,
+            included_patterns,
+            excluded_patterns,
         )
     )
 
@@ -80,6 +84,8 @@ async def async_get_config_entry_diagnostics(
             "included_domains": sorted(included_domains),
             "included_entities_count": len(included_entities),
             "excluded_entities_count": len(excluded_entities),
+            "included_patterns": included_patterns,
+            "excluded_patterns": excluded_patterns,
         },
         "config_entry": {
             "data": async_redact_data(dict(entry.data), TO_REDACT),

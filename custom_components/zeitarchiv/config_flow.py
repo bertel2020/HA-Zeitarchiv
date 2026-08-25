@@ -17,6 +17,7 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PORT
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import selector
 
 from .api import ZeitarchivApiError, ZeitarchivAuthError, ZeitarchivClient
@@ -27,15 +28,123 @@ from .const import (
     CONF_DEVICES,
     CONF_DOMAINS,
     CONF_ENTITIES,
+    CONF_ENTITY_PATTERNS,
     CONF_EXCLUDE_ENTITIES,
+    CONF_EXCLUDE_ENTITY_PATTERNS,
     DEFAULT_PORT,
     DOMAIN,
 )
+from .filtering import normalize_entity_patterns, should_archive
 from .options_transfer import OptionsImportError, export_options, import_options
 
 _LOGGER = logging.getLogger(__name__)
 
 CONF_YAML_CONFIG = "yaml_config"
+REPORT_ENTITY_LIMIT = 200
+
+
+def _pattern_text(value: Any) -> str:
+    """Wandelt gespeicherte Muster in den mehrzeiligen Formularwert um."""
+    if isinstance(value, str):
+        return value
+    return "\n".join(value or [])
+
+
+def _entity_lines(entity_ids: list[str], remaining: int) -> tuple[list[str], int]:
+    """Formatiert einen begrenzten Teil der Entity-Liste für die Vorschau."""
+    visible = entity_ids[:remaining]
+    lines = [f"- `{entity_id}`" for entity_id in visible]
+    hidden = len(entity_ids) - len(visible)
+    if hidden:
+        lines.append(f"- … (+{hidden})")
+    return lines, remaining - len(visible)
+
+
+def _build_filter_report(hass: Any, options: dict[str, Any]) -> dict[str, str]:
+    """Erstellt die Vorschau der aktuell tatsächlich aufgelösten Entitäten."""
+    # Laufzeitimport vermeidet einen Modulzyklus beim Laden des Config-Flows.
+    from . import _resolve_filters
+
+    (
+        included_entities,
+        included_domains,
+        excluded_entities,
+        included_patterns,
+        excluded_patterns,
+    ) = _resolve_filters(hass, options)
+
+    registry = er.async_get(hass)
+    state_ids = {state.entity_id for state in hass.states.async_all()}
+    registry_ids = {entry.entity_id for entry in registry.entities.values()}
+    candidates = state_ids | registry_ids
+
+    def included_before_exclusions(entity_id: str) -> bool:
+        return should_archive(
+            entity_id,
+            entity_id.split(".", 1)[0],
+            included_entities,
+            included_domains,
+            set(),
+            included_patterns,
+            (),
+        )
+
+    def included_after_exclusions(entity_id: str) -> bool:
+        return should_archive(
+            entity_id,
+            entity_id.split(".", 1)[0],
+            included_entities,
+            included_domains,
+            excluded_entities,
+            included_patterns,
+            excluded_patterns,
+        )
+
+    matching = {
+        entity_id for entity_id in candidates if included_after_exclusions(entity_id)
+    }
+    current = sorted(matching & state_ids)
+    without_state = sorted(matching - state_ids)
+    excluded = sorted(
+        entity_id
+        for entity_id in candidates
+        if included_before_exclusions(entity_id)
+        and not included_after_exclusions(entity_id)
+    )
+
+    domain_counts: dict[str, int] = {}
+    for entity_id in current:
+        domain = entity_id.split(".", 1)[0]
+        domain_counts[domain] = domain_counts.get(domain, 0) + 1
+    summary = ", ".join(
+        f"`{domain}`: {count}" for domain, count in sorted(domain_counts.items())
+    ) or "—"
+
+    remaining = REPORT_ENTITY_LIMIT
+    current_lines, remaining = _entity_lines(current, remaining)
+    without_state_lines, remaining = _entity_lines(without_state, remaining)
+    excluded_lines, remaining = _entity_lines(excluded, remaining)
+    limited = (
+        remaining == 0
+        and (len(current) + len(without_state) + len(excluded))
+        > REPORT_ENTITY_LIMIT
+    )
+    return {
+        "current_count": str(len(current)),
+        "domain_summary": summary,
+        "current_entities": "\n".join(current_lines) or "- —",
+        "without_state_count": str(len(without_state)),
+        "without_state_entities": "\n".join(without_state_lines) or "- —",
+        "excluded_count": str(len(excluded)),
+        "excluded_entities": "\n".join(excluded_lines) or "- —",
+        "limit_note": (
+            f"⚠ {REPORT_ENTITY_LIMIT} / "
+            f"{len(current) + len(without_state) + len(excluded)} Entity-IDs"
+            if limited
+            else ""
+        ),
+    }
+
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
@@ -220,22 +329,53 @@ class ZeitarchivOptionsFlow(config_entries.OptionsFlow):
         """Zeigt ein übersichtliches Menü statt sofort aller Filterfelder."""
         return self.async_show_menu(
             step_id="init",
-            menu_options=["filters", "export", "import"],
+            menu_options=["filters", "overview", "export", "import"],
+        )
+
+    async def async_step_overview(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Zeigt die mit den gespeicherten Filtern erfassten Entitäten."""
+        if user_input is not None:
+            return await self.async_step_init()
+        return self.async_show_form(
+            step_id="overview",
+            data_schema=vol.Schema({}),
+            description_placeholders=_build_filter_report(
+                self.hass, dict(self.config_entry.options)
+            ),
         )
 
     async def async_step_filters(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Bearbeitet die aktiven Archivfilter."""
+        errors: dict[str, str] = {}
         if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
+            normalized = dict(user_input)
+            try:
+                normalized[CONF_ENTITY_PATTERNS] = normalize_entity_patterns(
+                    user_input.get(CONF_ENTITY_PATTERNS, "")
+                )
+            except ValueError as err:
+                errors[CONF_ENTITY_PATTERNS] = str(err)
+            try:
+                normalized[CONF_EXCLUDE_ENTITY_PATTERNS] = normalize_entity_patterns(
+                    user_input.get(CONF_EXCLUDE_ENTITY_PATTERNS, "")
+                )
+            except ValueError as err:
+                errors[CONF_EXCLUDE_ENTITY_PATTERNS] = str(err)
+            if not errors:
+                self._pending_filters = normalized
+                return await self.async_step_filter_preview()
 
         options = self.config_entry.options
+        defaults = user_input if user_input is not None else options
         schema = vol.Schema(
             {
                 vol.Optional(
                     CONF_DOMAINS,
-                    default=options.get(CONF_DOMAINS, ARCHIVABLE_DOMAINS),
+                    default=defaults.get(CONF_DOMAINS, ARCHIVABLE_DOMAINS),
                 ): selector.SelectSelector(
                     selector.SelectSelectorConfig(
                         options=ARCHIVABLE_DOMAINS,
@@ -244,24 +384,57 @@ class ZeitarchivOptionsFlow(config_entries.OptionsFlow):
                     )
                 ),
                 vol.Optional(
-                    CONF_ENTITIES, default=options.get(CONF_ENTITIES, [])
+                    CONF_ENTITIES, default=defaults.get(CONF_ENTITIES, [])
                 ): selector.EntitySelector(
                     selector.EntitySelectorConfig(multiple=True, reorder=True)
                 ),
                 vol.Optional(
-                    CONF_AREAS, default=options.get(CONF_AREAS, [])
+                    CONF_AREAS, default=defaults.get(CONF_AREAS, [])
                 ): selector.AreaSelector(selector.AreaSelectorConfig(multiple=True)),
                 vol.Optional(
-                    CONF_DEVICES, default=options.get(CONF_DEVICES, [])
+                    CONF_DEVICES, default=defaults.get(CONF_DEVICES, [])
                 ): selector.DeviceSelector(selector.DeviceSelectorConfig(multiple=True)),
                 vol.Optional(
-                    CONF_EXCLUDE_ENTITIES, default=options.get(CONF_EXCLUDE_ENTITIES, [])
+                    CONF_EXCLUDE_ENTITIES,
+                    default=defaults.get(CONF_EXCLUDE_ENTITIES, []),
                 ): selector.EntitySelector(
                     selector.EntitySelectorConfig(multiple=True, reorder=True)
+                ),
+                vol.Optional(
+                    CONF_ENTITY_PATTERNS,
+                    default=_pattern_text(defaults.get(CONF_ENTITY_PATTERNS, [])),
+                ): selector.TextSelector(
+                    selector.TextSelectorConfig(multiline=True)
+                ),
+                vol.Optional(
+                    CONF_EXCLUDE_ENTITY_PATTERNS,
+                    default=_pattern_text(
+                        defaults.get(CONF_EXCLUDE_ENTITY_PATTERNS, [])
+                    ),
+                ): selector.TextSelector(
+                    selector.TextSelectorConfig(multiline=True)
                 ),
             }
         )
-        return self.async_show_form(step_id="filters", data_schema=schema)
+        return self.async_show_form(
+            step_id="filters", data_schema=schema, errors=errors
+        )
+
+    async def async_step_filter_preview(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Zeigt die effektiv erfassten Entitäten vor dem Speichern."""
+        pending = getattr(self, "_pending_filters", None)
+        if pending is None:
+            return await self.async_step_filters()
+        if user_input is not None:
+            del self._pending_filters
+            return self.async_create_entry(title="", data=pending)
+        return self.async_show_form(
+            step_id="filter_preview",
+            data_schema=vol.Schema({}),
+            description_placeholders=_build_filter_report(self.hass, pending),
+        )
 
     async def async_step_export(
         self, user_input: dict[str, Any] | None = None

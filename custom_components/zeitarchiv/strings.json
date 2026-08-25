@@ -47,11 +47,13 @@
         "description": "Archivfilter bearbeiten oder sicher zwischen Home-Assistant-Systemen übertragen.",
         "menu_options": {
           "filters": "Archivfilter bearbeiten",
+          "overview": "Aktuell erfasste Entitäten",
           "export": "Filter als YAML exportieren",
           "import": "Filter aus YAML importieren"
         },
         "menu_option_descriptions": {
-          "filters": "Domains, Entitäten, Bereiche, Geräte und Ausschlüsse auswählen.",
+          "filters": "Domains, Entitäten, Bereiche, Geräte, Muster und Ausschlüsse auswählen.",
+          "overview": "Erfasste, zustandslose und ausgeschlossene Entitäten prüfen.",
           "export": "Aktuelle Filter ohne Host und API-Token kopieren.",
           "import": "Einen Zeitarchiv-Export einlesen und die aktuellen Filter ersetzen."
         }
@@ -64,8 +66,22 @@
           "entities": "Einzelne Entitäten",
           "areas": "Bereiche",
           "devices": "Geräte",
-          "exclude_entities": "Ausgeschlossene Entitäten"
+          "exclude_entities": "Ausgeschlossene Entitäten",
+          "entity_patterns": "Entitätsmuster einschließen",
+          "exclude_entity_patterns": "Entitätsmuster ausschließen"
+        },
+        "data_description": {
+          "entity_patterns": "Ein Muster pro Zeile. Ohne Punkt wird nur die Objekt-ID geprüft (`*_leistung`), mit Punkt die vollständige Entity-ID (`sensor.wetter_*`). Erlaubt sind `*` und `?`.",
+          "exclude_entity_patterns": "Ein Muster pro Zeile. Ausschlüsse haben immer Vorrang, zum Beispiel `*_id` oder `sensor.*_raw`."
         }
+      },
+      "filter_preview": {
+        "title": "Zeitarchiv – Filtervorschau",
+        "description": "Die Auswahl wurde gegen die aktuell bekannten Entitäten aufgelöst. Geräte und Bereiche erscheinen dadurch mit allen zugehörigen Entity-IDs.\n\n**Aktuell erfasst: {current_count}** ({domain_summary})\n\n{current_entities}\n\n**Registriert, derzeit ohne Zustand: {without_state_count}**\n\n{without_state_entities}\n\n**Durch Ausschlüsse entfernt: {excluded_count}**\n\n{excluded_entities}\n\n{limit_note}\n\nMit **Absenden** werden diese Filter gespeichert."
+      },
+      "overview": {
+        "title": "Zeitarchiv – Aktuell erfasste Entitäten",
+        "description": "Diese Übersicht wertet die gespeicherten Filter gegen die aktuell bekannten Entitäten aus. Geräte und Bereiche erscheinen mit allen zugehörigen Entity-IDs.\n\n**Aktuell erfasst: {current_count}** ({domain_summary})\n\n{current_entities}\n\n**Registriert, derzeit ohne Zustand: {without_state_count}**\n\n{without_state_entities}\n\n**Durch Ausschlüsse entfernt: {excluded_count}**\n\n{excluded_entities}\n\n{limit_note}\n\nMit **Absenden** gelangst du zurück zu den Einstellungen; es werden keine Filter verändert."
       },
       "export": {
         "title": "Zeitarchiv – Filter exportieren",
@@ -87,7 +103,9 @@
       "invalid_structure": "Der Inhalt ist kein gültiger Zeitarchiv-Filterexport.",
       "unsupported_format": "Format oder Version dieses Exports wird nicht unterstützt.",
       "invalid_domain": "Der Export enthält eine nicht unterstützte Domain.",
-      "invalid_entity": "Der Export enthält eine ungültige Entity-ID."
+      "invalid_entity": "Der Export enthält eine ungültige Entity-ID.",
+      "invalid_pattern": "Das Muster ist ungültig. Erlaubt sind Entity-ID-Zeichen sowie * und ?.",
+      "too_many_patterns": "Je Musterfeld sind höchstens 100 Einträge erlaubt."
     }
   },
   "entity": {

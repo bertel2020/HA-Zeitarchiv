@@ -13,18 +13,25 @@ from .const import (
     CONF_DEVICES,
     CONF_DOMAINS,
     CONF_ENTITIES,
+    CONF_ENTITY_PATTERNS,
     CONF_EXCLUDE_ENTITIES,
+    CONF_EXCLUDE_ENTITY_PATTERNS,
 )
+from .filtering import normalize_entity_patterns
 
 FORMAT_NAME = "zeitarchiv-options"
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
+SUPPORTED_FORMAT_VERSIONS = {1, FORMAT_VERSION}
 FILTER_KEYS = (
     CONF_DOMAINS,
     CONF_ENTITIES,
     CONF_AREAS,
     CONF_DEVICES,
     CONF_EXCLUDE_ENTITIES,
+    CONF_ENTITY_PATTERNS,
+    CONF_EXCLUDE_ENTITY_PATTERNS,
 )
+VERSION_1_FILTER_KEYS = FILTER_KEYS[:5]
 
 _ENTITY_ID_PATTERN = re.compile(r"^[a-z0-9_]+\.[a-z0-9_]+$")
 
@@ -38,7 +45,13 @@ def export_options(options: Mapping[str, Any]) -> str:
     filters = {
         key: (
             list(dict.fromkeys(options.get(key, [])))
-            if key in (CONF_ENTITIES, CONF_EXCLUDE_ENTITIES)
+            if key
+            in (
+                CONF_ENTITIES,
+                CONF_EXCLUDE_ENTITIES,
+                CONF_ENTITY_PATTERNS,
+                CONF_EXCLUDE_ENTITY_PATTERNS,
+            )
             else sorted(set(options.get(key, [])))
         )
         for key in FILTER_KEYS
@@ -67,11 +80,13 @@ def import_options(raw_yaml: str) -> dict[str, list[str]]:
         raise OptionsImportError("invalid_structure")
     if set(document) != {"format", "version", "filters"}:
         raise OptionsImportError("invalid_structure")
-    if document["format"] != FORMAT_NAME or document["version"] != FORMAT_VERSION:
+    version = document["version"]
+    if document["format"] != FORMAT_NAME or version not in SUPPORTED_FORMAT_VERSIONS:
         raise OptionsImportError("unsupported_format")
 
     filters = document["filters"]
-    if not isinstance(filters, dict) or not set(filters).issubset(FILTER_KEYS):
+    allowed_keys = VERSION_1_FILTER_KEYS if version == 1 else FILTER_KEYS
+    if not isinstance(filters, dict) or not set(filters).issubset(allowed_keys):
         raise OptionsImportError("invalid_structure")
 
     result: dict[str, list[str]] = {}
@@ -89,9 +104,20 @@ def import_options(raw_yaml: str) -> dict[str, list[str]]:
             not _ENTITY_ID_PATTERN.fullmatch(value) for value in values
         ):
             raise OptionsImportError("invalid_entity")
+        if key in (CONF_ENTITY_PATTERNS, CONF_EXCLUDE_ENTITY_PATTERNS):
+            try:
+                values = normalize_entity_patterns(values)
+            except ValueError as err:
+                raise OptionsImportError(str(err)) from err
         result[key] = (
             list(dict.fromkeys(values))
-            if key in (CONF_ENTITIES, CONF_EXCLUDE_ENTITIES)
+            if key
+            in (
+                CONF_ENTITIES,
+                CONF_EXCLUDE_ENTITIES,
+                CONF_ENTITY_PATTERNS,
+                CONF_EXCLUDE_ENTITY_PATTERNS,
+            )
             else sorted(set(values))
         )
 

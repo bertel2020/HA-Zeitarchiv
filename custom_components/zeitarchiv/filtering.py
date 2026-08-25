@@ -7,6 +7,47 @@ bereits in included_entity_ids eingerechnet — hier bleibt nur noch reine Menge
 
 from __future__ import annotations
 
+import re
+from fnmatch import fnmatchcase
+
+
+ENTITY_PATTERN_RE = re.compile(r"^[a-z0-9_*?]+(?:\.[a-z0-9_*?]+)?$")
+MAX_ENTITY_PATTERNS = 100
+MAX_ENTITY_PATTERN_LENGTH = 128
+
+
+def normalize_entity_patterns(
+    value: str | list[str] | tuple[str, ...] | None,
+) -> list[str]:
+    """Normalisiert und validiert Entity-Glob-Muster.
+
+    Muster ohne Punkt beziehen sich auf die Object-ID hinter der Domain,
+    Muster mit Punkt auf die vollständige Entity-ID. Unterstützt werden nur
+    ``*`` und ``?``; die umfangreichere fnmatch-Klammer-Syntax bleibt bewusst
+    gesperrt, damit die Eingabe im Options-Flow vorhersehbar bleibt.
+    """
+    raw_patterns = value.splitlines() if isinstance(value, str) else (value or [])
+    patterns = [pattern.strip().lower() for pattern in raw_patterns if pattern.strip()]
+    patterns = list(dict.fromkeys(patterns))
+    if len(patterns) > MAX_ENTITY_PATTERNS:
+        raise ValueError("too_many_patterns")
+    if any(
+        len(pattern) > MAX_ENTITY_PATTERN_LENGTH
+        or not ENTITY_PATTERN_RE.fullmatch(pattern)
+        for pattern in patterns
+    ):
+        raise ValueError("invalid_pattern")
+    return patterns
+
+
+def matches_entity_pattern(entity_id: str, patterns: list[str] | tuple[str, ...]) -> bool:
+    """Prüft eine Entity-ID gegen normalisierte Glob-Muster."""
+    object_id = entity_id.split(".", 1)[1] if "." in entity_id else entity_id
+    return any(
+        fnmatchcase(entity_id if "." in pattern else object_id, pattern)
+        for pattern in patterns
+    )
+
 
 def is_state_value_change(old_value: str | None, new_value: str) -> bool:
     """Gibt an, ob ein ``state_changed``-Event einen neuen Wert enthält.
@@ -26,15 +67,20 @@ def should_archive(
     included_entity_ids: set[str],
     included_domains: set[str],
     excluded_entity_ids: set[str],
+    included_entity_patterns: list[str] | tuple[str, ...] = (),
+    excluded_entity_patterns: list[str] | tuple[str, ...] = (),
 ) -> bool:
     """Entscheidet, ob eine Entität archiviert werden soll.
 
-    Exclude gewinnt immer. Danach: explizit genannte Entity-ID ODER eine
-    ausgewählte Domain reicht für Include (genau wie InfluxDBs
-    include/exclude-per-Domain/Entity/Glob-Logik, nur ohne Glob-Teil —
-    der wird in Zeitarchiv durch EntitySelector/AreaSelector/DeviceSelector
-    im Options-Flow ersetzt, siehe Konzept Abschnitt 03).
+    Exakte und musterbasierte Ausschlüsse gewinnen immer. Danach reicht eine
+    explizite Entity-ID, eine ausgewählte Domain oder ein Einschlussmuster.
     """
-    if entity_id in excluded_entity_ids:
+    if entity_id in excluded_entity_ids or matches_entity_pattern(
+        entity_id, excluded_entity_patterns
+    ):
         return False
-    return entity_id in included_entity_ids or domain in included_domains
+    return (
+        entity_id in included_entity_ids
+        or domain in included_domains
+        or matches_entity_pattern(entity_id, included_entity_patterns)
+    )

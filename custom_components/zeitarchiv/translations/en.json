@@ -47,11 +47,13 @@
         "description": "Edit archive filters or safely transfer them between Home Assistant systems.",
         "menu_options": {
           "filters": "Edit archive filters",
+          "overview": "Currently included entities",
           "export": "Export filters as YAML",
           "import": "Import filters from YAML"
         },
         "menu_option_descriptions": {
-          "filters": "Select domains, entities, areas, devices, and exclusions.",
+          "filters": "Select domains, entities, areas, devices, patterns, and exclusions.",
+          "overview": "Review included, stateless, and excluded entities.",
           "export": "Copy the current filters without host or API token.",
           "import": "Read a Zeitarchiv export and replace the current filters."
         }
@@ -64,8 +66,22 @@
           "entities": "Individual entities",
           "areas": "Areas",
           "devices": "Devices",
-          "exclude_entities": "Excluded entities"
+          "exclude_entities": "Excluded entities",
+          "entity_patterns": "Include entity patterns",
+          "exclude_entity_patterns": "Exclude entity patterns"
+        },
+        "data_description": {
+          "entity_patterns": "One pattern per line. Patterns without a dot match the object ID (`*_power`); patterns with a dot match the full entity ID (`sensor.weather_*`). `*` and `?` are supported.",
+          "exclude_entity_patterns": "One pattern per line. Exclusions always take precedence, for example `*_id` or `sensor.*_raw`."
         }
+      },
+      "filter_preview": {
+        "title": "Zeitarchiv – Filter preview",
+        "description": "The selection was resolved against the currently known entities. Devices and areas therefore show all associated entity IDs.\n\n**Currently included: {current_count}** ({domain_summary})\n\n{current_entities}\n\n**Registered without a current state: {without_state_count}**\n\n{without_state_entities}\n\n**Removed by exclusions: {excluded_count}**\n\n{excluded_entities}\n\n{limit_note}\n\nSelect **Submit** to save these filters."
+      },
+      "overview": {
+        "title": "Zeitarchiv – Currently included entities",
+        "description": "This overview evaluates the saved filters against the currently known entities. Devices and areas show all associated entity IDs.\n\n**Currently included: {current_count}** ({domain_summary})\n\n{current_entities}\n\n**Registered without a current state: {without_state_count}**\n\n{without_state_entities}\n\n**Removed by exclusions: {excluded_count}**\n\n{excluded_entities}\n\n{limit_note}\n\nSelect **Submit** to return to settings; no filters are changed."
       },
       "export": {
         "title": "Zeitarchiv – Export filters",
@@ -87,7 +103,9 @@
       "invalid_structure": "The content is not a valid Zeitarchiv filter export.",
       "unsupported_format": "This export format or version is not supported.",
       "invalid_domain": "The export contains an unsupported domain.",
-      "invalid_entity": "The export contains an invalid entity ID."
+      "invalid_entity": "The export contains an invalid entity ID.",
+      "invalid_pattern": "The pattern is invalid. Entity ID characters plus * and ? are allowed.",
+      "too_many_patterns": "Each pattern field supports at most 100 entries."
     }
   },
   "entity": {
