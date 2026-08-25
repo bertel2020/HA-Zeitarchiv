@@ -20,7 +20,7 @@ eigentlichen Zeitreihen, Charts und Tabellen bleiben Aufgabe der App.
 | --- | --- |
 | Auswahl | Domains, einzelne Entitäten, Bereiche und Geräte kombinieren |
 | Ausschluss | Einzelne Entity-IDs haben als Ausschluss immer Vorrang |
-| Aufbereitung | Numerische Werte sowie Schalterzustände `on`/`off` |
+| Aufbereitung | Numerische Werte mit maximal drei Nachkommastellen sowie Schalterzustände `on`/`off` |
 | Transport | In-Memory-Queue, Batches, Timeout und dauerhafte Retries |
 | Sicherheit | Bearer-Token; Reauth-Hinweis bei abgelehntem Token |
 | Transparenz | Vier Diagnose-Sensoren und Diagnose-Download |
@@ -29,7 +29,8 @@ eigentlichen Zeitreihen, Charts und Tabellen bleiben Aufgabe der App.
 ## Datenfluss
 
 ```text
-state_changed
+Integration geladen/neu geladen ─► aktueller Zustand
+state_changed                  ───► neue Zustandsänderung
      │
      ├─ nur tatsächliche Zustandsänderung?
      ├─ Filter trifft zu und nicht ausgeschlossen?
@@ -50,6 +51,12 @@ state_changed
 Eine stabile Event-ID macht wiederholte Übertragungen idempotent. Geht eine
 HTTP-Antwort verloren, kann derselbe Batch erneut gesendet werden, ohne in der
 App denselben Messpunkt doppelt anzulegen.
+
+Unmittelbar beim Laden oder Neuladen eines Integrationseintrags werden die
+aktuellen Zustände aller passenden Entitäten einmal in die Warteschlange
+gelegt. Dadurch erscheinen neu ausgewählte Entitäten sofort in der App; die
+Integration wartet weder auf die nächste Zustandsänderung noch auf einen
+erneuten Start von Home Assistant.
 
 ## Installation
 
@@ -119,7 +126,8 @@ reine Änderung von Attributen wie Friendly Name oder Einheit erzeugt keinen
 zusätzlichen Archivpunkt.
 
 - Numerische Zustände von `sensor`, `climate`, `input_number`, `counter` und
-  vergleichbaren Domains werden als Zahl übertragen.
+  vergleichbaren Domains werden als Zahl mit maximal drei Nachkommastellen
+  übertragen.
 - `binary_sensor`, `switch` und `input_boolean` werden als `on → 1` und
   `off → 0` übertragen.
 - Textwerte sowie `unknown`, `unavailable`, `none` und leere Zustände werden
