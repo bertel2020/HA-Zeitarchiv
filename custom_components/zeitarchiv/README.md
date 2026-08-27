@@ -270,7 +270,10 @@ hinzukommen, werden erst nach erneutem Speichern der Filter berücksichtigt.
 ## Entwicklung
 
 HACS und Home Assistants `hassfest` prüfen die Repository- und
-Integrationsstruktur automatisch bei jedem Push und Pull Request.
+Integrationsstruktur automatisch bei jedem Push und Pull Request. Die
+Transport-, Filter- und YAML-Logik ist von einer laufenden
+Home-Assistant-Instanz getrennt testbar (`pytest`, siehe die Tests im
+Entwicklungs-Monorepo).
 
 Relevante Module:
 
