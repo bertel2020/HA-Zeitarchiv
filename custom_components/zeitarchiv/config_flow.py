@@ -1,7 +1,7 @@
 """Config- und Options-Flow für Zeitarchiv.
 
-Verbindung (Host/Port/Token) hier im Config-Flow; grobe Filter (Domains/
-Entities/Bereiche/Geräte, Exclude, Default-Auflösung/-Aufbewahrung) im
+Verbindung (Host/Port/Token) hier im Config-Flow; grobe Filter (Labels/
+Entities/Bereiche/Geräte, Exclude) im
 Options-Flow — Einstellungen je Entität leben in der App-eigenen
 Oberfläche, nicht hier (Konzept Abschnitt 03).
 """
@@ -12,36 +12,37 @@ import logging
 from typing import Any
 
 import voluptuous as vol
-
 from homeassistant import config_entries
 from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PORT
 from homeassistant.core import callback
-from homeassistant.data_entry_flow import FlowResult
+from homeassistant.data_entry_flow import FlowResult, section
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import selector
 
 from .api import ZeitarchivApiError, ZeitarchivAuthError, ZeitarchivClient
 from .const import (
-    ARCHIVABLE_DOMAINS,
     CONF_API_TOKEN,
     CONF_AREAS,
     CONF_DECIMAL_PLACES,
     CONF_DEVICES,
-    CONF_DOMAINS,
     CONF_ENTITIES,
     CONF_ENTITY_PATTERNS,
     CONF_EXCLUDE_ENTITIES,
     CONF_EXCLUDE_ENTITY_PATTERNS,
+    CONF_LABELS,
     DEFAULT_DECIMAL_PLACES,
     DEFAULT_PORT,
     DOMAIN,
 )
-from .filtering import normalize_entity_patterns, should_archive
+from .filtering import normalize_entity_patterns
 from .options_transfer import OptionsImportError, export_options, import_options
 
 _LOGGER = logging.getLogger(__name__)
 
 CONF_YAML_CONFIG = "yaml_config"
+CONF_ADDITIONAL_SELECTION = "additional_selection"
+CONF_EXCLUSIONS = "exclusions"
+CONF_VALUE_PROCESSING = "value_processing"
 REPORT_ENTITY_LIMIT = 200
 
 
@@ -50,6 +51,20 @@ def _pattern_text(value: Any) -> str:
     if isinstance(value, str):
         return value
     return "\n".join(value or [])
+
+
+def _flatten_filter_input(user_input: dict[str, Any]) -> dict[str, Any]:
+    """Überführt native HA-Sections in die flache Options-Struktur."""
+    flattened = dict(user_input)
+    for section_key in (
+        CONF_ADDITIONAL_SELECTION,
+        CONF_EXCLUSIONS,
+        CONF_VALUE_PROCESSING,
+    ):
+        section_values = flattened.pop(section_key, {})
+        if isinstance(section_values, dict):
+            flattened.update(section_values)
+    return flattened
 
 
 def _entity_lines(entity_ids: list[str], remaining: int) -> tuple[list[str], int]:
@@ -67,13 +82,7 @@ def _build_filter_report(hass: Any, options: dict[str, Any]) -> dict[str, str]:
     # Laufzeitimport vermeidet einen Modulzyklus beim Laden des Config-Flows.
     from . import _resolve_filters
 
-    (
-        included_entities,
-        included_domains,
-        excluded_entities,
-        included_patterns,
-        excluded_patterns,
-    ) = _resolve_filters(hass, options)
+    filters = _resolve_filters(hass, options)
 
     registry = er.async_get(hass)
     state_ids = {state.entity_id for state in hass.states.async_all()}
@@ -81,26 +90,10 @@ def _build_filter_report(hass: Any, options: dict[str, Any]) -> dict[str, str]:
     candidates = state_ids | registry_ids
 
     def included_before_exclusions(entity_id: str) -> bool:
-        return should_archive(
-            entity_id,
-            entity_id.split(".", 1)[0],
-            included_entities,
-            included_domains,
-            set(),
-            included_patterns,
-            (),
-        )
+        return filters.matches(entity_id, apply_exclusions=False)
 
     def included_after_exclusions(entity_id: str) -> bool:
-        return should_archive(
-            entity_id,
-            entity_id.split(".", 1)[0],
-            included_entities,
-            included_domains,
-            excluded_entities,
-            included_patterns,
-            excluded_patterns,
-        )
+        return filters.matches(entity_id)
 
     matching = {
         entity_id for entity_id in candidates if included_after_exclusions(entity_id)
@@ -118,9 +111,12 @@ def _build_filter_report(hass: Any, options: dict[str, Any]) -> dict[str, str]:
     for entity_id in current:
         domain = entity_id.split(".", 1)[0]
         domain_counts[domain] = domain_counts.get(domain, 0) + 1
-    summary = ", ".join(
-        f"`{domain}`: {count}" for domain, count in sorted(domain_counts.items())
-    ) or "—"
+    summary = (
+        ", ".join(
+            f"`{domain}`: {count}" for domain, count in sorted(domain_counts.items())
+        )
+        or "—"
+    )
 
     remaining = REPORT_ENTITY_LIMIT
     current_lines, remaining = _entity_lines(current, remaining)
@@ -128,10 +124,11 @@ def _build_filter_report(hass: Any, options: dict[str, Any]) -> dict[str, str]:
     excluded_lines, remaining = _entity_lines(excluded, remaining)
     limited = (
         remaining == 0
-        and (len(current) + len(without_state) + len(excluded))
-        > REPORT_ENTITY_LIMIT
+        and (len(current) + len(without_state) + len(excluded)) > REPORT_ENTITY_LIMIT
     )
     return {
+        "label_count": str(len(filters.selected_labels)),
+        "decimal_places": str(options.get(CONF_DECIMAL_PLACES, DEFAULT_DECIMAL_PLACES)),
         "current_count": str(len(current)),
         "domain_summary": summary,
         "current_entities": "\n".join(current_lines) or "- —",
@@ -173,7 +170,7 @@ async def _validate_input(hass: Any, data: dict[str, Any]) -> None:
 class ZeitarchivConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Verbindung zur Zeitarchiv-App einrichten."""
 
-    VERSION = 1
+    VERSION = 2
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -254,20 +251,22 @@ class ZeitarchivConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         default=entry.data.get(CONF_NAME, "Produktivsystem"),
                     ): str,
                     vol.Required(CONF_HOST, default=entry.data[CONF_HOST]): str,
-                    vol.Required(CONF_PORT, default=entry.data[CONF_PORT]): vol.Coerce(int),
+                    vol.Required(CONF_PORT, default=entry.data[CONF_PORT]): vol.Coerce(
+                        int
+                    ),
                     vol.Required(
                         CONF_API_TOKEN, default=entry.data[CONF_API_TOKEN]
                     ): selector.TextSelector(
-                        selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+                        selector.TextSelectorConfig(
+                            type=selector.TextSelectorType.PASSWORD
+                        )
                     ),
                 }
             ),
             errors=errors,
         )
 
-    async def async_step_reauth(
-        self, entry_data: dict[str, Any]
-    ) -> FlowResult:
+    async def async_step_reauth(self, entry_data: dict[str, Any]) -> FlowResult:
         """Von HA automatisch gestartet, sobald der Queue-Writer einen
         abgelehnten Token meldet (siehe on_auth_failed in __init__.py) — der
         naheliegendste Moment für "Token neu setzen": genau dann, wenn er
@@ -280,7 +279,10 @@ class ZeitarchivConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> FlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
-            data = {**self._reauth_entry_data, CONF_API_TOKEN: user_input[CONF_API_TOKEN]}
+            data = {
+                **self._reauth_entry_data,
+                CONF_API_TOKEN: user_input[CONF_API_TOKEN],
+            }
             try:
                 await _validate_input(self.hass, data)
             except ZeitarchivAuthError:
@@ -293,16 +295,16 @@ class ZeitarchivConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             else:
                 # Wie beim Reconfigure übernimmt ausschließlich der vorhandene
                 # Update-Listener den Reload.
-                return self.async_update_and_abort(
-                    self._get_reauth_entry(), data=data
-                )
+                return self.async_update_and_abort(self._get_reauth_entry(), data=data)
 
         return self.async_show_form(
             step_id="reauth_confirm",
             data_schema=vol.Schema(
                 {
                     vol.Required(CONF_API_TOKEN): selector.TextSelector(
-                        selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+                        selector.TextSelectorConfig(
+                            type=selector.TextSelectorType.PASSWORD
+                        )
                     ),
                 }
             ),
@@ -354,83 +356,112 @@ class ZeitarchivOptionsFlow(config_entries.OptionsFlow):
         """Bearbeitet die aktiven Archivfilter."""
         errors: dict[str, str] = {}
         if user_input is not None:
-            normalized = dict(user_input)
+            normalized = _flatten_filter_input(user_input)
             try:
                 normalized[CONF_ENTITY_PATTERNS] = normalize_entity_patterns(
-                    user_input.get(CONF_ENTITY_PATTERNS, "")
+                    normalized.get(CONF_ENTITY_PATTERNS, "")
                 )
             except ValueError as err:
-                errors[CONF_ENTITY_PATTERNS] = str(err)
+                errors["base"] = str(err)
             try:
                 normalized[CONF_EXCLUDE_ENTITY_PATTERNS] = normalize_entity_patterns(
-                    user_input.get(CONF_EXCLUDE_ENTITY_PATTERNS, "")
+                    normalized.get(CONF_EXCLUDE_ENTITY_PATTERNS, "")
                 )
             except ValueError as err:
-                errors[CONF_EXCLUDE_ENTITY_PATTERNS] = str(err)
+                errors["base"] = str(err)
             if not errors:
                 self._pending_filters = normalized
                 return await self.async_step_filter_preview()
 
         options = self.config_entry.options
-        defaults = user_input if user_input is not None else options
+        defaults = (
+            _flatten_filter_input(user_input) if user_input is not None else options
+        )
         schema = vol.Schema(
             {
                 vol.Optional(
-                    CONF_DOMAINS,
-                    default=defaults.get(CONF_DOMAINS, ARCHIVABLE_DOMAINS),
-                ): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=ARCHIVABLE_DOMAINS,
-                        multiple=True,
-                        mode=selector.SelectSelectorMode.LIST,
-                    )
-                ),
-                vol.Optional(
-                    CONF_ENTITIES, default=defaults.get(CONF_ENTITIES, [])
-                ): selector.EntitySelector(
-                    selector.EntitySelectorConfig(multiple=True, reorder=True)
-                ),
-                vol.Optional(
-                    CONF_AREAS, default=defaults.get(CONF_AREAS, [])
-                ): selector.AreaSelector(selector.AreaSelectorConfig(multiple=True)),
-                vol.Optional(
-                    CONF_DEVICES, default=defaults.get(CONF_DEVICES, [])
-                ): selector.DeviceSelector(selector.DeviceSelectorConfig(multiple=True)),
-                vol.Optional(
-                    CONF_EXCLUDE_ENTITIES,
-                    default=defaults.get(CONF_EXCLUDE_ENTITIES, []),
-                ): selector.EntitySelector(
-                    selector.EntitySelectorConfig(multiple=True, reorder=True)
-                ),
-                vol.Optional(
-                    CONF_ENTITY_PATTERNS,
-                    default=_pattern_text(defaults.get(CONF_ENTITY_PATTERNS, [])),
-                ): selector.TextSelector(
-                    selector.TextSelectorConfig(multiline=True)
-                ),
-                vol.Optional(
-                    CONF_EXCLUDE_ENTITY_PATTERNS,
-                    default=_pattern_text(
-                        defaults.get(CONF_EXCLUDE_ENTITY_PATTERNS, [])
+                    CONF_LABELS, default=defaults.get(CONF_LABELS, [])
+                ): selector.LabelSelector(selector.LabelSelectorConfig(multiple=True)),
+                vol.Required(CONF_ADDITIONAL_SELECTION): section(
+                    vol.Schema(
+                        {
+                            vol.Optional(
+                                CONF_ENTITIES,
+                                default=defaults.get(CONF_ENTITIES, []),
+                            ): selector.EntitySelector(
+                                selector.EntitySelectorConfig(
+                                    multiple=True, reorder=True
+                                )
+                            ),
+                            vol.Optional(
+                                CONF_AREAS,
+                                default=defaults.get(CONF_AREAS, []),
+                            ): selector.AreaSelector(
+                                selector.AreaSelectorConfig(multiple=True)
+                            ),
+                            vol.Optional(
+                                CONF_DEVICES,
+                                default=defaults.get(CONF_DEVICES, []),
+                            ): selector.DeviceSelector(
+                                selector.DeviceSelectorConfig(multiple=True)
+                            ),
+                            vol.Optional(
+                                CONF_ENTITY_PATTERNS,
+                                default=_pattern_text(
+                                    defaults.get(CONF_ENTITY_PATTERNS, [])
+                                ),
+                            ): selector.TextSelector(
+                                selector.TextSelectorConfig(multiline=True)
+                            ),
+                        }
                     ),
-                ): selector.TextSelector(
-                    selector.TextSelectorConfig(multiline=True)
+                    {"collapsed": True},
                 ),
-                vol.Optional(
-                    CONF_DECIMAL_PLACES,
-                    default=defaults.get(
-                        CONF_DECIMAL_PLACES, DEFAULT_DECIMAL_PLACES
+                vol.Required(CONF_EXCLUSIONS): section(
+                    vol.Schema(
+                        {
+                            vol.Optional(
+                                CONF_EXCLUDE_ENTITIES,
+                                default=defaults.get(CONF_EXCLUDE_ENTITIES, []),
+                            ): selector.EntitySelector(
+                                selector.EntitySelectorConfig(
+                                    multiple=True, reorder=True
+                                )
+                            ),
+                            vol.Optional(
+                                CONF_EXCLUDE_ENTITY_PATTERNS,
+                                default=_pattern_text(
+                                    defaults.get(CONF_EXCLUDE_ENTITY_PATTERNS, [])
+                                ),
+                            ): selector.TextSelector(
+                                selector.TextSelectorConfig(multiline=True)
+                            ),
+                        }
                     ),
-                ): vol.All(
-                    selector.NumberSelector(
-                        selector.NumberSelectorConfig(
-                            min=0,
-                            max=3,
-                            step=1,
-                            mode=selector.NumberSelectorMode.BOX,
-                        )
+                    {"collapsed": True},
+                ),
+                vol.Required(CONF_VALUE_PROCESSING): section(
+                    vol.Schema(
+                        {
+                            vol.Optional(
+                                CONF_DECIMAL_PLACES,
+                                default=defaults.get(
+                                    CONF_DECIMAL_PLACES, DEFAULT_DECIMAL_PLACES
+                                ),
+                            ): vol.All(
+                                selector.NumberSelector(
+                                    selector.NumberSelectorConfig(
+                                        min=0,
+                                        max=3,
+                                        step=1,
+                                        mode=selector.NumberSelectorMode.BOX,
+                                    )
+                                ),
+                                vol.Coerce(int),
+                            )
+                        }
                     ),
-                    vol.Coerce(int),
+                    {"collapsed": True},
                 ),
             }
         )
@@ -487,6 +518,11 @@ class ZeitarchivOptionsFlow(config_entries.OptionsFlow):
             except OptionsImportError as err:
                 errors["base"] = str(err)
             else:
+                from . import _migrate_legacy_domain_options
+
+                imported_options = _migrate_legacy_domain_options(
+                    self.hass, imported_options
+                )
                 # Der YAML-Export/-Import betrifft ausschliesslich die
                 # Archivfilter (siehe options_transfer.py) — Nachkommastellen
                 # bleiben deshalb unangetastet, statt beim Import still auf

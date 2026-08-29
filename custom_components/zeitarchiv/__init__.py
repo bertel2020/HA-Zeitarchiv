@@ -23,30 +23,35 @@ import time
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT, EVENT_STATE_CHANGED
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, State
+from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
 from .api import ZeitarchivClient
 from .const import (
     CONF_API_TOKEN,
-    CONF_AREAS,
-    CONF_DEVICES,
     CONF_DECIMAL_PLACES,
-    CONF_DOMAINS,
-    CONF_ENTITIES,
-    CONF_ENTITY_PATTERNS,
-    CONF_EXCLUDE_ENTITIES,
-    CONF_EXCLUDE_ENTITY_PATTERNS,
     DEFAULT_DECIMAL_PLACES,
     DOMAIN,
 )
 from .events import build_event
-from .filtering import is_state_value_change, should_archive
+from .filtering import is_state_value_change
 from .queue_writer import ZeitarchivQueueWriter
+from .registry_filter import ArchiveFilterMatcher, migrate_legacy_domains
 
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list = ["sensor"]  # nur Diagnose-Sensoren, siehe sensor.py.
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Entfernt den alten Domainfilter bestandserhaltend aus den Optionen."""
+    if entry.version > 2:
+        return False
+    if entry.version < 2:
+        migrated = _migrate_legacy_domain_options(hass, dict(entry.options))
+        hass.config_entries.async_update_entry(entry, options=migrated, version=2)
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -68,28 +73,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
     queue_writer.start()
 
-    (
-        included_entities,
-        included_domains,
-        excluded_entities,
-        included_patterns,
-        excluded_patterns,
-    ) = _resolve_filters(hass, entry.options)
+    filters = _resolve_filters(hass, entry.options)
     decimal_places = entry.options.get(CONF_DECIMAL_PLACES, DEFAULT_DECIMAL_PLACES)
 
     def _enqueue_state(state: State) -> bool:
         """Filtert und uebergibt einen aktuellen oder geaenderten Zustand."""
         entity_id = state.entity_id
         domain = entity_id.split(".", 1)[0]
-        if not should_archive(
-            entity_id,
-            domain,
-            included_entities,
-            included_domains,
-            excluded_entities,
-            included_patterns,
-            excluded_patterns,
-        ):
+        if not filters.matches(entity_id):
             return False
 
         payload = build_event(
@@ -98,7 +89,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             state=state.state,
             state_class=state.attributes.get("state_class"),
             unit=state.attributes.get("unit_of_measurement"),
-            timestamp=state.last_updated.timestamp() if state.last_updated else time.time(),
+            timestamp=state.last_updated.timestamp()
+            if state.last_updated
+            else time.time(),
             friendly_name=state.attributes.get("friendly_name"),
             decimal_places=decimal_places,
         )
@@ -139,14 +132,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "client": client,
         "queue_writer": queue_writer,
         "remove_listener": remove_listener,
-        # Für diagnostics.py — wie viele/welche Entitäten die aktuell
-        # aufgelösten Filter tatsächlich erfassen, ohne sie dort erneut
-        # auflösen zu müssen.
-        "included_entities": included_entities,
-        "included_domains": included_domains,
-        "excluded_entities": excluded_entities,
-        "included_patterns": included_patterns,
-        "excluded_patterns": excluded_patterns,
+        # Für diagnostics.py — derselbe Live-Matcher verhindert abweichende
+        # Auswertungen zwischen Schreibpfad und Diagnose-Download.
+        "filters": filters,
     }
 
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
@@ -175,41 +163,26 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-def _resolve_filters(
-    hass: HomeAssistant, options: dict
-) -> tuple[set[str], set[str], set[str], list[str], list[str]]:
-    """Löst Bereiche/Geräte aus den Options einmalig zu konkreten Entity-IDs auf.
-
-    Bekannte Phase-1-Grenze: Entitäten, die *nach* diesem Auflösen neu zu einem
-    gewählten Bereich/Gerät hinzukommen, greifen erst nach einem erneuten
-    Speichern der Optionen (das löst _async_update_listener und damit einen
-    Reload aus) — kein automatisches Nachziehen währenddessen.
-    """
-    included_domains = set(options.get(CONF_DOMAINS, []))
-    excluded_entities = set(options.get(CONF_EXCLUDE_ENTITIES, []))
-    included_entities = set(options.get(CONF_ENTITIES, []))
-    included_patterns = list(options.get(CONF_ENTITY_PATTERNS, []))
-    excluded_patterns = list(options.get(CONF_EXCLUDE_ENTITY_PATTERNS, []))
-
-    entity_registry = er.async_get(hass)
-    device_registry = dr.async_get(hass)
-
-    selected_areas = set(options.get(CONF_AREAS, []))
-    selected_devices = set(options.get(CONF_DEVICES, []))
-
-    if selected_areas or selected_devices:
-        for entry in entity_registry.entities.values():
-            device = (
-                device_registry.async_get(entry.device_id) if entry.device_id else None
-            )
-            effective_area = entry.area_id or (device.area_id if device else None)
-            if effective_area in selected_areas or entry.device_id in selected_devices:
-                included_entities.add(entry.entity_id)
-
-    return (
-        included_entities,
-        included_domains,
-        excluded_entities,
-        included_patterns,
-        excluded_patterns,
+def _resolve_filters(hass: HomeAssistant, options: dict) -> ArchiveFilterMatcher:
+    """Erstellt einen Matcher auf den live aktualisierten HA-Registries."""
+    return ArchiveFilterMatcher(
+        options,
+        er.async_get(hass),
+        dr.async_get(hass),
+        ar.async_get(hass),
     )
+
+
+def _known_entity_ids(hass: HomeAssistant) -> set[str]:
+    """Liefert Registry- und State-IDs für die Domain-Altlastmigration."""
+    registry = er.async_get(hass)
+    return {state.entity_id for state in hass.states.async_all()} | {
+        entry.entity_id for entry in registry.entities.values()
+    }
+
+
+def _migrate_legacy_domain_options(
+    hass: HomeAssistant, options: dict[str, object]
+) -> dict[str, object]:
+    """Entfernt den früheren Domainfilter mit bestandserhaltender Auflösung."""
+    return migrate_legacy_domains(options, _known_entity_ids(hass))

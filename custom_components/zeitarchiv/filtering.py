@@ -10,7 +10,6 @@ from __future__ import annotations
 import re
 from fnmatch import fnmatchcase
 
-
 ENTITY_PATTERN_RE = re.compile(r"^[a-z0-9_*?]+(?:\.[a-z0-9_*?]+)?$")
 MAX_ENTITY_PATTERNS = 100
 MAX_ENTITY_PATTERN_LENGTH = 128
@@ -40,7 +39,9 @@ def normalize_entity_patterns(
     return patterns
 
 
-def matches_entity_pattern(entity_id: str, patterns: list[str] | tuple[str, ...]) -> bool:
+def matches_entity_pattern(
+    entity_id: str, patterns: list[str] | tuple[str, ...]
+) -> bool:
     """Prüft eine Entity-ID gegen normalisierte Glob-Muster."""
     object_id = entity_id.split(".", 1)[1] if "." in entity_id else entity_id
     return any(
@@ -63,17 +64,18 @@ def is_state_value_change(old_value: str | None, new_value: str) -> bool:
 
 def should_archive(
     entity_id: str,
-    domain: str,
     included_entity_ids: set[str],
-    included_domains: set[str],
     excluded_entity_ids: set[str],
     included_entity_patterns: list[str] | tuple[str, ...] = (),
     excluded_entity_patterns: list[str] | tuple[str, ...] = (),
+    *,
+    included_by_registry: bool = False,
 ) -> bool:
     """Entscheidet, ob eine Entität archiviert werden soll.
 
     Exakte und musterbasierte Ausschlüsse gewinnen immer. Danach reicht eine
-    explizite Entity-ID, eine ausgewählte Domain oder ein Einschlussmuster.
+    explizite Entity-ID, eine Registry-Auswahl (Label/Bereich/Gerät) oder ein
+    Einschlussmuster.
     """
     if entity_id in excluded_entity_ids or matches_entity_pattern(
         entity_id, excluded_entity_patterns
@@ -81,6 +83,6 @@ def should_archive(
         return False
     return (
         entity_id in included_entity_ids
-        or domain in included_domains
+        or included_by_registry
         or matches_entity_pattern(entity_id, included_entity_patterns)
     )

@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.14.0 - 2026-08-30
+
+### Neu
+
+- Labels sind die bevorzugte Archivfilter-Auswahl. Direkt gelabelte Entitäten
+  sowie Entitäten gelabelter Geräte und Bereiche werden bei folgenden
+  Zustandsänderungen ohne erneutes Speichern erfasst.
+- Der Archivfilter verwendet native, einklappbare Home-Assistant-Bereiche und
+  zeigt die konfigurierten Nachkommastellen auch in Vorschau und Übersicht.
+
+### Geändert
+
+- Domainfilter wurden entfernt. Gespeicherte Domainauswahlen und ältere
+  YAML-Exporte werden einmalig in aktuell bekannte Entity-IDs umgewandelt.
+- Das portable Filterformat wurde auf Version 3 angehoben; Version 1 und 2
+  bleiben importierbar.
+
 ## 0.13.0 - 2026-08-29
 
 ### Neu

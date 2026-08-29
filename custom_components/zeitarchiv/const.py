@@ -10,7 +10,7 @@ DEFAULT_PORT = 8127
 
 # Options-Flow (grobe Filter — Standard-Auflösung/-Aufbewahrung werden
 # bewusst NICHT hier gepflegt, siehe Docstring von ZeitarchivOptionsFlow)
-CONF_DOMAINS = "domains"
+CONF_LABELS = "labels"
 CONF_ENTITIES = "entities"
 CONF_AREAS = "areas"
 CONF_DEVICES = "devices"
@@ -22,17 +22,6 @@ CONF_DECIMAL_PLACES = "decimal_places"
 # als Default beibehalten, damit bestehende Installationen ihr Verhalten
 # nicht stillschweigend ändern.
 DEFAULT_DECIMAL_PLACES = 3
-
-# Domains, die sinnvoll archivierbar sind (Vorauswahl im Options-Flow).
-ARCHIVABLE_DOMAINS = [
-    "sensor",
-    "binary_sensor",
-    "switch",
-    "climate",
-    "input_number",
-    "input_boolean",
-    "counter",
-]
 
 # Queue/Batch — Vorbild: die Queue/Batch/Retry-Mechanik der HA-Core-InfluxDB-Integration.
 MAX_QUEUE_SIZE = 5000

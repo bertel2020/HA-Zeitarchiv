@@ -3,27 +3,28 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 import yaml
 
 from .const import (
-    ARCHIVABLE_DOMAINS,
     CONF_AREAS,
     CONF_DEVICES,
-    CONF_DOMAINS,
     CONF_ENTITIES,
     CONF_ENTITY_PATTERNS,
     CONF_EXCLUDE_ENTITIES,
     CONF_EXCLUDE_ENTITY_PATTERNS,
+    CONF_LABELS,
 )
 from .filtering import normalize_entity_patterns
+from .registry_filter import LEGACY_CONF_DOMAINS
 
 FORMAT_NAME = "zeitarchiv-options"
-FORMAT_VERSION = 2
-SUPPORTED_FORMAT_VERSIONS = {1, FORMAT_VERSION}
+FORMAT_VERSION = 3
+SUPPORTED_FORMAT_VERSIONS = {1, 2, FORMAT_VERSION}
 FILTER_KEYS = (
-    CONF_DOMAINS,
+    CONF_LABELS,
     CONF_ENTITIES,
     CONF_AREAS,
     CONF_DEVICES,
@@ -31,7 +32,26 @@ FILTER_KEYS = (
     CONF_ENTITY_PATTERNS,
     CONF_EXCLUDE_ENTITY_PATTERNS,
 )
-VERSION_1_FILTER_KEYS = FILTER_KEYS[:5]
+LEGACY_VERSION_1_FILTER_KEYS = (
+    LEGACY_CONF_DOMAINS,
+    CONF_ENTITIES,
+    CONF_AREAS,
+    CONF_DEVICES,
+    CONF_EXCLUDE_ENTITIES,
+)
+LEGACY_VERSION_2_FILTER_KEYS = LEGACY_VERSION_1_FILTER_KEYS + (
+    CONF_ENTITY_PATTERNS,
+    CONF_EXCLUDE_ENTITY_PATTERNS,
+)
+LEGACY_ARCHIVABLE_DOMAINS = {
+    "sensor",
+    "binary_sensor",
+    "switch",
+    "climate",
+    "input_number",
+    "input_boolean",
+    "counter",
+}
 
 _ENTITY_ID_PATTERN = re.compile(r"^[a-z0-9_]+\.[a-z0-9_]+$")
 
@@ -85,7 +105,13 @@ def import_options(raw_yaml: str) -> dict[str, list[str]]:
         raise OptionsImportError("unsupported_format")
 
     filters = document["filters"]
-    allowed_keys = VERSION_1_FILTER_KEYS if version == 1 else FILTER_KEYS
+    allowed_keys = (
+        LEGACY_VERSION_1_FILTER_KEYS
+        if version == 1
+        else LEGACY_VERSION_2_FILTER_KEYS
+        if version == 2
+        else FILTER_KEYS
+    )
     if not isinstance(filters, dict) or not set(filters).issubset(allowed_keys):
         raise OptionsImportError("invalid_structure")
 
@@ -96,10 +122,6 @@ def import_options(raw_yaml: str) -> dict[str, list[str]]:
             not isinstance(value, str) or not value for value in values
         ):
             raise OptionsImportError("invalid_structure")
-        if key == CONF_DOMAINS and any(
-            value not in ARCHIVABLE_DOMAINS for value in values
-        ):
-            raise OptionsImportError("invalid_domain")
         if key in (CONF_ENTITIES, CONF_EXCLUDE_ENTITIES) and any(
             not _ENTITY_ID_PATTERN.fullmatch(value) for value in values
         ):
@@ -120,5 +142,11 @@ def import_options(raw_yaml: str) -> dict[str, list[str]]:
             )
             else sorted(set(values))
         )
+
+    if version in (1, 2):
+        legacy_domains = filters.get(LEGACY_CONF_DOMAINS, [])
+        if any(value not in LEGACY_ARCHIVABLE_DOMAINS for value in legacy_domains):
+            raise OptionsImportError("invalid_domain")
+        result[LEGACY_CONF_DOMAINS] = list(dict.fromkeys(legacy_domains))
 
     return result

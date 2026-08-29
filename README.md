@@ -18,7 +18,7 @@ eigentlichen Zeitreihen, Charts und Tabellen bleiben Aufgabe der App.
 
 | Aufgabe | Verhalten |
 | --- | --- |
-| Auswahl | Domains, einzelne Entitäten, Bereiche, Geräte und Entity-Muster kombinieren |
+| Auswahl | Bevorzugt Labels; optional einzelne Entitäten, Bereiche, Geräte und Entity-Muster kombinieren |
 | Ausschluss | Einzelne Entity-IDs und Ausschlussmuster haben immer Vorrang |
 | Aufbereitung | Numerische Werte mit einstellbaren Nachkommastellen (0–3, Standard 3) sowie Schalterzustände `on`/`off` |
 | Transport | In-Memory-Queue, Batches, Timeout und dauerhafte Retries |
@@ -109,10 +109,10 @@ bearbeiten** öffnen.
 
 | Auswahl | Wirkung |
 | --- | --- |
-| Domains | Alle passenden Entitäten dieser Domain |
-| Einzelne Entitäten | Zusätzliche Entity-IDs, unabhängig von der Domain |
-| Bereiche | Alle beim Speichern zugeordneten Entitäten |
-| Geräte | Alle beim Speichern zugeordneten Entitäten |
+| Labels (empfohlen) | Direkt gelabelte Entitäten sowie Entitäten gelabelter Geräte und Bereiche; Änderungen gelten ohne erneutes Speichern für folgende Zustandsänderungen |
+| Einzelne Entitäten | Zusätzliche konkrete Entity-IDs |
+| Bereiche | Alle aktuell zugeordneten Entitäten |
+| Geräte | Alle aktuell zugeordneten Entitäten |
 | Ausgeschlossene Entitäten | Werden in jedem Fall verworfen |
 | Entitätsmuster einschließen | `*`-/`?`-Muster; ohne Punkt für Objekt-IDs, mit Punkt für vollständige Entity-IDs |
 | Entitätsmuster ausschließen | Musterbasierte Ausschlüsse mit demselben Vorrang wie einzelne Ausschlüsse |
@@ -121,16 +121,19 @@ bearbeiten** öffnen.
 Nach dem Absenden zeigt ein Prüfschritt die tatsächlich aufgelösten
 Entity-IDs. Die Vorschau unterscheidet aktive Entitäten, registrierte
 Entitäten ohne aktuellen Zustand und durch Ausschlüsse entfernte Entitäten.
-Bei Bereichen und Geräten werden dadurch alle zugehörigen Entitäten sichtbar,
-bevor die Auswahl gespeichert wird.
+Bei Labels, Bereichen und Geräten werden dadurch alle zugehörigen Entitäten
+sichtbar, bevor die Auswahl gespeichert wird. Die Vorschau nennt außerdem die
+eingestellten Nachkommastellen; Schaltzustände werden unabhängig davon als
+`1/0` gespeichert.
 
 Über **Konfigurieren → Aktuell erfasste Entitäten** lässt sich derselbe Report
 auch später jederzeit für die gespeicherten Filter öffnen, ohne die Auswahl zu
 verändern.
 
-Beim ersten Öffnen sind `sensor`, `binary_sensor`, `switch`, `climate`,
-`input_number`, `input_boolean` und `counter` vorausgewählt. Bereits
-gespeicherte Auswahlen werden dadurch nicht verändert.
+Domainfilter werden nicht mehr angeboten. Beim Upgrade werden früher
+gespeicherte Domainauswahlen einmalig in die zu diesem Zeitpunkt bekannten
+konkreten Entity-IDs umgewandelt. Für neue und später hinzukommende Entitäten
+sind Labels der bevorzugte Weg.
 
 ## Welche Werte werden archiviert?
 
@@ -155,11 +158,12 @@ Filter. Sie werden global oder je Entität in der App konfiguriert.
 
 ## Einstellungsmenü
 
-**Konfigurieren** öffnet ein kompaktes Menü mit drei Aktionen:
+**Konfigurieren** öffnet ein kompaktes Menü mit vier Aktionen:
 
 1. **Archivfilter bearbeiten** – aktive Auswahl ändern.
-2. **Filter als YAML exportieren** – eine portable Kopie anzeigen.
-3. **Filter aus YAML importieren** – alle Filter aus einer Kopie ersetzen.
+2. **Aktuell erfasste Entitäten** – aufgelöste Auswahl und Rundung prüfen.
+3. **Filter als YAML exportieren** – eine portable Kopie anzeigen.
+4. **Filter aus YAML importieren** – alle Filter aus einer Kopie ersetzen.
 
 ### YAML-Export für Testsysteme
 
@@ -169,11 +173,10 @@ werden:
 
 ```yaml
 format: zeitarchiv-options
-version: 2
+version: 3
 filters:
-  domains:
-    - binary_sensor
-    - sensor
+  labels:
+    - zeitarchiv
   entities:
     - sensor.aussentemperatur
   areas: []
@@ -187,14 +190,15 @@ filters:
 ```
 
 Der Import verwendet einen sicheren YAML-Loader und prüft Formatversion,
-Struktur, Domains, Entity-IDs und Muster. Exporte der vorherigen Formatversion
-1 bleiben importierbar. Erst nach erfolgreicher Prüfung ersetzt der Import die
+Struktur, Entity-IDs und Muster. Exporte der vorherigen Formatversionen 1 und 2
+bleiben importierbar; enthaltene Domains werden einmalig in aktuell bekannte
+Entity-IDs umgewandelt. Erst nach erfolgreicher Prüfung ersetzt der Import die
 Optionen und lädt die Integration neu.
 
 > [!NOTE]
 > Entity-IDs sind zwischen gleich aufgebauten Systemen meist direkt
-> übertragbar. Bereiche und Geräte referenzieren interne Registry-IDs und
-> funktionieren auf dem Zielsystem nur, wenn diese IDs übereinstimmen.
+> übertragbar. Labels, Bereiche und Geräte referenzieren interne Registry-IDs
+> und funktionieren auf dem Zielsystem nur, wenn diese IDs übereinstimmen.
 
 ## Warteschlange und Fehlerverhalten
 

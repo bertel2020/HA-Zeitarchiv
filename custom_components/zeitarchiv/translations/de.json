@@ -44,7 +44,7 @@
     "step": {
       "init": {
         "title": "Zeitarchiv – Einstellungen",
-        "description": "Archivfilter bearbeiten oder sicher zwischen Home-Assistant-Systemen übertragen.",
+        "description": "Mit Labels festlegen, welche Entitäten Zeitarchiv erfasst, oder Filter sicher zwischen Home-Assistant-Systemen übertragen.",
         "menu_options": {
           "filters": "Archivfilter bearbeiten",
           "overview": "Aktuell erfasste Entitäten",
@@ -52,7 +52,7 @@
           "import": "Filter aus YAML importieren"
         },
         "menu_option_descriptions": {
-          "filters": "Domains, Entitäten, Bereiche, Geräte, Muster und Ausschlüsse auswählen.",
+          "filters": "Bevorzugt Labels auswählen; weitere Auswahlwege und Ausschlüsse sind optional.",
           "overview": "Erfasste, zustandslose und ausgeschlossene Entitäten prüfen.",
           "export": "Aktuelle Filter ohne Host und API-Token kopieren.",
           "import": "Einen Zeitarchiv-Export einlesen und die aktuellen Filter ersetzen."
@@ -60,41 +60,68 @@
       },
       "filters": {
         "title": "Zeitarchiv – Archivfilter",
-        "description": "Grobe Auswahl, was überhaupt archiviert wird. Auflösung/Aufbewahrung (auch die Standardwerte für neu erkannte Entitäten) stellst du in der Zeitarchiv-Oberfläche selbst ein (Einstellungen → Archivierung).",
+        "description": "Labels sind die empfohlene Auswahl. Erfasst werden direkt gelabelte Entitäten sowie Entitäten gelabelter Geräte und Bereiche. Mehrere Labels wirken als ODER-Verknüpfung; spätere Labeländerungen gelten für folgende Zustandsänderungen ohne erneutes Speichern. Auflösung und Aufbewahrung stellst du in Zeitarchiv selbst ein (Einstellungen → Archivierung).",
         "data": {
-          "domains": "Domains",
-          "entities": "Einzelne Entitäten",
-          "areas": "Bereiche",
-          "devices": "Geräte",
-          "exclude_entities": "Ausgeschlossene Entitäten",
-          "entity_patterns": "Entitätsmuster einschließen",
-          "exclude_entity_patterns": "Entitätsmuster ausschließen",
-          "decimal_places": "Nachkommastellen"
+          "labels": "Labels (empfohlen)"
         },
         "data_description": {
-          "entity_patterns": "Ein Muster pro Zeile. Ohne Punkt wird nur die Objekt-ID geprüft (`*_leistung`), mit Punkt die vollständige Entity-ID (`sensor.wetter_*`). Erlaubt sind `*` und `?`.",
-          "exclude_entity_patterns": "Ein Muster pro Zeile. Ausschlüsse haben immer Vorrang, zum Beispiel `*_id` oder `sensor.*_raw`.",
-          "decimal_places": "Auf wie viele Nachkommastellen Messwerte vor der Übertragung gerundet werden (0–3). Empfehlung: 3 (Standard) — passt für praktisch alle Sensoren. Weniger Nachkommastellen verbessern die Komprimierbarkeit der Langzeitspeicherung in der App und sparen dadurch etwas Speicherplatz, was bei sehr vielen Entitäten und langer Aufbewahrung spürbar werden kann. Zu wenige Nachkommastellen können bei kleinteiligen Messwerten (z. B. Strom in A) jedoch Genauigkeit kosten."
+          "labels": "Ein Label kann direkt einer Entität, einem Gerät oder einem Bereich zugewiesen sein. Ausschlüsse haben immer Vorrang."
+        },
+        "sections": {
+          "additional_selection": {
+            "name": "Weitere Auswahlmöglichkeiten",
+            "description": "Optional zusätzlich einzelne Entitäten, Bereiche, Geräte oder Muster erfassen.",
+            "data": {
+              "entities": "Einzelne Entitäten",
+              "areas": "Bereiche",
+              "devices": "Geräte",
+              "entity_patterns": "Entitätsmuster einschließen"
+            },
+            "data_description": {
+              "entity_patterns": "Ein Muster pro Zeile. Ohne Punkt wird nur die Objekt-ID geprüft (`*_leistung`), mit Punkt die vollständige Entity-ID (`sensor.wetter_*`). Erlaubt sind `*` und `?`."
+            }
+          },
+          "exclusions": {
+            "name": "Ausschlüsse",
+            "description": "Ausnahmen gelten unabhängig davon, wodurch eine Entität ausgewählt wurde.",
+            "data": {
+              "exclude_entities": "Ausgeschlossene Entitäten",
+              "exclude_entity_patterns": "Entitätsmuster ausschließen"
+            },
+            "data_description": {
+              "exclude_entity_patterns": "Ein Muster pro Zeile. Ausschlüsse haben immer Vorrang, zum Beispiel `*_id` oder `sensor.*_raw`."
+            }
+          },
+          "value_processing": {
+            "name": "Werteverarbeitung",
+            "description": "Legt fest, wie numerische Messwerte vor der Übertragung vorbereitet werden.",
+            "data": {
+              "decimal_places": "Nachkommastellen"
+            },
+            "data_description": {
+              "decimal_places": "Numerische Messwerte werden vor der Übertragung gerundet; einstellbar sind 0 bis 3 Nachkommastellen. Empfehlung: 3 (Standard). Weniger Stellen können Speicher sparen, bei feinen Messwerten aber Genauigkeit kosten. Schaltzustände werden unabhängig davon als 1/0 gespeichert."
+            }
+          }
         }
       },
       "filter_preview": {
         "title": "Zeitarchiv – Filtervorschau",
-        "description": "Die Auswahl wurde gegen die aktuell bekannten Entitäten aufgelöst. Geräte und Bereiche erscheinen dadurch mit allen zugehörigen Entity-IDs.\n\n**Aktuell erfasst: {current_count}** ({domain_summary})\n\n{current_entities}\n\n**Registriert, derzeit ohne Zustand: {without_state_count}**\n\n{without_state_entities}\n\n**Durch Ausschlüsse entfernt: {excluded_count}**\n\n{excluded_entities}\n\n{limit_note}\n\nMit **Absenden** werden diese Filter gespeichert."
+        "description": "Die Auswahl wurde gegen die aktuell bekannten Entitäten aufgelöst. Ausgewählte Labels: **{label_count}**. Gelabelte Geräte und Bereiche erscheinen mit ihren zugehörigen Entity-IDs.\n\n**Werteverarbeitung:** Numerische Messwerte werden vor der Übertragung auf bis zu **{decimal_places} Nachkommastellen** gerundet. Schaltzustände werden als **1/0** gespeichert.\n\n**Vom Filter ausgewählt: {current_count}** ({domain_summary})\n\n{current_entities}\n\n**Registriert, derzeit ohne Zustand: {without_state_count}**\n\n{without_state_entities}\n\n**Durch Ausschlüsse entfernt: {excluded_count}**\n\n{excluded_entities}\n\n{limit_note}\n\nMit **Absenden** werden diese Filter gespeichert."
       },
       "overview": {
         "title": "Zeitarchiv – Aktuell erfasste Entitäten",
-        "description": "Diese Übersicht wertet die gespeicherten Filter gegen die aktuell bekannten Entitäten aus. Geräte und Bereiche erscheinen mit allen zugehörigen Entity-IDs.\n\n**Aktuell erfasst: {current_count}** ({domain_summary})\n\n{current_entities}\n\n**Registriert, derzeit ohne Zustand: {without_state_count}**\n\n{without_state_entities}\n\n**Durch Ausschlüsse entfernt: {excluded_count}**\n\n{excluded_entities}\n\n{limit_note}\n\nMit **Absenden** gelangst du zurück zu den Einstellungen; es werden keine Filter verändert."
+        "description": "Diese Übersicht wertet die gespeicherten Filter gegen die aktuell bekannten Entitäten aus. Ausgewählte Labels: **{label_count}**.\n\n**Werteverarbeitung:** Numerische Messwerte werden vor der Übertragung auf bis zu **{decimal_places} Nachkommastellen** gerundet. Schaltzustände werden als **1/0** gespeichert.\n\n**Vom Filter ausgewählt: {current_count}** ({domain_summary})\n\n{current_entities}\n\n**Registriert, derzeit ohne Zustand: {without_state_count}**\n\n{without_state_entities}\n\n**Durch Ausschlüsse entfernt: {excluded_count}**\n\n{excluded_entities}\n\n{limit_note}\n\nMit **Absenden** gelangst du zurück zu den Einstellungen; es werden keine Filter verändert."
       },
       "export": {
         "title": "Zeitarchiv – Filter exportieren",
-        "description": "Kopiere den YAML-Inhalt und speichere ihn als Datei oder füge ihn auf einem anderen System unter „Filter aus YAML importieren“ ein. Host und API-Token sind nicht enthalten. Mit „Absenden“ gelangst du zurück zum Menü.",
+        "description": "Kopiere den YAML-Inhalt und speichere ihn als Datei oder füge ihn auf einem anderen System unter „Filter aus YAML importieren“ ein. Host und API-Token sind nicht enthalten. Beachte, dass Labels, Bereiche und Geräte interne IDs verwenden. Mit „Absenden“ gelangst du zurück zum Menü.",
         "data": {
           "yaml_config": "YAML-Konfiguration"
         }
       },
       "import": {
         "title": "Zeitarchiv – Filter importieren",
-        "description": "Füge einen zuvor exportierten Zeitarchiv-YAML-Inhalt ein. Der Import ersetzt alle aktuellen Filter. Bereiche und Geräte funktionieren nur, wenn ihre internen IDs auf diesem System übereinstimmen.",
+        "description": "Füge einen zuvor exportierten Zeitarchiv-YAML-Inhalt ein. Der Import ersetzt alle aktuellen Filter. Labels, Bereiche und Geräte funktionieren nur, wenn ihre internen IDs auf diesem System übereinstimmen. Alte Exporte mit Domains werden einmalig in die aktuell bekannten konkreten Entitäten umgewandelt.",
         "data": {
           "yaml_config": "YAML-Konfiguration"
         }

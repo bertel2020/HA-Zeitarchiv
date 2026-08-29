@@ -19,7 +19,7 @@ from homeassistant.core import HomeAssistant
 
 from .api import ZeitarchivApiError, ZeitarchivClient
 from .const import CONF_API_TOKEN, DOMAIN
-from .filtering import should_archive
+from .registry_filter import ArchiveFilterMatcher
 
 TO_REDACT = {CONF_API_TOKEN}
 
@@ -43,23 +43,9 @@ async def async_get_config_entry_diagnostics(
         reachable = False
         connect_error = str(err)
 
-    included_entities: set[str] = data["included_entities"]
-    included_domains: set[str] = data["included_domains"]
-    excluded_entities: set[str] = data["excluded_entities"]
-    included_patterns: list[str] = data["included_patterns"]
-    excluded_patterns: list[str] = data["excluded_patterns"]
+    filters: ArchiveFilterMatcher = data["filters"]
     matching_now = sum(
-        1
-        for state in hass.states.async_all()
-        if should_archive(
-            state.entity_id,
-            state.entity_id.split(".", 1)[0],
-            included_entities,
-            included_domains,
-            excluded_entities,
-            included_patterns,
-            excluded_patterns,
-        )
+        1 for state in hass.states.async_all() if filters.matches(state.entity_id)
     )
 
     now = time.time()
@@ -76,16 +62,20 @@ async def async_get_config_entry_diagnostics(
             "queue_size": queue_writer.queue_size,
             "sent_count_since_start": queue_writer.sent_count,
             "dropped_count_since_start": queue_writer.dropped_count,
-            "last_success_seconds_ago": None if last_success_ts is None else round(now - last_success_ts, 1),
+            "last_success_seconds_ago": (
+                None if last_success_ts is None else round(now - last_success_ts, 1)
+            ),
             "last_error": queue_writer.last_error,
         },
         "filters": {
             "matching_entities_now": matching_now,
-            "included_domains": sorted(included_domains),
-            "included_entities_count": len(included_entities),
-            "excluded_entities_count": len(excluded_entities),
-            "included_patterns": included_patterns,
-            "excluded_patterns": excluded_patterns,
+            "selected_labels": sorted(filters.selected_labels),
+            "selected_areas_count": len(filters.selected_areas),
+            "selected_devices_count": len(filters.selected_devices),
+            "included_entities_count": len(filters.included_entities),
+            "excluded_entities_count": len(filters.excluded_entities),
+            "included_patterns": filters.included_patterns,
+            "excluded_patterns": filters.excluded_patterns,
         },
         "config_entry": {
             "data": async_redact_data(dict(entry.data), TO_REDACT),
