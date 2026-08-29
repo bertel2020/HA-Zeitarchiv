@@ -19,6 +19,7 @@ def build_event(
     unit: str | None,
     timestamp: float,
     friendly_name: str | None = None,
+    decimal_places: int = 3,
 ) -> dict | None:
     """Baut das Event-Payload für die Queue, oder None wenn der Zustand verworfen wird.
 
@@ -38,9 +39,10 @@ def build_event(
     else:
         try:
             # Die Integration begrenzt die uebertragenen Messwerte bereits an
-            # der Quelle. Dadurch landen weder Anzeige-Artefakte noch mehr als
-            # drei fachlich relevante Nachkommastellen in der App.
-            value = round(float(state), 3)
+            # der Quelle (Options-Flow: Nachkommastellen). Dadurch landen
+            # weder Anzeige-Artefakte noch mehr fachlich relevante
+            # Nachkommastellen als konfiguriert in der App.
+            value = round(float(state), decimal_places)
         except (TypeError, ValueError):
             return None
 

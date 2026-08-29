@@ -68,11 +68,13 @@
           "devices": "Devices",
           "exclude_entities": "Excluded entities",
           "entity_patterns": "Include entity patterns",
-          "exclude_entity_patterns": "Exclude entity patterns"
+          "exclude_entity_patterns": "Exclude entity patterns",
+          "decimal_places": "Decimal places"
         },
         "data_description": {
           "entity_patterns": "One pattern per line. Patterns without a dot match the object ID (`*_power`); patterns with a dot match the full entity ID (`sensor.weather_*`). `*` and `?` are supported.",
-          "exclude_entity_patterns": "One pattern per line. Exclusions always take precedence, for example `*_id` or `sensor.*_raw`."
+          "exclude_entity_patterns": "One pattern per line. Exclusions always take precedence, for example `*_id` or `sensor.*_raw`.",
+          "decimal_places": "How many decimal places sensor values are rounded to before transmission (0–3). Recommended: 3 (default) — fits practically all sensors. Fewer decimal places improve compressibility of the add-on's long-term storage and can save some disk space, which may become noticeable with many entities and long retention. Too few decimal places, however, can lose accuracy for fine-grained readings (e.g. current in A)."
         }
       },
       "filter_preview": {

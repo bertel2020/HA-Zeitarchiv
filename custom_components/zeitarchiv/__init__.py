@@ -31,11 +31,13 @@ from .const import (
     CONF_API_TOKEN,
     CONF_AREAS,
     CONF_DEVICES,
+    CONF_DECIMAL_PLACES,
     CONF_DOMAINS,
     CONF_ENTITIES,
     CONF_ENTITY_PATTERNS,
     CONF_EXCLUDE_ENTITIES,
     CONF_EXCLUDE_ENTITY_PATTERNS,
+    DEFAULT_DECIMAL_PLACES,
     DOMAIN,
 )
 from .events import build_event
@@ -73,6 +75,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         included_patterns,
         excluded_patterns,
     ) = _resolve_filters(hass, entry.options)
+    decimal_places = entry.options.get(CONF_DECIMAL_PLACES, DEFAULT_DECIMAL_PLACES)
 
     def _enqueue_state(state: State) -> bool:
         """Filtert und uebergibt einen aktuellen oder geaenderten Zustand."""
@@ -97,6 +100,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             unit=state.attributes.get("unit_of_measurement"),
             timestamp=state.last_updated.timestamp() if state.last_updated else time.time(),
             friendly_name=state.attributes.get("friendly_name"),
+            decimal_places=decimal_places,
         )
         if payload is None:
             return False

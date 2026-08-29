@@ -20,7 +20,7 @@ eigentlichen Zeitreihen, Charts und Tabellen bleiben Aufgabe der App.
 | --- | --- |
 | Auswahl | Domains, einzelne Entitäten, Bereiche, Geräte und Entity-Muster kombinieren |
 | Ausschluss | Einzelne Entity-IDs und Ausschlussmuster haben immer Vorrang |
-| Aufbereitung | Numerische Werte mit maximal drei Nachkommastellen sowie Schalterzustände `on`/`off` |
+| Aufbereitung | Numerische Werte mit einstellbaren Nachkommastellen (0–3, Standard 3) sowie Schalterzustände `on`/`off` |
 | Transport | In-Memory-Queue, Batches, Timeout und dauerhafte Retries |
 | Sicherheit | Bearer-Token; Reauth-Hinweis bei abgelehntem Token |
 | Transparenz | Vier Diagnose-Sensoren und Diagnose-Download |
@@ -116,6 +116,7 @@ bearbeiten** öffnen.
 | Ausgeschlossene Entitäten | Werden in jedem Fall verworfen |
 | Entitätsmuster einschließen | `*`-/`?`-Muster; ohne Punkt für Objekt-IDs, mit Punkt für vollständige Entity-IDs |
 | Entitätsmuster ausschließen | Musterbasierte Ausschlüsse mit demselben Vorrang wie einzelne Ausschlüsse |
+| Nachkommastellen | Rundung numerischer Werte vor der Übertragung, 0–3, Standard 3 |
 
 Nach dem Absenden zeigt ein Prüfschritt die tatsächlich aufgelösten
 Entity-IDs. Die Vorschau unterscheidet aktive Entitäten, registrierte
@@ -138,15 +139,19 @@ reine Änderung von Attributen wie Friendly Name oder Einheit erzeugt keinen
 zusätzlichen Archivpunkt.
 
 - Numerische Zustände von `sensor`, `climate`, `input_number`, `counter` und
-  vergleichbaren Domains werden als Zahl mit maximal drei Nachkommastellen
-  übertragen.
+  vergleichbaren Domains werden als Zahl mit den im Options-Flow eingestellten
+  Nachkommastellen (0–3, Standard 3) übertragen. Empfohlen ist der Standard;
+  weniger Nachkommastellen verbessern die Komprimierbarkeit der
+  Langzeitspeicherung in der App und können bei sehr vielen Entitäten und
+  langer Aufbewahrung spürbar Speicherplatz sparen, kosten bei kleinteiligen
+  Messwerten (z. B. Strom in A) aber Genauigkeit.
 - `binary_sensor`, `switch` und `input_boolean` werden als `on → 1` und
   `off → 0` übertragen.
 - Textwerte sowie `unknown`, `unavailable`, `none` und leere Zustände werden
   nicht archiviert.
 
-Auflösung, Aufbewahrung, Rundung und Bereinigungsschwellen gehören nicht in
-diesen Filter. Sie werden global oder je Entität in der App konfiguriert.
+Auflösung, Aufbewahrung und Bereinigungsschwellen gehören nicht in diesen
+Filter. Sie werden global oder je Entität in der App konfiguriert.
 
 ## Einstellungsmenü
 

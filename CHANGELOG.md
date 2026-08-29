@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.13.0 - 2026-08-29
+
+### Neu
+
+- Die Anzahl der bei der Übertragung verwendeten Nachkommastellen (0–3) ist
+  im Options-Flow unter **Archivfilter bearbeiten** einstellbar, inklusive
+  Empfehlung und Hinweis auf die Auswirkung auf den Speicherverbrauch in der
+  App. Der bisherige Festwert von drei Nachkommastellen bleibt der Standard.
+
 ## 0.12.0 - 2026-08-25
 
 ### Behoben

@@ -17,6 +17,11 @@ CONF_DEVICES = "devices"
 CONF_EXCLUDE_ENTITIES = "exclude_entities"
 CONF_ENTITY_PATTERNS = "entity_patterns"
 CONF_EXCLUDE_ENTITY_PATTERNS = "exclude_entity_patterns"
+CONF_DECIMAL_PLACES = "decimal_places"
+# 3 Nachkommastellen war bisher der fest verdrahtete Wert (siehe events.py) —
+# als Default beibehalten, damit bestehende Installationen ihr Verhalten
+# nicht stillschweigend ändern.
+DEFAULT_DECIMAL_PLACES = 3
 
 # Domains, die sinnvoll archivierbar sind (Vorauswahl im Options-Flow).
 ARCHIVABLE_DOMAINS = [

@@ -25,12 +25,14 @@ from .const import (
     ARCHIVABLE_DOMAINS,
     CONF_API_TOKEN,
     CONF_AREAS,
+    CONF_DECIMAL_PLACES,
     CONF_DEVICES,
     CONF_DOMAINS,
     CONF_ENTITIES,
     CONF_ENTITY_PATTERNS,
     CONF_EXCLUDE_ENTITIES,
     CONF_EXCLUDE_ENTITY_PATTERNS,
+    DEFAULT_DECIMAL_PLACES,
     DEFAULT_PORT,
     DOMAIN,
 )
@@ -414,6 +416,22 @@ class ZeitarchivOptionsFlow(config_entries.OptionsFlow):
                 ): selector.TextSelector(
                     selector.TextSelectorConfig(multiline=True)
                 ),
+                vol.Optional(
+                    CONF_DECIMAL_PLACES,
+                    default=defaults.get(
+                        CONF_DECIMAL_PLACES, DEFAULT_DECIMAL_PLACES
+                    ),
+                ): vol.All(
+                    selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=0,
+                            max=3,
+                            step=1,
+                            mode=selector.NumberSelectorMode.BOX,
+                        )
+                    ),
+                    vol.Coerce(int),
+                ),
             }
         )
         return self.async_show_form(
@@ -469,6 +487,14 @@ class ZeitarchivOptionsFlow(config_entries.OptionsFlow):
             except OptionsImportError as err:
                 errors["base"] = str(err)
             else:
+                # Der YAML-Export/-Import betrifft ausschliesslich die
+                # Archivfilter (siehe options_transfer.py) — Nachkommastellen
+                # bleiben deshalb unangetastet, statt beim Import still auf
+                # den Standardwert zurueckzufallen.
+                if CONF_DECIMAL_PLACES in self.config_entry.options:
+                    imported_options[CONF_DECIMAL_PLACES] = self.config_entry.options[
+                        CONF_DECIMAL_PLACES
+                    ]
                 return self.async_create_entry(title="", data=imported_options)
 
         return self.async_show_form(

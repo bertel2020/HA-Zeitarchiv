@@ -68,11 +68,13 @@
           "devices": "Geräte",
           "exclude_entities": "Ausgeschlossene Entitäten",
           "entity_patterns": "Entitätsmuster einschließen",
-          "exclude_entity_patterns": "Entitätsmuster ausschließen"
+          "exclude_entity_patterns": "Entitätsmuster ausschließen",
+          "decimal_places": "Nachkommastellen"
         },
         "data_description": {
           "entity_patterns": "Ein Muster pro Zeile. Ohne Punkt wird nur die Objekt-ID geprüft (`*_leistung`), mit Punkt die vollständige Entity-ID (`sensor.wetter_*`). Erlaubt sind `*` und `?`.",
-          "exclude_entity_patterns": "Ein Muster pro Zeile. Ausschlüsse haben immer Vorrang, zum Beispiel `*_id` oder `sensor.*_raw`."
+          "exclude_entity_patterns": "Ein Muster pro Zeile. Ausschlüsse haben immer Vorrang, zum Beispiel `*_id` oder `sensor.*_raw`.",
+          "decimal_places": "Auf wie viele Nachkommastellen Messwerte vor der Übertragung gerundet werden (0–3). Empfehlung: 3 (Standard) — passt für praktisch alle Sensoren. Weniger Nachkommastellen verbessern die Komprimierbarkeit der Langzeitspeicherung in der App und sparen dadurch etwas Speicherplatz, was bei sehr vielen Entitäten und langer Aufbewahrung spürbar werden kann. Zu wenige Nachkommastellen können bei kleinteiligen Messwerten (z. B. Strom in A) jedoch Genauigkeit kosten."
         }
       },
       "filter_preview": {
