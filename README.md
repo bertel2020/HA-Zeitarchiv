@@ -60,13 +60,21 @@ erneuten Start von Home Assistant.
 
 ## Installation
 
-### Über HACS
+### Über HACS (empfohlen)
 
-1. In HACS **Integrationen** öffnen.
-2. Über das Menü **Benutzerdefinierte Repositories** auswählen.
-3. `https://github.com/bertel2020/HA-Zeitarchiv` eintragen und als Kategorie
-   **Integration** wählen.
-4. **Zeitarchiv** herunterladen und Home Assistant neu starten.
+[![HACS-Repository in My Home Assistant öffnen](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=bertel2020&repository=HA-Zeitarchiv&category=integration)
+[![Zeitarchiv zu My Home Assistant hinzufügen](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=zeitarchiv)
+
+1. Über den ersten Button das Zeitarchiv-Repository in HACS öffnen.
+2. **Zeitarchiv** herunterladen und Home Assistant neu starten.
+3. Über den zweiten Button die Integration hinzufügen. Alternativ in Home
+   Assistant **Einstellungen → Geräte & Dienste → Integration hinzufügen →
+   Zeitarchiv** öffnen.
+
+Falls der erste Button nicht funktioniert, in HACS unter **Integrationen →
+Benutzerdefinierte Repositories**
+`https://github.com/bertel2020/HA-Zeitarchiv` als Kategorie **Integration**
+eintragen.
 
 ### Manuell
 
