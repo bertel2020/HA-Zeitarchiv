@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.15.1 - 2026-09-03
+
+### Geändert
+
+- Die neue App-Meldung für knappen Host-Speicherplatz fließt jetzt durch
+  dieselbe Rückkopplung wie die übrigen Health-Zustände: ab kritischem
+  Füllstand als Home-Assistant-Repair, bereits ab der Warnstufe als Teil des
+  gebündelten `binary_sensor`-Wartungshinweises.
+
 ## 0.15.0 - 2026-09-03
 
 ### Neu
