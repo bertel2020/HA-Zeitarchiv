@@ -1,0 +1,7 @@
+# Nur für CI/lokale Tests (siehe .github/workflows/tests.yml) — nicht Teil der
+# Integration: pyyaml und requests liefert Home Assistant Core zur Laufzeit
+# selbst, deshalb bleibt manifest.json "requirements" leer. Versionen wie in
+# der lokalen Entwicklungsumgebung, gegen die die Suite zuletzt grün lief.
+pytest
+pyyaml==6.0.3
+requests==2.34.2
