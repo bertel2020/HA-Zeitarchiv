@@ -184,6 +184,10 @@
     "integration_outdated": {
       "title": "Zeitarchiv-Integration veraltet",
       "description": "Die Verbindung „{connection}\" meldet eine veraltete Integrationsversion: {detail}\n\nBitte über HACS oder manuell aktualisieren."
+    },
+    "housekeeping_host_disk_space_low": {
+      "title": "Host-Speicherplatz wird knapp",
+      "description": "Für „{connection}\" wird der freie Speicherplatz auf dem Host-Dateisystem knapp: {detail}\n\nDetails in der Zeitarchiv-App (Einstellungen → Housekeeping)."
     }
   }
 }

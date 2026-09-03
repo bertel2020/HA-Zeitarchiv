@@ -46,6 +46,7 @@ _HEALTH_SENSORS: tuple[_HealthSensorSpec, ...] = (
             "system.storage_reconcile_errors",
             "retention.job_failed",
             "housekeeping.purge_available",
+            "housekeeping.host_disk_space_low",
         }),
     ),
 )

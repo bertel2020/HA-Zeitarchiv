@@ -184,6 +184,10 @@
     "integration_outdated": {
       "title": "Zeitarchiv integration outdated",
       "description": "The connection \"{connection}\" reports an outdated integration version: {detail}\n\nPlease update via HACS or manually."
+    },
+    "housekeeping_host_disk_space_low": {
+      "title": "Host disk space running low",
+      "description": "Free disk space on the host filesystem is running low for \"{connection}\": {detail}\n\nSee the Zeitarchiv app (Settings → Housekeeping) for details."
     }
   }
 }
