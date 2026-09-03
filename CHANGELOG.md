@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.15.0 - 2026-09-03
+
+### Neu
+
+- Neue Health-Entities (`binary_sensor`) am Zeitarchiv-Gerät: fehlgeschlagenes
+  Backup, lange inaktive Entitäten sowie ein gebündelter Wartungshinweis
+  (Speicherabgleich, Aufbewahrung, Aufräumen empfohlen) — direkt in
+  Automationen nutzbar.
+- Kritische Zustände (fehlgeschlagenes Backup/Aufbewahrung/Import, lange
+  inaktive Entitäten, veraltete Integration) erscheinen zusätzlich als
+  Home-Assistant-Repair unter Einstellungen → Repairs.
+- Die Integration schickt ihre Version bei jeder Anfrage an die App mit; die
+  App zeigt sie in ihren Verbindungs-Einstellungen an und weist auf
+  veraltete Integrationsversionen hin.
+
 ## 0.14.0 - 2026-08-30
 
 ### Neu
