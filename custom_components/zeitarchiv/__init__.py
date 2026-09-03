@@ -1,18 +1,22 @@
 """Die Zeitarchiv-Integration.
 
-Reiner Datensenke-Aufbau: hört auf state_changed, filtert nach den
-Options-Flow-Einstellungen, reicht passende Zustände an die
-Queue/Batch/Retry-Logik weiter, die sie an die App schickt.
+Zwei unabhängige Richtungen:
 
-Erzeugt selbst KEINE Entities für die archivierten Daten (die gehören der
-App, nicht HA) — nur eine Handvoll Diagnose-Sensoren (sensor.py,
-entity_category=diagnostic) über den Zustand des Schreibpfads selbst
-(Warteschlange, letzte erfolgreiche Übertragung, verworfene Events), damit
-sich "funktioniert die Integration gerade" auch ohne Diagnose-Download auf
-der Geräteseite ablesen lässt. Deshalb weiterhin kein DataUpdateCoordinator
-(das Haus-Muster von fritzbox_phone/oscam) — der ist für Entities gedacht,
-die extern abgefragte Daten *anzeigen*; hier reicht simples Polling des
-ohnehin schon im Prozess laufenden ZeitarchivQueueWriter-Zustands.
+1. HA → App (Schreibpfad, der eigentliche Zweck): hört auf state_changed,
+   filtert nach den Options-Flow-Einstellungen, reicht passende Zustände an
+   die Queue/Batch/Retry-Logik weiter, die sie an die App schickt. Erzeugt
+   selbst KEINE Entities für die archivierten Daten (die gehören der App,
+   nicht HA) — nur eine Handvoll Diagnose-Sensoren (sensor.py,
+   entity_category=diagnostic) über den Zustand des Schreibpfads selbst.
+   Reines Polling von bereits im Prozess vorhandenem Zustand (kein I/O),
+   deshalb dort bewusst kein DataUpdateCoordinator.
+
+2. App → HA (Rückkanal, siehe coordinator.py/binary_sensor.py/repairs.py):
+   pollt /api/notices und macht daraus automatisierbare Health-Entities
+   sowie Repairs für kritische Fälle. Hier holt ein DataUpdateCoordinator
+   tatsächlich externe Daten (das Haus-Muster von fritzbox_phone/oscam) —
+   ein Fehlschlag blockiert absichtlich nicht den Schreibpfad, siehe
+   coordinator.py.
 """
 
 from __future__ import annotations
@@ -26,6 +30,7 @@ from homeassistant.core import Event, EventStateChangedData, HomeAssistant, Stat
 from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.loader import async_get_integration
 
 from .api import ZeitarchivClient
 from .const import (
@@ -34,14 +39,16 @@ from .const import (
     DEFAULT_DECIMAL_PLACES,
     DOMAIN,
 )
+from .coordinator import ZeitarchivNoticesCoordinator
 from .events import build_event
 from .filtering import is_state_value_change
 from .queue_writer import ZeitarchivQueueWriter
 from .registry_filter import ArchiveFilterMatcher, migrate_legacy_domains
+from . import repairs as repairs_mod
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list = ["sensor"]  # nur Diagnose-Sensoren, siehe sensor.py.
+PLATFORMS: list = ["sensor", "binary_sensor"]
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -56,8 +63,12 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Richtet Zeitarchiv aus einem Config-Entry ein."""
+    integration = await async_get_integration(hass, DOMAIN)
     client = ZeitarchivClient(
-        entry.data[CONF_HOST], entry.data[CONF_PORT], entry.data[CONF_API_TOKEN]
+        entry.data[CONF_HOST],
+        entry.data[CONF_PORT],
+        entry.data[CONF_API_TOKEN],
+        integration_version=str(integration.version) if integration.version else None,
     )
     # on_auth_failed läuft im Hintergrund-Thread des Queue-Writers (siehe
     # dessen Docstring, kein homeassistant-Import dort) — hass.add_job statt
@@ -72,6 +83,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         client, on_auth_failed=lambda: hass.add_job(entry.async_start_reauth, hass)
     )
     queue_writer.start()
+    notices_coordinator = ZeitarchivNoticesCoordinator(hass, entry, client)
 
     filters = _resolve_filters(hass, entry.options)
     decimal_places = entry.options.get(CONF_DECIMAL_PLACES, DEFAULT_DECIMAL_PLACES)
@@ -135,7 +147,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         # Für diagnostics.py — derselbe Live-Matcher verhindert abweichende
         # Auswertungen zwischen Schreibpfad und Diagnose-Download.
         "filters": filters,
+        "notices_coordinator": notices_coordinator,
     }
+
+    def _sync_repairs() -> None:
+        repairs_mod.async_sync_issues(hass, entry, notices_coordinator.data or [])
+
+    entry.async_on_unload(notices_coordinator.async_add_listener(_sync_repairs))
+    # Erster Abruf bewusst mit async_refresh() statt
+    # async_config_entry_first_refresh(): Letzteres würde bei Fehlschlag
+    # (App unerreichbar, oder zu alte App-Version ohne /api/notices)
+    # ConfigEntryNotReady auslösen und damit die GESAMTE Integration inkl.
+    # Schreibpfad blockieren — für dieses optionale Zusatzfeature
+    # unangemessen (siehe coordinator.py).
+    await notices_coordinator.async_refresh()
+    _sync_repairs()
 
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     # Erst NACH dem obigen hass.data-Eintrag weiterreichen — sensor.py liest
@@ -155,6 +181,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         return False
     data = hass.data[DOMAIN][entry.entry_id]
     data["remove_listener"]()
+    # Sonst blieben Repair-Karten einer entfernten/neu geladenen Verbindung
+    # verwaist stehen, bis zufällig dieselbe Meldung erneut aktiv wird.
+    repairs_mod.async_clear_issues(hass, entry)
     stopped = await hass.async_add_executor_job(data["queue_writer"].stop)
     if not stopped:
         _LOGGER.error("Zeitarchiv-Queue-Worker konnte nicht sauber beendet werden")

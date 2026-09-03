@@ -18,6 +18,7 @@ from homeassistant.core import callback
 from homeassistant.data_entry_flow import FlowResult, section
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import selector
+from homeassistant.loader import async_get_integration
 
 from .api import ZeitarchivApiError, ZeitarchivAuthError, ZeitarchivClient
 from .const import (
@@ -163,7 +164,13 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
 
 async def _validate_input(hass: Any, data: dict[str, Any]) -> None:
     """Testet die Verbindung zur App. Wirft bei Fehlschlag."""
-    client = ZeitarchivClient(data[CONF_HOST], data[CONF_PORT], data[CONF_API_TOKEN])
+    integration = await async_get_integration(hass, DOMAIN)
+    client = ZeitarchivClient(
+        data[CONF_HOST],
+        data[CONF_PORT],
+        data[CONF_API_TOKEN],
+        integration_version=str(integration.version) if integration.version else None,
+    )
     await hass.async_add_executor_job(client.test_connection)
 
 

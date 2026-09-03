@@ -151,6 +151,39 @@
       "dropped_count": {
         "name": "Dropped events (since start)"
       }
+    },
+    "binary_sensor": {
+      "backup_failed": {
+        "name": "Backup failed"
+      },
+      "entities_inactive": {
+        "name": "Entities inactive"
+      },
+      "health_issue": {
+        "name": "Maintenance notice"
+      }
+    }
+  },
+  "issues": {
+    "backup_job_failed": {
+      "title": "Zeitarchiv backup failed",
+      "description": "The latest backup run for \"{connection}\" failed: {detail}\n\nSee the Zeitarchiv app (Settings → Backup) for details and next steps."
+    },
+    "retention_job_failed": {
+      "title": "Zeitarchiv retention run failed",
+      "description": "The latest retention run for \"{connection}\" failed: {detail}\n\nSee the Zeitarchiv app (Settings → Archiving) for details."
+    },
+    "import_job_failed": {
+      "title": "Zeitarchiv import failed",
+      "description": "The latest import for \"{connection}\" failed: {detail}\n\nSee the Zeitarchiv app for details."
+    },
+    "housekeeping_inactive_entities_error": {
+      "title": "Zeitarchiv: entities inactive for a while",
+      "description": "One or more entities for \"{connection}\" haven't reported a value in several days: {detail}\n\nSee the Zeitarchiv app for details."
+    },
+    "integration_outdated": {
+      "title": "Zeitarchiv integration outdated",
+      "description": "The connection \"{connection}\" reports an outdated integration version: {detail}\n\nPlease update via HACS or manually."
     }
   }
 }

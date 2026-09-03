@@ -151,6 +151,39 @@
       "dropped_count": {
         "name": "Verworfene Ereignisse (seit Start)"
       }
+    },
+    "binary_sensor": {
+      "backup_failed": {
+        "name": "Backup fehlgeschlagen"
+      },
+      "entities_inactive": {
+        "name": "Entitäten inaktiv"
+      },
+      "health_issue": {
+        "name": "Wartungshinweis"
+      }
+    }
+  },
+  "issues": {
+    "backup_job_failed": {
+      "title": "Zeitarchiv-Backup fehlgeschlagen",
+      "description": "Der letzte Sicherungslauf für „{connection}\" ist fehlgeschlagen: {detail}\n\nDetails und weitere Schritte in der Zeitarchiv-App (Einstellungen → Sicherung)."
+    },
+    "retention_job_failed": {
+      "title": "Zeitarchiv-Aufbewahrung fehlgeschlagen",
+      "description": "Der letzte Aufbewahrungslauf für „{connection}\" ist fehlgeschlagen: {detail}\n\nDetails in der Zeitarchiv-App (Einstellungen → Archivierung)."
+    },
+    "import_job_failed": {
+      "title": "Zeitarchiv-Import fehlgeschlagen",
+      "description": "Der letzte Import für „{connection}\" ist fehlgeschlagen: {detail}\n\nDetails in der Zeitarchiv-App."
+    },
+    "housekeeping_inactive_entities_error": {
+      "title": "Zeitarchiv: Entitäten lange inaktiv",
+      "description": "Für „{connection}\" melden sich eine oder mehrere Entitäten seit mehreren Tagen nicht mehr: {detail}\n\nDetails in der Zeitarchiv-App."
+    },
+    "integration_outdated": {
+      "title": "Zeitarchiv-Integration veraltet",
+      "description": "Die Verbindung „{connection}\" meldet eine veraltete Integrationsversion: {detail}\n\nBitte über HACS oder manuell aktualisieren."
     }
   }
 }
