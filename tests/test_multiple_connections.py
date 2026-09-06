@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
+
+from _paths import ROOT
 
 
-ROOT = Path(__file__).resolve().parents[1]
 FLOW_PATH = ROOT / "custom_components" / "zeitarchiv" / "config_flow.py"
 
 
