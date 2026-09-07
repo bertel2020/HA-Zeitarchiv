@@ -33,8 +33,9 @@ DOCS = ADDON / "docs"
 TEMPLATES = APP / "templates"
 STATIC = APP / "static"
 APP_CSS = STATIC / "css" / "app.css"
-#: Seitenlokales CSS, seit ZG-04 Schritt 3 aus den Templates herausgehoben.
+#: Seitenlokales CSS und JS, seit ZG-04 Schritt 3 aus den Templates gehoben.
 PAGE_CSS = STATIC / "css" / "pages"
+PAGE_JS = STATIC / "js" / "pages"
 APP_JS = STATIC / "js"
 
 # `from app.main import ...` muss in beiden Layouts funktionieren. Steht hier
@@ -44,17 +45,22 @@ if str(ADDON) not in sys.path:
 
 
 def page_text(name: str) -> str:
-    """Template samt dem CSS, das diese Seite mitbringt.
+    """Template samt dem CSS und JavaScript, das diese Seite mitbringt.
 
-    Seit ZG-04 Schritt 3 stehen die seitenlokalen Regeln nicht mehr als
-    <style>-Block im Template, sondern als static/css/pages/<seite>.css
-    daneben. „Was diese Seite an CSS liefert" ist damit auf zwei Dateien
-    verteilt — Tests, die eine solche Regel prüfen, meinen aber weiterhin
-    beides zusammen. Deshalb hier einmal zusammengesetzt, statt in jedem
-    betroffenen Test zwei Dateien von Hand zu lesen.
+    Seit ZG-04 Schritt 3 stehen die seitenlokalen Regeln und Skripte nicht mehr
+    als <style>/<script>-Block im Template, sondern als
+    static/css/pages/<seite>.css und static/js/pages/<seite>.js daneben. „Was
+    diese Seite mitbringt" ist damit auf bis zu drei Dateien verteilt — Tests,
+    die eine solche Regel oder Codezeile prüfen, meinen aber weiterhin alles
+    zusammen. Deshalb hier einmal zusammengesetzt, statt in jedem betroffenen
+    Test mehrere Dateien von Hand zu lesen.
     """
-    template = (TEMPLATES / name).read_text(encoding="utf-8")
-    match = re.search(r"/static/css/pages/([a-z_]+\.css)", template)
-    if match is None:
-        return template
-    return template + "\n" + (PAGE_CSS / match.group(1)).read_text(encoding="utf-8")
+    text = (TEMPLATES / name).read_text(encoding="utf-8")
+    for muster, ordner in (
+        (r"/static/css/pages/([a-z_]+\.css)", PAGE_CSS),
+        (r"/static/js/pages/([a-z_]+\.js)", PAGE_JS),
+    ):
+        match = re.search(muster, text)
+        if match is not None:
+            text += "\n" + (ordner / match.group(1)).read_text(encoding="utf-8")
+    return text
