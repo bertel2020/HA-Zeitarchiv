@@ -56,9 +56,12 @@ def page_text(name: str) -> str:
     Test mehrere Dateien von Hand zu lesen.
     """
     text = (TEMPLATES / name).read_text(encoding="utf-8")
+    # Ohne führendes "/static/", damit beide Schreibweisen passen: die alte
+    # ("{{ app_root }}/static/css/pages/x.css?v={{ css_v }}") und die seit
+    # ZG-05 gültige ("{{ asset('css/pages/x.css') }}").
     for muster, ordner in (
-        (r"/static/css/pages/([a-z_]+\.css)", PAGE_CSS),
-        (r"/static/js/pages/([a-z_]+\.js)", PAGE_JS),
+        (r"css/pages/([a-z_]+\.css)", PAGE_CSS),
+        (r"js/pages/([a-z_]+\.js)", PAGE_JS),
     ):
         match = re.search(muster, text)
         if match is not None:
