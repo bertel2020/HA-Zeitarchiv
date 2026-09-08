@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.16.0 - 2026-09-08
+
+### Neu
+
+- Neuer Sensor **Letztes Backup** am Zeitarchiv-Gerät (Zeitpunkt, Dateiname,
+  Größe) sowie ein importierbares Automations-Blueprint, um Backups darüber
+  automatisch an ein externes Ziel zu kopieren (z. B. mit `rclone`) — siehe
+  README, Abschnitt "Offsite-Backup per Automation".
+
 ## 0.15.1 - 2026-09-03
 
 ### Geändert
