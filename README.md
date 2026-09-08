@@ -6,7 +6,7 @@
 
 <p align="center">
   Der zuverlässige Schreibpfad von Home Assistant in das Zeitarchiv.<br>
-  <sub>FILTER · QUEUE · BATCHING · RETRY · DIAGNOSE · YAML-TRANSFER</sub>
+  <sub>FILTER · QUEUE · BATCHING · RETRY · DIAGNOSE · AUTOMATION · YAML-TRANSFER</sub>
 </p>
 
 Die Zeitarchiv-Integration beobachtet ausgewählte Zustandsänderungen und
