@@ -151,7 +151,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     }
 
     def _sync_repairs() -> None:
-        repairs_mod.async_sync_issues(hass, entry, notices_coordinator.data or [])
+        repairs_mod.async_sync_issues(
+            hass, entry, (notices_coordinator.data or {}).get("notices", [])
+        )
 
     entry.async_on_unload(notices_coordinator.async_add_listener(_sync_repairs))
     # Erster Abruf bewusst mit async_refresh() statt

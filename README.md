@@ -251,6 +251,30 @@ werden. Der Bericht enthält:
 
 Der API-Token wird automatisch geschwärzt.
 
+## Offsite-Backup per Automation
+
+Zeitarchiv spricht selbst kein S3/WebDAV/SMB — dafür bräuchte der Container
+neue Abhängigkeiten und Zugangsdaten, für einen Fall, den der HA-Host ohnehin
+besser löst. Stattdessen liefert die Integration einen Automations-Trigger:
+den Sensor **Letztes Backup** (State = Zeitstempel des letzten
+ERFOLGREICHEN Backups, Attribute `filename`/`size_bytes`) — bewusst keine
+Diagnose-Entity, damit er in Automationen leicht auffindbar bleibt.
+
+[![Blueprint importieren](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fbertel2020%2FHA-Zeitarchiv%2Fmain%2Fblueprints%2Fautomation%2Fzeitarchiv%2Fbackup_upload.yaml)
+
+Nach dem Import: den Backup-Sensor der gewünschten Verbindung auswählen und
+eine eigene Upload-Aktion eintragen, z. B. ein `shell_command` mit
+`rclone copy`:
+
+```yaml
+shell_command:
+  rclone_backup_upload: "rclone copy '/config/zeitarchiv-backups/{{ filename }}' remote:zeitarchiv-backups/"
+```
+
+In der Blueprint-Aktion stehen Dateiname und Größe per Vorlage zur
+Verfügung: `{{ trigger.to_state.attributes.filename }}` und
+`{{ trigger.to_state.attributes.size_bytes }}`.
+
 ## Token ändern
 
 Wird der Token in der App neu generiert, lehnt die App den nächsten Batch ab.
@@ -300,7 +324,9 @@ Relevante Module:
 | `events.py` | Validierung und Event-Aufbereitung |
 | `filtering.py` | Ein- und Ausschlusslogik |
 | `queue_writer.py` | Queue, Batching, Retry und Live-Zähler |
-| `sensor.py` | Diagnose-Entitäten |
+| `coordinator.py` | Pollt `/api/notices` (Meldungen und letztes Backup) |
+| `sensor.py` | Diagnose-Entitäten sowie der Backup-Sensor für Automationen |
+| `binary_sensor.py` | Automations-taugliche Health-Entities aus den Meldungen |
 | `diagnostics.py` | Geschwärzter Diagnosebericht |
 
 ## Bekannte Grenzen

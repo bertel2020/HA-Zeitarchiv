@@ -1,16 +1,24 @@
-"""Diagnose-Sensoren für Zeitarchiv.
+"""Sensoren für Zeitarchiv.
 
-Bewusst nur eine Handvoll, alle entity_category=diagnostic (tauchen deshalb
-nicht im normalen Dashboard/der Entitäten-Übersicht auf, sondern nur unter
-"Diagnose" auf der Geräteseite) — Zeitarchiv erzeugt sonst weiterhin keine
-Entities für die archivierten Daten selbst (siehe __init__.py-Docstring).
+Zwei unterschiedliche Muster nebeneinander, je nach Datenquelle:
 
-Reines Polling (should_poll/update(), Standardintervall) statt eines
-DataUpdateCoordinator: die gelesenen Werte kommen aus dem ohnehin schon im
-Prozess laufenden ZeitarchivQueueWriter (reine Attributzugriffe, kein I/O),
-ein Coordinator wäre hier reiner Mehraufwand ohne Nutzen. Dieselben Werte
-liefert diagnostics.py als Download — hier stehen sie zusätzlich live auf
-der Geräteseite, ohne dafür erst "Diagnose herunterladen" klicken zu müssen.
+- Diagnose-Sensoren (`_ZeitarchivDiagnosticSensor` und ihre Kinder): bewusst
+  alle entity_category=diagnostic (tauchen deshalb nicht im normalen
+  Dashboard/der Entitäten-Übersicht auf, sondern nur unter "Diagnose" auf der
+  Geräteseite) — Zeitarchiv erzeugt sonst weiterhin keine Entities für die
+  archivierten Daten selbst (siehe __init__.py-Docstring). Reines Polling
+  (should_poll/update(), Standardintervall) statt eines
+  DataUpdateCoordinator: die gelesenen Werte kommen aus dem ohnehin schon im
+  Prozess laufenden ZeitarchivQueueWriter (reine Attributzugriffe, kein I/O),
+  ein Coordinator wäre hier reiner Mehraufwand ohne Nutzen. Dieselben Werte
+  liefert diagnostics.py als Download — hier stehen sie zusätzlich live auf
+  der Geräteseite, ohne dafür erst "Diagnose herunterladen" klicken zu müssen.
+- `ZeitarchivLatestBackupSensor`: coordinator-basiert wie
+  `ZeitarchivHealthBinarySensor` in binary_sensor.py, bewusst KEIN
+  entity_category=diagnostic — der Zustandswechsel ist der Automations-
+  Trigger für eine eigene Offsite-Kopie des Backups (siehe
+  blueprints/automation/zeitarchiv/backup_upload.yaml), eine Diagnose-Entity
+  wäre dafür schwerer auffindbar.
 """
 
 from __future__ import annotations
@@ -26,15 +34,19 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo, EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
+from .coordinator import ZeitarchivNoticesCoordinator
 from .queue_writer import ZeitarchivQueueWriter
 
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    queue_writer: ZeitarchivQueueWriter = hass.data[DOMAIN][entry.entry_id]["queue_writer"]
+    entry_data = hass.data[DOMAIN][entry.entry_id]
+    queue_writer: ZeitarchivQueueWriter = entry_data["queue_writer"]
+    notices_coordinator: ZeitarchivNoticesCoordinator = entry_data["notices_coordinator"]
     device_info = DeviceInfo(
         identifiers={(DOMAIN, entry.entry_id)},
         name=entry.title,
@@ -47,6 +59,7 @@ async def async_setup_entry(
             ZeitarchivSentCountSensor(queue_writer, entry, device_info),
             ZeitarchivQueueSizeSensor(queue_writer, entry, device_info),
             ZeitarchivDroppedSensor(queue_writer, entry, device_info),
+            ZeitarchivLatestBackupSensor(notices_coordinator, entry, device_info),
         ]
     )
 
@@ -138,3 +151,45 @@ class ZeitarchivDroppedSensor(_ZeitarchivDiagnosticSensor):
 
     def update(self) -> None:
         self._attr_native_value = self._queue_writer.dropped_count
+
+
+class ZeitarchivLatestBackupSensor(
+    CoordinatorEntity[ZeitarchivNoticesCoordinator], SensorEntity
+):
+    """Zeitpunkt des letzten ERFOLGREICHEN Zeitarchiv-Backups. Bewusst KEIN
+    entity_category=diagnostic (Unterschied zu _ZeitarchivDiagnosticSensor
+    oben) und coordinator-basiert statt should_poll: der Zustandswechsel ist
+    der Automations-Trigger für eine eigene Offsite-Kopie, siehe
+    blueprints/automation/zeitarchiv/backup_upload.yaml — eine Diagnose-
+    Entity wäre für einen Automations-Trigger schwerer auffindbar, das würde
+    den Zweck unterlaufen."""
+
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+    _attr_has_entity_name = True
+    _attr_icon = "mdi:cloud-upload-outline"
+
+    def __init__(
+        self,
+        coordinator: ZeitarchivNoticesCoordinator,
+        entry: ConfigEntry,
+        device_info: DeviceInfo,
+    ) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry.entry_id}_latest_backup"
+        self._attr_translation_key = "latest_backup"
+        self._attr_device_info = device_info
+
+    def _latest_backup(self) -> dict | None:
+        return (self.coordinator.data or {}).get("latest_backup")
+
+    @property
+    def native_value(self):
+        backup = self._latest_backup()
+        if not backup or backup.get("finished_at") is None:
+            return None
+        return datetime.fromtimestamp(backup["finished_at"], tz=timezone.utc)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        backup = self._latest_backup() or {}
+        return {"filename": backup.get("filename"), "size_bytes": backup.get("size_bytes")}

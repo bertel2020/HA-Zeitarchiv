@@ -150,6 +150,9 @@
       },
       "dropped_count": {
         "name": "Dropped events (since start)"
+      },
+      "latest_backup": {
+        "name": "Latest backup"
       }
     },
     "binary_sensor": {

@@ -150,6 +150,9 @@
       },
       "dropped_count": {
         "name": "Verworfene Ereignisse (seit Start)"
+      },
+      "latest_backup": {
+        "name": "Letztes Backup"
       }
     },
     "binary_sensor": {

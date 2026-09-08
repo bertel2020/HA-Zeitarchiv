@@ -1,0 +1,42 @@
+blueprint:
+  name: "Zeitarchiv: Backup hochladen"
+  description: >
+    Löst beim nächsten erfolgreichen Zeitarchiv-Backup eine eigene Aktion
+    aus — z. B. `shell_command` mit `rclone copy`, ein Cloud-Backup-Addon
+    oder Node-RED. Zeitarchiv selbst spricht kein S3/WebDAV/SMB; dieses
+    Blueprint verdrahtet nur "wann", nicht "wohin".
+  domain: automation
+  source_url: https://github.com/bertel2020/HA-Zeitarchiv/blob/main/blueprints/automation/zeitarchiv/backup_upload.yaml
+  input:
+    backup_sensor:
+      name: Zeitarchiv-Backup-Sensor
+      description: >
+        Der "Letztes Backup"-Sensor der gewünschten Zeitarchiv-Verbindung.
+      selector:
+        entity:
+          filter:
+            - integration: zeitarchiv
+              domain: sensor
+    upload_action:
+      name: Upload-Aktion
+      description: >
+        Deine eigene Aktion für die eigentliche Übertragung. Per Vorlage
+        verfügbar: {{ trigger.to_state.state }} (Zeitpunkt, ISO 8601),
+        {{ trigger.to_state.attributes.filename }} und
+        {{ trigger.to_state.attributes.size_bytes }}.
+      selector:
+        action: {}
+
+mode: single
+
+trigger:
+  - trigger: state
+    entity_id: !input backup_sensor
+
+condition:
+  - condition: template
+    value_template: >
+      {{ trigger.to_state.state not in ['unknown', 'unavailable', 'none'] }}
+
+action:
+  - action: !input upload_action

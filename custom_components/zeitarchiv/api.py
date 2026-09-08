@@ -63,10 +63,12 @@ class ZeitarchivClient:
                 f"App antwortete mit Status {response.status_code}"
             )
 
-    def get_notices(self) -> list[dict[str, Any]]:
-        """Aktuell aktive, nicht stummgeschaltete Meldungen der App (siehe
-        notices.py/api_routes.py dort) — Grundlage für Repairs/binary_sensor.
-        Wirft bei Fehlschlag, wie test_connection()/write_batch()."""
+    def get_notices(self) -> dict[str, Any]:
+        """Aktuell aktive, nicht stummgeschaltete Meldungen UND das letzte
+        erfolgreiche Backup der App (siehe notices.py/api_routes.py dort) —
+        Grundlage für Repairs/binary_sensor.py (notices) und sensor.py
+        (latest_backup). Wirft bei Fehlschlag, wie
+        test_connection()/write_batch()."""
         try:
             response = requests.get(
                 f"{self._base_url}/api/notices", headers=self._headers, timeout=_TIMEOUT
@@ -85,10 +87,16 @@ class ZeitarchivClient:
             payload = response.json()
         except ValueError as err:
             raise ZeitarchivApiError("App lieferte keine gültige JSON-Antwort") from err
+
         notices = payload.get("notices") if isinstance(payload, dict) else None
         if not isinstance(notices, list):
             raise ZeitarchivApiError("App lieferte eine unerwartete Antwortstruktur")
-        return notices
+
+        latest_backup = payload.get("latest_backup") if isinstance(payload, dict) else None
+        if latest_backup is not None and not isinstance(latest_backup, dict):
+            raise ZeitarchivApiError("App lieferte eine unerwartete Antwortstruktur")
+
+        return {"notices": notices, "latest_backup": latest_backup}
 
     def write_batch(self, events: list[dict[str, Any]]) -> None:
         """Schickt einen Batch Events an /api/write. Wirft bei Fehlschlag."""

@@ -92,7 +92,7 @@ class ZeitarchivHealthBinarySensor(
         self._attr_device_info = device_info
 
     def _matching_notices(self) -> list[dict]:
-        notices = self.coordinator.data or []
+        notices = (self.coordinator.data or {}).get("notices", [])
         return [notice for notice in notices if notice.get("id") in self._spec.notice_ids]
 
     @property

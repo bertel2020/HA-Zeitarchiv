@@ -28,8 +28,10 @@ _LOGGER = logging.getLogger(__name__)
 NOTICES_SCAN_INTERVAL = timedelta(seconds=60)
 
 
-class ZeitarchivNoticesCoordinator(DataUpdateCoordinator[list[dict]]):
-    """Pollt /api/notices."""
+class ZeitarchivNoticesCoordinator(DataUpdateCoordinator[dict]):
+    """Pollt /api/notices — liefert {"notices": [...], "latest_backup": {...}
+    | None} (siehe api.get_notices() und app/api_routes.py auf der App-
+    Seite)."""
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry, client: ZeitarchivClient) -> None:
         self.client = client
@@ -41,7 +43,7 @@ class ZeitarchivNoticesCoordinator(DataUpdateCoordinator[list[dict]]):
             update_interval=NOTICES_SCAN_INTERVAL,
         )
 
-    async def _async_update_data(self) -> list[dict]:
+    async def _async_update_data(self) -> dict:
         try:
             return await self.hass.async_add_executor_job(self.client.get_notices)
         except ZeitarchivApiError as err:
