@@ -66,9 +66,9 @@ class ZeitarchivClient:
     def get_notices(self) -> dict[str, Any]:
         """Aktuell aktive, nicht stummgeschaltete Meldungen UND das letzte
         erfolgreiche Backup der App (siehe notices.py/api_routes.py dort) —
-        Grundlage für Repairs/binary_sensor.py (notices) und sensor.py
-        (latest_backup). Wirft bei Fehlschlag, wie
-        test_connection()/write_batch()."""
+        Grundlage für Repairs/binary_sensor.py (notices), sensor.py
+        (latest_backup) und ZeitarchivModeSensor (demo_mode). Wirft bei
+        Fehlschlag, wie test_connection()/write_batch()."""
         try:
             response = requests.get(
                 f"{self._base_url}/api/notices", headers=self._headers, timeout=_TIMEOUT
@@ -96,7 +96,14 @@ class ZeitarchivClient:
         if latest_backup is not None and not isinstance(latest_backup, dict):
             raise ZeitarchivApiError("App lieferte eine unerwartete Antwortstruktur")
 
-        return {"notices": notices, "latest_backup": latest_backup}
+        # Default False statt Pflichtfeld: eine ältere App-Version ohne
+        # dieses Feld (vor DEMO_MODUS_PLAN.md Punkt 11) konnte ohnehin nur
+        # produktiv laufen — kein Versions-Gate nötig.
+        demo_mode = payload.get("demo_mode", False) if isinstance(payload, dict) else False
+        if not isinstance(demo_mode, bool):
+            raise ZeitarchivApiError("App lieferte eine unerwartete Antwortstruktur")
+
+        return {"notices": notices, "latest_backup": latest_backup, "demo_mode": demo_mode}
 
     def write_batch(self, events: list[dict[str, Any]]) -> None:
         """Schickt einen Batch Events an /api/write. Wirft bei Fehlschlag."""

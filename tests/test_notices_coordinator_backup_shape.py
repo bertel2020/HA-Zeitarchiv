@@ -51,3 +51,22 @@ def test_entity_sensor_translations_have_latest_backup_key() -> None:
     for name in ("strings.json", "translations/de.json", "translations/en.json"):
         data = json.loads((INTEGRATION_DIR / name).read_text(encoding="utf-8"))
         assert "name" in data["entity"]["sensor"]["latest_backup"]
+
+
+def test_sensor_defines_mode_sensor_without_diagnostic_category() -> None:
+    source = (INTEGRATION_DIR / "sensor.py").read_text(encoding="utf-8")
+    start = source.index("class ZeitarchivModeSensor")
+    rest = source[start:]
+    end = rest.find("\nclass ", 1)
+    class_source = rest if end == -1 else rest[:end]
+
+    assert "SensorDeviceClass.ENUM" in class_source
+    assert "_attr_entity_category" not in class_source
+
+
+def test_entity_sensor_translations_have_mode_key_with_both_states() -> None:
+    for name in ("strings.json", "translations/de.json", "translations/en.json"):
+        data = json.loads((INTEGRATION_DIR / name).read_text(encoding="utf-8"))
+        mode = data["entity"]["sensor"]["mode"]
+        assert "name" in mode
+        assert set(mode["state"]) == {"produktiv", "demo"}

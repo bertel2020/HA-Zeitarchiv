@@ -153,6 +153,13 @@
       },
       "latest_backup": {
         "name": "Latest backup"
+      },
+      "mode": {
+        "name": "Operating mode",
+        "state": {
+          "produktiv": "Production",
+          "demo": "Demo mode"
+        }
       }
     },
     "binary_sensor": {

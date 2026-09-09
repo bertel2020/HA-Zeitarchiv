@@ -19,6 +19,16 @@ Zwei unterschiedliche Muster nebeneinander, je nach Datenquelle:
   Trigger für eine eigene Offsite-Kopie des Backups (siehe
   blueprints/automation/zeitarchiv/backup_upload.yaml), eine Diagnose-Entity
   wäre dafür schwerer auffindbar.
+- `ZeitarchivModeSensor`: derselbe Coordinator wie `ZeitarchivLatestBackupSensor`
+  (dieselbe /api/notices-Antwort liefert seit DEMO_MODUS_PLAN.md Punkt 11
+  zusätzlich "demo_mode"), ebenfalls bewusst KEIN entity_category=diagnostic
+  — "läuft die verbundene Instanz gerade als Demo?" soll im normalen
+  Dashboard auffindbar sein. Der dritte, im Mockup gezeigte Zustand "Nicht
+  verbunden" ist KEIN eigener Enum-Wert, sondern der Standard-`unavailable`-
+  Zustand von `CoordinatorEntity` (siehe deren `available`-Property,
+  gekoppelt an `coordinator.last_update_success`) — dieselbe Home-Assistant-
+  Mechanik, die auch `ZeitarchivLatestBackupSensor` bei einem
+  Verbindungsausfall schon heute zeigt.
 """
 
 from __future__ import annotations
@@ -60,6 +70,7 @@ async def async_setup_entry(
             ZeitarchivQueueSizeSensor(queue_writer, entry, device_info),
             ZeitarchivDroppedSensor(queue_writer, entry, device_info),
             ZeitarchivLatestBackupSensor(notices_coordinator, entry, device_info),
+            ZeitarchivModeSensor(notices_coordinator, entry, device_info),
         ]
     )
 
@@ -193,3 +204,35 @@ class ZeitarchivLatestBackupSensor(
     def extra_state_attributes(self) -> dict:
         backup = self._latest_backup() or {}
         return {"filename": backup.get("filename"), "size_bytes": backup.get("size_bytes")}
+
+
+class ZeitarchivModeSensor(CoordinatorEntity[ZeitarchivNoticesCoordinator], SensorEntity):
+    """Betriebsmodus der verbundenen App-Instanz (Produktiv/Demo-Modus) —
+    siehe Modul-Docstring oben für die Begründung von Coordinator-Basis,
+    fehlender entity_category=diagnostic und dem dritten, nicht als
+    Enum-Wert abgebildeten Mockup-Zustand "Nicht verbunden"."""
+
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = ["produktiv", "demo"]
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: ZeitarchivNoticesCoordinator,
+        entry: ConfigEntry,
+        device_info: DeviceInfo,
+    ) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry.entry_id}_mode"
+        self._attr_translation_key = "mode"
+        self._attr_device_info = device_info
+
+    @property
+    def native_value(self) -> str | None:
+        if not self.coordinator.data:
+            return None
+        return "demo" if self.coordinator.data.get("demo_mode") else "produktiv"
+
+    @property
+    def icon(self) -> str:
+        return "mdi:flask-outline" if self.native_value == "demo" else "mdi:check-decagram-outline"

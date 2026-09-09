@@ -254,6 +254,18 @@ werden. Der Bericht enthält:
 
 Der API-Token wird automatisch geschwärzt.
 
+## Betriebsmodus
+
+Der Sensor **Betriebsmodus** am Zeitarchiv-Gerät zeigt, ob die verbundene
+App-Instanz gerade produktiv oder im Demo-Modus läuft (eine synthetische
+Vorführ-/Testinstanz mit eigenem Datenverzeichnis, siehe Zeitarchiv-App-
+Dokumentation). Nützlich, um in Automationen oder per Blick aufs Dashboard
+zu erkennen, ob man gerade auf einer Vorführinstanz statt der echten Anlage
+sitzt. Bewusst keine Diagnose-Entity, aus demselben Grund wie beim
+Backup-Sensor unten. Ist die App gerade nicht erreichbar, zeigt die Entity
+den Home-Assistant-Standardzustand „Nicht verfügbar" statt eines falschen
+Werts.
+
 ## Offsite-Backup per Automation
 
 Zeitarchiv spricht selbst kein S3/WebDAV/SMB — dafür bräuchte der Container
