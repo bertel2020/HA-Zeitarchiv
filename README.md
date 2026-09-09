@@ -83,6 +83,11 @@ eintragen.
 Die [Zeitarchiv-App](https://github.com/bertel2020/HA-Apps/tree/main/zeitarchiv) muss laufen. Den API-Token findest
 du dort unter **Einstellungen → Verbindung**.
 
+App und Integration versionieren unabhängig voneinander, keine bestimmte
+Mindestversion nötig — neuere Funktionen (z. B. der Betriebsmodus-Sensor)
+bleiben gegen eine ältere Gegenseite einfach ungenutzt, statt die
+Verbindung zu stören.
+
 #### 2. Custom Integration kopieren
 
 Das Verzeichnis `custom_components/zeitarchiv` nach
@@ -254,6 +259,43 @@ werden. Der Bericht enthält:
 
 Der API-Token wird automatisch geschwärzt.
 
+## Wartungshinweise: Repairs und Health-Sensoren
+
+Beide Wege lesen dieselben Meldungen der App (`/api/notices`, gepollt alle
+60 s), aber für unterschiedliche Zwecke — nur ein Ausschnitt wird zur
+Repair-Karte, ein anderer (überlappender) Ausschnitt zu automatisierbaren
+Entities:
+
+**Drei `binary_sensor`-Health-Entities** am Zeitarchiv-Gerät, bewusst
+**keine** Diagnose-Entities (sollen im normalen Dashboard/für Automationen
+auffindbar bleiben):
+
+| Sensor | Springt an bei |
+| --- | --- |
+| Backup fehlgeschlagen | letzter Sicherungslauf fehlgeschlagen |
+| Entitäten inaktiv | eine oder mehrere Entitäten melden sich seit mehreren Tagen nicht mehr (info/warn/error gebündelt) |
+| Wartungshinweis | Speicherindex-Abgleichsfehler, fehlgeschlagene Aufbewahrung, empfohlene Bereinigung, knapper Host-Speicherplatz |
+
+Jeder Sensor trägt als Attribut `reasons`/`details` die genauen Meldungs-IDs
+und Texte, die ihn gerade auslösen — praktisch, wenn mehrere Ursachen
+gleichzeitig zutreffen.
+
+**Home-Assistant-Repairs** (Einstellungen → System → Repairs) decken davon
+nur die wirklich kritischen Fälle ab, die einer bewussten Reaktion
+bedürfen: fehlgeschlagenes Backup, fehlgeschlagene Aufbewahrung,
+fehlgeschlagener Import (nur bei komplettem Fehlschlag, nicht bei
+Teilerfolg), lange inaktive Entitäten (nur die kritische Stufe), veraltete
+Integrationsversion, sowie kritisch knapper Host-Speicherplatz. Absichtlich
+keine interaktiven Fix-Flows — die eigentliche Behebung (Backup erneut
+anstoßen, Aufbewahrung prüfen, Integration aktualisieren) passiert in der
+Zeitarchiv-App bzw. über HACS, die Repair-Karte dient als Hinweis mit
+Handlungsanweisung im Text.
+
+**Eine Ausnahme kommt nicht aus den Meldungen:** Das Repair-Issue „Zeitarchiv-
+Verbindung pausiert" (siehe [Token ändern](#token-ändern)) entsteht
+eigenständig direkt aus dem Schreibpfad, weil der normale, meldungsbasierte
+Weg in genau dem Moment (abgelehnter Token) selbst nicht erreichbar ist.
+
 ## Betriebsmodus
 
 Der Sensor **Betriebsmodus** am Zeitarchiv-Gerät zeigt, ob die verbundene
@@ -297,6 +339,17 @@ Die Integration startet daraufhin den Home-Assistant-Reauth-Flow; der
 ausstehende Batch bleibt erhalten. Den neuen Token einfach im angezeigten
 Dialog eintragen.
 
+**Ausnahme: Demo-Modus.** Schaltet die App auf den [Demo-Modus](#betriebsmodus)
+um, ändert sich ihr Token ebenfalls — löst aber bewusst **keinen** Reauth
+aus: Die Integration erkennt den Grund selbst (kein echtes Tokenproblem) und
+pausiert stattdessen ruhig, erkennbar an einem eigenen Hinweis unter
+Einstellungen → Repairs. Sobald die App zurück auf Produktiv geschaltet
+wird, sendet die Verbindung von selbst wieder — mit dem ursprünglichen
+Token, ohne etwas hier nachzupflegen. Nur wenn sich das nicht eindeutig
+bestimmen lässt, fragt der gewohnte Reauth-Dialog nach — und warnt dann
+zusätzlich, falls der neu eingetragene Token zufällig doch zu einer
+Demo-Instanz gehört.
+
 Verbindungsname, Host, Port und Token können außerdem jederzeit über die
 Integrationskachel → **Neu konfigurieren** geändert werden. Die Verbindung wird
 vor der Übernahme erneut getestet.
@@ -339,9 +392,10 @@ Relevante Module:
 | `events.py` | Validierung und Event-Aufbereitung |
 | `filtering.py` | Ein- und Ausschlusslogik |
 | `queue_writer.py` | Queue, Batching, Retry und Live-Zähler |
-| `coordinator.py` | Pollt `/api/notices` (Meldungen und letztes Backup) |
-| `sensor.py` | Diagnose-Entitäten sowie der Backup-Sensor für Automationen |
+| `coordinator.py` | Pollt `/api/notices` (Meldungen, letztes Backup, Betriebsmodus) |
+| `sensor.py` | Diagnose-Entitäten sowie Backup-/Betriebsmodus-Sensor für Automationen |
 | `binary_sensor.py` | Automations-taugliche Health-Entities aus den Meldungen |
+| `repairs.py` | Home-Assistant-Repairs für kritische Meldungen, plus das eigenständige "Verbindung pausiert"-Issue |
 | `diagnostics.py` | Geschwärzter Diagnosebericht |
 
 ## Bekannte Grenzen
