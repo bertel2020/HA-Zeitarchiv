@@ -20,7 +20,7 @@ eigentlichen Zeitreihen, Charts und Tabellen bleiben Aufgabe der App.
 | --- | --- |
 | Auswahl | Bevorzugt Labels; optional einzelne Entitäten, Bereiche, Geräte und Entity-Muster kombinieren |
 | Ausschluss | Einzelne Entity-IDs und Ausschlussmuster haben immer Vorrang |
-| Aufbereitung | Numerische Werte mit einstellbaren Nachkommastellen (0–3, Standard 3) sowie Schalterzustände `on`/`off` |
+| Aufbereitung | Numerische Werte mit einstellbaren Nachkommastellen (0–3, Standard 3) sowie Schalter- (`on`/`off`) und Anwesenheitszustände (`home`/`not_home`) |
 | Transport | In-Memory-Queue, Batches, Timeout und dauerhafte Retries |
 | Sicherheit | Bearer-Token; Reauth-Hinweis bei abgelehntem Token |
 | Transparenz | Vier Diagnose-Sensoren und Diagnose-Download |
@@ -158,6 +158,9 @@ zusätzlichen Archivpunkt.
   Messwerten (z. B. Strom in A) aber Genauigkeit.
 - `binary_sensor`, `switch` und `input_boolean` werden als `on → 1` und
   `off → 0` übertragen.
+- `device_tracker` und `person` werden als Anwesenheit übertragen:
+  `home → 1`, jeder andere Zustand (`not_home` oder eine benannte Zone
+  ungleich `home`) `→ 0`.
 - Textwerte sowie `unknown`, `unavailable`, `none` und leere Zustände werden
   nicht archiviert.
 
