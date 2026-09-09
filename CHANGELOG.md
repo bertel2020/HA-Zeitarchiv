@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.18.0 - 2026-09-09
+
+### Neu
+
+- Schaltet die verbundene App in den Demo-Modus um, löst das bei
+  bestehenden Verbindungen keinen unnötigen Reauth-Dialog mehr aus. Die
+  Integration erkennt den Grund selbst und pausiert stattdessen ruhig
+  (sichtbar unter Einstellungen → Repairs), bis die App zurück auf
+  Produktiv geschaltet wird — dann sendet die Verbindung von selbst
+  wieder, ohne dass etwas nachgepflegt werden muss.
+
 ## 0.17.0 - 2026-09-09
 
 ### Neu
