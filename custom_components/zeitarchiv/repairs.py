@@ -81,9 +81,39 @@ def async_sync_issues(hass: HomeAssistant, entry: ConfigEntry, notices: list[dic
     entry_data["active_repair_issues"] = current_issue_ids
 
 
+def async_set_demo_mode_paused_issue(hass: HomeAssistant, entry: ConfigEntry, active: bool) -> None:
+    """Eigenständiges Issue, NICHT über async_sync_issues()/die Notices-Liste
+    (DEMO_MODUS_REAUTH_PLAN.md). Grund: während der Token abgelehnt wird,
+    kann der ZeitarchivNoticesCoordinator /api/notices selbst nicht abrufen
+    (derselbe Token) — der normale, notices-getriebene Repair-Weg ist in
+    genau diesem Moment blockiert. Wird direkt aus queue_writer.py über
+    on_demo_mode_detected/on_demo_mode_resolved ausgelöst, sobald ein
+    abgelehnter Token per /api/health als "Ziel läuft im Demo-Modus" statt
+    als echtes Tokenproblem erkannt wird bzw. sobald ein Batch danach
+    wieder gelingt."""
+    issue_id = f"{entry.entry_id}_demo_mode_paused"
+    if active:
+        ir.async_create_issue(
+            hass,
+            DOMAIN,
+            issue_id,
+            is_fixable=False,
+            severity=ir.IssueSeverity.WARNING,
+            translation_key="demo_mode_paused",
+            translation_placeholders={"connection": entry.title},
+        )
+    else:
+        ir.async_delete_issue(hass, DOMAIN, issue_id)
+
+
 def async_clear_issues(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Entfernt alle noch offenen Repair-Issues eines Entries — beim Entladen/
     Entfernen der Verbindung, damit keine verwaisten Karten stehen bleiben."""
+    # Nicht Teil von active_repair_issues (das führt nur async_sync_issues()
+    # nach, siehe async_set_demo_mode_paused_issue() oben) — ir.async_delete_issue
+    # ist ein No-op, falls das Issue gerade nicht aktiv ist, deshalb hier
+    # unbedingt statt bedingt aufgerufen.
+    ir.async_delete_issue(hass, DOMAIN, f"{entry.entry_id}_demo_mode_paused")
     entry_data = hass.data[DOMAIN].get(entry.entry_id)
     if not entry_data:
         return

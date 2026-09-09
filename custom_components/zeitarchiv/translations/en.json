@@ -27,6 +27,13 @@
         "data": {
           "api_token": "API token"
         }
+      },
+      "reauth_confirm_demo_warning": {
+        "title": "Zeitarchiv – target is running in demo mode",
+        "description": "The new token belongs to an instance that is currently running in demo mode — probably because the app was switched over while \"{connection}\" still had the old token. Use it anyway? If you cancel, the previous token stays unchanged and will work again on its own once the app switches back to production.",
+        "data": {
+          "confirm": "Use it anyway"
+        }
       }
     },
     "error": {
@@ -37,7 +44,8 @@
     },
     "abort": {
       "reconfigure_successful": "Connection updated.",
-      "reauth_successful": "New token saved."
+      "reauth_successful": "New token saved.",
+      "demo_mode_reauth_cancelled": "Cancelled — the previous token stays unchanged."
     }
   },
   "options": {
@@ -198,6 +206,10 @@
     "housekeeping_host_disk_space_low": {
       "title": "Host disk space running low",
       "description": "Free disk space on the host filesystem is running low for \"{connection}\": {detail}\n\nSee the Zeitarchiv app (Settings → Housekeeping) for details."
+    },
+    "demo_mode_paused": {
+      "title": "Zeitarchiv connection paused",
+      "description": "The connection \"{connection}\" is not sending right now because the app is running in demo mode — not a token problem. Resumes on its own once the app switches back to production."
     }
   }
 }

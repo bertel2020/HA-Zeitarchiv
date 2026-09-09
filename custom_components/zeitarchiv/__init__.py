@@ -79,8 +79,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # den Token in der Zeitarchiv-GUI selbst neu zu generieren
     # (Einstellungen → Verbindung) — ohne das hier würde ein dort geänderter
     # Token nur endlos leise im Log ausstehende Batches erzeugen.
+    # on_demo_mode_detected/on_demo_mode_resolved (DEMO_MODUS_REAUTH_PLAN.md):
+    # dieselbe hass.add_job-Notwendigkeit wie on_auth_failed (Hintergrund-
+    # Thread, kein Event-Loop) — repairs_mod.async_set_demo_mode_paused_issue
+    # ruft ir.async_create_issue/async_delete_issue auf, beide müssen auf dem
+    # Event-Loop laufen, nicht auf dem Queue-Writer-Thread.
     queue_writer = ZeitarchivQueueWriter(
-        client, on_auth_failed=lambda: hass.add_job(entry.async_start_reauth, hass)
+        client,
+        on_auth_failed=lambda: hass.add_job(entry.async_start_reauth, hass),
+        on_demo_mode_detected=lambda: hass.add_job(
+            repairs_mod.async_set_demo_mode_paused_issue, hass, entry, True
+        ),
+        on_demo_mode_resolved=lambda: hass.add_job(
+            repairs_mod.async_set_demo_mode_paused_issue, hass, entry, False
+        ),
     )
     queue_writer.start()
     notices_coordinator = ZeitarchivNoticesCoordinator(hass, entry, client)

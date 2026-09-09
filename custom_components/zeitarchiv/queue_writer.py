@@ -28,9 +28,14 @@ _STOP = object()
 
 
 class WriteClient(Protocol):
-    """Alles, was der Queue-Writer vom HTTP-Client braucht — für Fakes in Tests."""
+    """Alles, was der Queue-Writer vom HTTP-Client braucht — für Fakes in Tests.
+
+    test_connection() ist optional (siehe _probe_demo_mode()): ein Fake ohne
+    diese Methode lässt die Demo-Modus-Erkennung einfach leer laufen (None),
+    kein Fehlschlag — bestehende Tests brauchen dafür keine Anpassung."""
 
     def write_batch(self, events: list[dict[str, Any]]) -> None: ...
+    def test_connection(self) -> None: ...
 
 
 class ZeitarchivQueueWriter:
@@ -45,6 +50,8 @@ class ZeitarchivQueueWriter:
         batch_timeout: float = BATCH_TIMEOUT,
         retry_delays: tuple[float, ...] = RETRY_DELAYS,
         on_auth_failed: Callable[[], None] | None = None,
+        on_demo_mode_detected: Callable[[], None] | None = None,
+        on_demo_mode_resolved: Callable[[], None] | None = None,
     ) -> None:
         self._client = client
         self._batch_size = batch_size
@@ -56,6 +63,15 @@ class ZeitarchivQueueWriter:
         # Bereich "Verbindung") als normaler HA-Reauth-Hinweis auftaucht statt
         # nur endlos leise Batches im Log zu verlieren.
         self._on_auth_failed = on_auth_failed
+        # DEMO_MODUS_REAUTH_PLAN.md: bevor ein abgelehnter Token einen Reauth
+        # auslöst, prüft _probe_demo_mode() erst, ob die Ablehnung daran
+        # liegt, dass das Ziel gerade im Demo-Modus läuft — dann kein Reauth,
+        # sondern dieser Callback (ruhige Pause statt Tokenwechsel-Aufforderung).
+        # on_demo_mode_resolved ist das Gegenstück, sobald ein Batch wieder
+        # gelingt, siehe _flush().
+        self._on_demo_mode_detected = on_demo_mode_detected
+        self._on_demo_mode_resolved = on_demo_mode_resolved
+        self._demo_mode_paused = False
         self._queue: queue.Queue = queue.Queue(maxsize=max_queue_size)
         self._thread: threading.Thread | None = None
         self._shutdown_event = threading.Event()
@@ -177,6 +193,27 @@ class ZeitarchivQueueWriter:
             if shutting_down and not batch and self._queue.empty():
                 break
 
+    def _probe_demo_mode(self) -> bool | None:
+        """Best-effort-Zusatzprüfung bei einem gerade abgelehnten Token
+        (DEMO_MODUS_REAUTH_PLAN.md): derselbe, jetzt ungültige Token
+        verrät über /api/health trotzdem, ob das Ziel im Demo-Modus läuft
+        (siehe api.py::_demo_mode_from_error_body — jeder andere Endpunkt
+        verlangt denselben Token und ließe sich sonst nicht mehr befragen).
+        Liefert None bei jeder Unklarheit (kein test_connection() auf dem
+        Client, Probe wirft etwas anderes als ZeitarchivAuthError, oder die
+        Probe gelingt unerwartet) — der Aufrufer behandelt None wie False:
+        sicherer Rückfall auf den normalen Reauth-Pfad, nie umgekehrt."""
+        probe = getattr(self._client, "test_connection", None)
+        if probe is None:
+            return None
+        try:
+            probe()
+        except ZeitarchivAuthError as err:
+            return err.demo_mode
+        except Exception:  # noqa: BLE001 — die Probe darf den Flush nie stören
+            return None
+        return None  # Probe erfolgreich? Token war doch gültig — kein Demo-Signal ableitbar
+
     def _flush(self, batch: list[dict[str, Any]]) -> bool:
         """Wiederholt einen Batch bis zum Erfolg oder bis zum expliziten Stopp."""
         attempt = 0
@@ -190,17 +227,32 @@ class ZeitarchivQueueWriter:
                 self._sent_count += len(batch)
                 self._last_success_ts = time.time()
                 self._last_error = None
+                if self._demo_mode_paused:
+                    self._demo_mode_paused = False
+                    if self._on_demo_mode_resolved is not None:
+                        self._on_demo_mode_resolved()
                 return True
             except ZeitarchivAuthError as err:
                 self._last_error = str(err)
                 if not auth_notified:
-                    _LOGGER.warning(
-                        "Zeitarchiv-Token abgelehnt; Batch mit %d Events bleibt bis zur Reauth ausstehend: %s",
-                        len(batch),
-                        err,
-                    )
-                if not auth_notified and self._on_auth_failed is not None:
-                    self._on_auth_failed()
+                    demo_mode = self._probe_demo_mode()
+                    if demo_mode is True:
+                        _LOGGER.info(
+                            "Zeitarchiv-Ziel läuft im Demo-Modus; Batch mit %d Events bleibt "
+                            "ausstehend, bis wieder produktiv geschaltet wird (kein Tokenproblem)",
+                            len(batch),
+                        )
+                        self._demo_mode_paused = True
+                        if self._on_demo_mode_detected is not None:
+                            self._on_demo_mode_detected()
+                    else:
+                        _LOGGER.warning(
+                            "Zeitarchiv-Token abgelehnt; Batch mit %d Events bleibt bis zur Reauth ausstehend: %s",
+                            len(batch),
+                            err,
+                        )
+                        if self._on_auth_failed is not None:
+                            self._on_auth_failed()
                 auth_notified = True
             except Exception as err:  # noqa: BLE001 — jeder andere Client-Fehler ist hier retry-würdig
                 self._last_error = str(err)

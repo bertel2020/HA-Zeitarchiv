@@ -22,7 +22,35 @@ class ZeitarchivApiError(Exception):
 
 
 class ZeitarchivAuthError(ZeitarchivApiError):
-    """Der API-Token wurde von der App abgelehnt."""
+    """Der API-Token wurde von der App abgelehnt.
+
+    demo_mode (DEMO_MODUS_REAUTH_PLAN.md): best-effort aus dem 401-Body von
+    /api/health gelesen — True/False, wenn die App-Version das Feld schon
+    liefert, sonst None (unbekannt: ältere App-Version, kein JSON-Body,
+    o. Ä.). queue_writer.py nutzt das, um vor einem Reauth zu prüfen, ob
+    die Ablehnung an einem echten Tokenproblem liegt oder daran, dass das
+    Ziel gerade im Demo-Modus läuft — bei None gilt derselbe Rückfall wie
+    bei False: normaler Reauth wie bisher."""
+
+    def __init__(self, message: str, *, demo_mode: bool | None = None) -> None:
+        super().__init__(message)
+        self.demo_mode = demo_mode
+
+
+def _demo_mode_from_error_body(response: requests.Response) -> bool | None:
+    """Best-effort: liest demo_mode aus dem 401-Body von /api/health
+    ({"detail": {"message": ..., "demo_mode": bool}}, siehe api_routes.py
+    dort). Nie ein Fehlschlag hier — ein kaputtes/fehlendes Feld bedeutet
+    nur "unbekannt" (None), nicht dass etwas mit der eigentlichen
+    401-Behandlung schiefgegangen wäre."""
+    try:
+        detail = response.json().get("detail")
+    except ValueError:
+        return None
+    if not isinstance(detail, dict):
+        return None
+    demo_mode = detail.get("demo_mode")
+    return demo_mode if isinstance(demo_mode, bool) else None
 
 
 class ZeitarchivClient:
@@ -57,7 +85,9 @@ class ZeitarchivClient:
             raise ZeitarchivApiError(f"App nicht erreichbar: {err}") from err
 
         if response.status_code == 401:
-            raise ZeitarchivAuthError("API-Token wurde von der App abgelehnt")
+            raise ZeitarchivAuthError(
+                "API-Token wurde von der App abgelehnt", demo_mode=_demo_mode_from_error_body(response)
+            )
         if response.status_code != 200:
             raise ZeitarchivApiError(
                 f"App antwortete mit Status {response.status_code}"

@@ -27,6 +27,13 @@
         "data": {
           "api_token": "API-Token"
         }
+      },
+      "reauth_confirm_demo_warning": {
+        "title": "Zeitarchiv – Ziel läuft im Demo-Modus",
+        "description": "Der neue Token gehört zu einer Instanz, die gerade im Demo-Modus läuft — vermutlich, weil die App umgeschaltet wurde, während „{connection}\" noch den alten Token hatte. Trotzdem übernehmen? Bei Abbruch bleibt der bisherige Token unverändert und funktioniert von selbst wieder, sobald die App zurück auf Produktiv geschaltet wird.",
+        "data": {
+          "confirm": "Trotzdem übernehmen"
+        }
       }
     },
     "error": {
@@ -37,7 +44,8 @@
     },
     "abort": {
       "reconfigure_successful": "Verbindung aktualisiert.",
-      "reauth_successful": "Neuer Token gespeichert."
+      "reauth_successful": "Neuer Token gespeichert.",
+      "demo_mode_reauth_cancelled": "Abgebrochen — der bisherige Token bleibt unverändert."
     }
   },
   "options": {
@@ -198,6 +206,10 @@
     "housekeeping_host_disk_space_low": {
       "title": "Host-Speicherplatz wird knapp",
       "description": "Für „{connection}\" wird der freie Speicherplatz auf dem Host-Dateisystem knapp: {detail}\n\nDetails in der Zeitarchiv-App (Einstellungen → Housekeeping)."
+    },
+    "demo_mode_paused": {
+      "title": "Zeitarchiv-Verbindung pausiert",
+      "description": "Die Verbindung „{connection}\" sendet aktuell nicht, weil die App im Demo-Modus läuft — kein Tokenproblem. Läuft von selbst weiter, sobald die App zurück auf Produktiv geschaltet wird."
     }
   }
 }

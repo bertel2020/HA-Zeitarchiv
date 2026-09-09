@@ -174,6 +174,30 @@ async def _validate_input(hass: Any, data: dict[str, Any]) -> None:
     await hass.async_add_executor_job(client.test_connection)
 
 
+async def _reauth_target_is_demo_mode(hass: Any, data: dict[str, Any]) -> bool:
+    """DEMO_MODUS_REAUTH_PLAN.md, zweite Sicherheitsebene (die erste sitzt
+    in queue_writer.py::_probe_demo_mode() und vermeidet den Reauth meist
+    schon von vornherein) — nur für async_step_reauth_confirm, NICHT für
+    user/reconfigure: dort ist eine bewusst gewählte Demo-Instanz als Ziel
+    plausibel, bei einem automatisch ausgelösten Reauth einer bestehenden
+    Verbindung dagegen eher ein Versehen. Best-effort: jeder Fehlschlag
+    (Netz, kaputtes JSON, ältere App-Version ohne das Feld) gilt als
+    False — dieser Zusatz-Check darf den eigentlichen Reauth nie selbst
+    blockieren."""
+    integration = await async_get_integration(hass, DOMAIN)
+    client = ZeitarchivClient(
+        data[CONF_HOST],
+        data[CONF_PORT],
+        data[CONF_API_TOKEN],
+        integration_version=str(integration.version) if integration.version else None,
+    )
+    try:
+        notices = await hass.async_add_executor_job(client.get_notices)
+    except ZeitarchivApiError:
+        return False
+    return notices.get("demo_mode") is True
+
+
 class ZeitarchivConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Verbindung zur Zeitarchiv-App einrichten."""
 
@@ -279,6 +303,7 @@ class ZeitarchivConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         naheliegendste Moment für "Token neu setzen": genau dann, wenn er
         gerade abgelehnt wurde, statt dass man das erst im Log bemerken müsste."""
         self._reauth_entry_data = entry_data
+        self._pending_reauth_data: dict[str, Any] | None = None
         return await self.async_step_reauth_confirm()
 
     async def async_step_reauth_confirm(
@@ -300,6 +325,14 @@ class ZeitarchivConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Unerwarteter Fehler beim Verbindungstest")
                 errors["base"] = "unknown"
             else:
+                # DEMO_MODUS_REAUTH_PLAN.md: der neue Token gehört zu einer
+                # Instanz, die gerade im Demo-Modus läuft — vermutlich, weil
+                # die App umgeschaltet wurde, während diese Verbindung noch
+                # den alten (Produktiv-)Token hatte. Erst bestätigen lassen,
+                # statt stillschweigend umzustellen.
+                if await _reauth_target_is_demo_mode(self.hass, data):
+                    self._pending_reauth_data = data
+                    return await self.async_step_reauth_confirm_demo_warning()
                 # Wie beim Reconfigure übernimmt ausschließlich der vorhandene
                 # Update-Listener den Reload.
                 return self.async_update_and_abort(self._get_reauth_entry(), data=data)
@@ -316,6 +349,27 @@ class ZeitarchivConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 }
             ),
             errors=errors,
+        )
+
+    async def async_step_reauth_confirm_demo_warning(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Zwischenschritt, nur erreicht wenn _reauth_target_is_demo_mode()
+        oben zugeschlagen hat. Bestätigt der Nutzer NICHT, bricht der Flow
+        einfach ab — der ursprüngliche (Produktiv-)Token bleibt unangetastet
+        in der Config-Entry stehen und funktioniert von selbst wieder, sobald
+        die App zurück auf Produktiv geschaltet wird (DEMO_MODUS_REAUTH_PLAN.md)."""
+        if user_input is not None:
+            data = self._pending_reauth_data
+            self._pending_reauth_data = None
+            if user_input.get("confirm"):
+                return self.async_update_and_abort(self._get_reauth_entry(), data=data)
+            return self.async_abort(reason="demo_mode_reauth_cancelled")
+
+        return self.async_show_form(
+            step_id="reauth_confirm_demo_warning",
+            data_schema=vol.Schema({vol.Required("confirm", default=False): bool}),
+            description_placeholders={"connection": self._get_reauth_entry().title},
         )
 
     @staticmethod

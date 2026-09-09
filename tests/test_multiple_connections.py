@@ -37,9 +37,13 @@ def test_reconfigure_updates_connection_name_and_title() -> None:
 
 
 def test_reconfigure_and_reauth_rely_on_update_listener_for_reload() -> None:
+    """Drei Aufrufstellen seit DEMO_MODUS_REAUTH_PLAN.md: reconfigure,
+    reauth_confirm und der neue reauth_confirm_demo_warning-Zwischenschritt
+    (Bestätigung der Demo-Modus-Warnung) — alle drei nutzen denselben
+    sicheren Reload-Weg über den bestehenden Update-Listener."""
     source = FLOW_PATH.read_text(encoding="utf-8")
 
-    assert source.count("self.async_update_and_abort(") == 2
+    assert source.count("self.async_update_and_abort(") == 3
     assert "return self.async_update_reload_and_abort(" not in source
     assert "await self.hass.config_entries.async_reload(" not in source
 

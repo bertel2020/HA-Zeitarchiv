@@ -45,6 +45,44 @@ class AuthFailingClient:
         raise ZeitarchivAuthError("Token abgelehnt")
 
 
+class DemoModeAuthFailingClient:
+    """Lehnt write_batch() die ersten N Male mit ZeitarchivAuthError(demo_mode=True)
+    ab (Ziel im Demo-Modus), danach gelingt es wie nach dem Zurückschalten auf
+    Produktiv. test_connection() (die Probe aus _probe_demo_mode()) bestätigt
+    währenddessen dasselbe demo_mode=True."""
+
+    def __init__(self, fail_first: int) -> None:
+        self.calls: list[list[dict]] = []
+        self.probe_calls = 0
+        self._fail_first = fail_first
+
+    def write_batch(self, events: list[dict]) -> None:
+        self.calls.append(list(events))
+        if len(self.calls) <= self._fail_first:
+            raise ZeitarchivAuthError("Token abgelehnt", demo_mode=True)
+
+    def test_connection(self) -> None:
+        self.probe_calls += 1
+        raise ZeitarchivAuthError("Token abgelehnt", demo_mode=True)
+
+
+class NonDemoAuthFailingClient:
+    """Lehnt write_batch() dauerhaft ab; test_connection() bestätigt aktiv
+    demo_mode=False — ein echtes Tokenproblem, kein Demo-Modus-Fall."""
+
+    def __init__(self) -> None:
+        self.calls: list[list[dict]] = []
+        self.probe_calls = 0
+
+    def write_batch(self, events: list[dict]) -> None:
+        self.calls.append(list(events))
+        raise ZeitarchivAuthError("Token abgelehnt")
+
+    def test_connection(self) -> None:
+        self.probe_calls += 1
+        raise ZeitarchivAuthError("Token abgelehnt", demo_mode=False)
+
+
 def _wait(event: threading.Event, timeout: float = 2.0) -> None:
     assert event.wait(timeout), "Timeout beim Warten auf den Queue-Writer"
 
@@ -153,6 +191,67 @@ def test_auth_error_retries_and_calls_callback_once_per_batch() -> None:
             time.sleep(0.01)
         assert len(client.calls) >= 2
         assert len(auth_failures) == 1
+    finally:
+        writer.stop()
+
+
+def test_demo_mode_auth_error_pauses_without_reauth_and_resolves_on_recovery() -> None:
+    """DEMO_MODUS_REAUTH_PLAN.md: ein abgelehnter Token löst erst
+    _probe_demo_mode() aus (test_connection() bestätigt demo_mode=True) —
+    dann KEIN Reauth, sondern on_demo_mode_detected(); sobald ein Batch
+    wieder gelingt (Ziel zurück auf Produktiv), feuert on_demo_mode_resolved()."""
+    client = DemoModeAuthFailingClient(fail_first=3)
+    detected: list[int] = []
+    resolved: list[int] = []
+    auth_failures: list[int] = []
+    writer = ZeitarchivQueueWriter(
+        client,
+        batch_size=1,
+        batch_timeout=10,
+        retry_delays=(0.01,),
+        on_auth_failed=lambda: auth_failures.append(1),
+        on_demo_mode_detected=lambda: detected.append(1),
+        on_demo_mode_resolved=lambda: resolved.append(1),
+    )
+    writer.start()
+    try:
+        writer.enqueue({"entity_id": "sensor.a"})
+        deadline = time.monotonic() + 2.0
+        while len(client.calls) < 4 and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert len(client.calls) == 4  # 3 im Demo-Modus fehlgeschlagen, 4. gelingt
+        assert client.probe_calls == 1  # nur einmal geprüft, nicht bei jedem Retry
+        assert detected == [1]
+        assert resolved == [1]
+        assert auth_failures == []  # kein Reauth ausgelöst
+    finally:
+        writer.stop()
+
+
+def test_auth_error_with_confirmed_non_demo_mode_still_triggers_reauth() -> None:
+    """Regressionsschutz für den sicheren Rückfall: bestätigt die Probe
+    aktiv "kein Demo-Modus" (demo_mode=False), läuft weiterhin der normale
+    Reauth-Pfad, nicht die Demo-Pause."""
+    client = NonDemoAuthFailingClient()
+    auth_failures: list[int] = []
+    detected: list[int] = []
+    writer = ZeitarchivQueueWriter(
+        client,
+        batch_size=1,
+        batch_timeout=10,
+        retry_delays=(0.01,),
+        on_auth_failed=lambda: auth_failures.append(1),
+        on_demo_mode_detected=lambda: detected.append(1),
+    )
+    writer.start()
+    try:
+        writer.enqueue({"entity_id": "sensor.a"})
+        deadline = time.monotonic() + 2.0
+        while not auth_failures and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert auth_failures == [1]
+        assert detected == []
+        assert client.probe_calls == 1
     finally:
         writer.stop()
 
