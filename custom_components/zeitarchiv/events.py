@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import uuid
 
-from .const import IGNORED_STATES, SWITCH_DOMAINS
+from .const import IGNORED_STATES, PRESENCE_DOMAINS, SWITCH_DOMAINS
 
 
 def build_event(
@@ -24,6 +24,9 @@ def build_event(
     """Baut das Event-Payload für die Queue, oder None wenn der Zustand verworfen wird.
 
     Schalter-Domains (binary_sensor/switch/input_boolean) werden auf 1/0 normalisiert.
+    Anwesenheits-Domains (device_tracker/person) ebenso, aber mit eigenem
+    State-Vokabular: "home" → 1, alles andere (auch eine benannte Zone
+    ungleich "home") → 0.
     Alles andere muss sich als float parsen lassen (Standard- und Zähler-Entitäten) —
     nicht-numerische Text-Sensoren werden in Phase 1 bewusst nicht archiviert, weil das
     Speicherformat aus dem Konzept (timestamp, value) dafür nicht ausgelegt ist.
@@ -36,6 +39,8 @@ def build_event(
         if normalized_state not in ("on", "off"):
             return None
         value = 1.0 if normalized_state == "on" else 0.0
+    elif domain in PRESENCE_DOMAINS:
+        value = 1.0 if normalized_state == "home" else 0.0
     else:
         try:
             # Die Integration begrenzt die uebertragenen Messwerte bereits an

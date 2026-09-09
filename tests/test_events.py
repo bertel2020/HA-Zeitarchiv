@@ -72,6 +72,31 @@ def test_binary_sensor_with_unexpected_state_is_dropped() -> None:
     assert build_event("binary_sensor.tuer", "binary_sensor", "problem", None, None, 1.0) is None
 
 
+def test_device_tracker_home_becomes_one() -> None:
+    event = build_event("device_tracker.handy", "device_tracker", "home", None, None, 1.0)
+    assert event["value"] == 1.0
+
+
+def test_device_tracker_not_home_becomes_zero() -> None:
+    event = build_event("device_tracker.handy", "device_tracker", "not_home", None, None, 1.0)
+    assert event["value"] == 0.0
+
+
+def test_device_tracker_named_zone_becomes_zero() -> None:
+    event = build_event("device_tracker.handy", "device_tracker", "arbeit", None, None, 1.0)
+    assert event["value"] == 0.0
+
+
+def test_person_home_normalized_case_insensitive() -> None:
+    event = build_event("person.roberto", "person", "HOME", None, None, 1.0)
+    assert event["value"] == 1.0
+
+
+def test_person_not_home_becomes_zero() -> None:
+    event = build_event("person.roberto", "person", "not_home", None, None, 1.0)
+    assert event["value"] == 0.0
+
+
 def _run_all() -> None:
     tests = [obj for name, obj in globals().items() if name.startswith("test_")]
     for test in tests:

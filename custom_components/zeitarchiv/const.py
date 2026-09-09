@@ -36,5 +36,11 @@ RETRY_DELAYS = (1, 2, 4, 8, 15, 30, 60)
 # unabhängig von state_class (die haben ohnehin meist keine).
 SWITCH_DOMAINS = {"binary_sensor", "switch", "input_boolean"}
 
+# Domains mit Anwesenheits-Zuständen ("home"/"not_home"/Zonenname statt
+# "on"/"off") — werden wie SWITCH_DOMAINS als Schalter archiviert (Zuhause →
+# 1, alles andere, auch eine benannte Zone ungleich "home" → 0), nur das
+# State-Vokabular unterscheidet sich.
+PRESENCE_DOMAINS = {"device_tracker", "person"}
+
 # Zustände, die nie archiviert werden.
 IGNORED_STATES = {"unavailable", "unknown", "none", ""}
