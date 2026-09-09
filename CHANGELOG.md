@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.17.0 - 2026-09-09
+
+### Neu
+
+- `device_tracker`- und `person`-Entitäten sind jetzt archivierbar. Sie
+  gelten wie Schalter: „Zuhause" wird als „an" gewertet, jeder andere
+  Zustand (unterwegs oder eine benannte Zone) als „aus".
+- Neuer Sensor **Betriebsmodus** am Zeitarchiv-Gerät zeigt, ob die
+  verbundene App-Instanz gerade produktiv oder im Demo-Modus läuft (siehe
+  App-Dokumentation) — nützlich, um in Automationen oder per Blick aufs
+  Dashboard eine Vorführinstanz von der echten Anlage zu unterscheiden.
+
 ## 0.16.0 - 2026-09-08
 
 ### Neu
