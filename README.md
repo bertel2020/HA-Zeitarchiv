@@ -273,7 +273,7 @@ auffindbar bleiben):
 | Sensor | Springt an bei |
 | --- | --- |
 | Backup fehlgeschlagen | letzter Sicherungslauf fehlgeschlagen |
-| Entitäten inaktiv | eine oder mehrere Entitäten melden sich seit mehreren Tagen nicht mehr (info/warn/error gebündelt) |
+| Inaktive Entitäten erkannt | eine oder mehrere Entitäten melden sich seit mehreren Tagen nicht mehr (info/warn/error gebündelt) |
 | Wartungshinweis | Speicherindex-Abgleichsfehler, fehlgeschlagene Aufbewahrung, empfohlene Bereinigung, knapper Host-Speicherplatz |
 
 Jeder Sensor trägt als Attribut `reasons`/`details` die genauen Meldungs-IDs
