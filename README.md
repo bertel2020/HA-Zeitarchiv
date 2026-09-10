@@ -9,6 +9,14 @@
   <sub>FILTER · QUEUE · BATCHING · RETRY · DIAGNOSE · AUTOMATION · YAML-TRANSFER</sub>
 </p>
 
+<p align="center">
+  <a href="https://github.com/hacs/integration"><img src="https://img.shields.io/badge/HACS-Custom-41BDF5.svg" alt="HACS Custom"></a>
+  <a href="https://github.com/bertel2020/HA-Zeitarchiv/releases"><img src="https://img.shields.io/github/v/release/bertel2020/HA-Zeitarchiv?sort=semver" alt="Release"></a>
+  <a href="https://github.com/bertel2020/HA-Zeitarchiv/actions/workflows/validate.yml"><img src="https://github.com/bertel2020/HA-Zeitarchiv/actions/workflows/validate.yml/badge.svg" alt="Validate"></a>
+  <a href="https://github.com/bertel2020/HA-Zeitarchiv/actions/workflows/tests.yml"><img src="https://github.com/bertel2020/HA-Zeitarchiv/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/bertel2020/HA-Zeitarchiv" alt="License"></a>
+</p>
+
 Die Zeitarchiv-Integration beobachtet ausgewählte Zustandsänderungen und
 überträgt sie gebündelt an die [Zeitarchiv-App](https://github.com/bertel2020/HA-Apps/tree/main/zeitarchiv). Sie
 erzeugt keine Kopien der archivierten Entitäten in Home Assistant: Die
@@ -375,28 +383,6 @@ Ausdrücke sind bewusst nicht zugelassen.
 Bereiche und Geräte werden beim Speichern der Optionen in konkrete Entity-IDs
 aufgelöst. Entitäten, die später neu zu einem gewählten Bereich oder Gerät
 hinzukommen, werden erst nach erneutem Speichern der Filter berücksichtigt.
-
-## Entwicklung
-
-HACS und Home Assistants `hassfest` prüfen die Repository- und
-Integrationsstruktur automatisch bei jedem Push und Pull Request. Die
-Transport-, Filter- und YAML-Logik ist von einer laufenden
-Home-Assistant-Instanz getrennt testbar (`pytest`, siehe die Tests im
-Entwicklungs-Monorepo).
-
-Relevante Module:
-
-| Datei | Aufgabe |
-| --- | --- |
-| `config_flow.py` | Einrichtung, Reauth, Filtermenü und YAML-Transfer |
-| `events.py` | Validierung und Event-Aufbereitung |
-| `filtering.py` | Ein- und Ausschlusslogik |
-| `queue_writer.py` | Queue, Batching, Retry und Live-Zähler |
-| `coordinator.py` | Pollt `/api/notices` (Meldungen, letztes Backup, Betriebsmodus) |
-| `sensor.py` | Diagnose-Entitäten sowie Backup-/Betriebsmodus-Sensor für Automationen |
-| `binary_sensor.py` | Automations-taugliche Health-Entities aus den Meldungen |
-| `repairs.py` | Home-Assistant-Repairs für kritische Meldungen, plus das eigenständige "Verbindung pausiert"-Issue |
-| `diagnostics.py` | Geschwärzter Diagnosebericht |
 
 ## Bekannte Grenzen
 
