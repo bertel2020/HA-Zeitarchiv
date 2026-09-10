@@ -5,8 +5,7 @@
 <h1 align="center">Zeitarchiv Integration</h1>
 
 <p align="center">
-  Der zuverlässige Schreibpfad von Home Assistant in das Zeitarchiv.<br>
-  <sub>FILTER · QUEUE · BATCHING · RETRY · DIAGNOSE · AUTOMATION · YAML-TRANSFER</sub>
+  Der zuverlässige Schreibpfad von Home Assistant in das Zeitarchiv.
 </p>
 
 <p align="center">
@@ -26,45 +25,13 @@ eigentlichen Zeitreihen, Charts und Tabellen bleiben Aufgabe der App.
 
 | Aufgabe | Verhalten |
 | --- | --- |
-| Auswahl | Bevorzugt Labels; optional einzelne Entitäten, Bereiche, Geräte und Entity-Muster kombinieren |
-| Ausschluss | Einzelne Entity-IDs und Ausschlussmuster haben immer Vorrang |
-| Aufbereitung | Numerische Werte mit einstellbaren Nachkommastellen (0–3, Standard 3) sowie Schalter- (`on`/`off`) und Anwesenheitszustände (`home`/`not_home`) |
-| Transport | In-Memory-Queue, Batches, Timeout und dauerhafte Retries |
-| Sicherheit | Bearer-Token; Reauth-Hinweis bei abgelehntem Token |
-| Transparenz | Vier Diagnose-Sensoren und Diagnose-Download |
-| Übertragbarkeit | Filter als versioniertes YAML exportieren/importieren |
-
-## Datenfluss
-
-```text
-Integration geladen/neu geladen ─► aktueller Zustand
-state_changed                  ───► neue Zustandsänderung
-     │
-     ├─ nur tatsächliche Zustandsänderung?
-     ├─ Filter trifft zu und nicht ausgeschlossen?
-     └─ unterstützter Wert?
-             │
-             ▼
-       In-Memory-Queue
-       max. 5.000 Events
-             │
-             ▼
-       Batch bis 100 Events
-       oder spätestens nach 5 s
-             │
-             ▼
-       Zeitarchiv-App :8127
-```
-
-Eine stabile Event-ID macht wiederholte Übertragungen idempotent. Geht eine
-HTTP-Antwort verloren, kann derselbe Batch erneut gesendet werden, ohne in der
-App denselben Messpunkt doppelt anzulegen.
-
-Unmittelbar beim Laden oder Neuladen eines Integrationseintrags werden die
-aktuellen Zustände aller passenden Entitäten einmal in die Warteschlange
-gelegt. Dadurch erscheinen neu ausgewählte Entitäten sofort in der App; die
-Integration wartet weder auf die nächste Zustandsänderung noch auf einen
-erneuten Start von Home Assistant.
+| **Auswahl der Entitäten** | Bevorzugt Labels; optional einzelne Entitäten, Bereiche, Geräte und Entity-Muster kombinieren |
+| **Ausschlüsse** | Einzelne Entity-IDs und Ausschlussmuster haben immer Vorrang |
+| **Wertaufbereitung** | Numerische Werte mit einstellbaren Nachkommastellen (0–3, Standard 3) sowie Schalter- (`on`/`off`) und Anwesenheitszustände (`home`/`not_home`) |
+| **Zuverlässiger Transport** | In-Memory-Queue, Batches, Timeout und dauerhafte Retries |
+| **Sichere Verbindung** | Bearer-Token; Reauth-Hinweis bei abgelehntem Token |
+| **Diagnose** | Vier Diagnose-Sensoren und Diagnose-Download |
+| **Filter übertragen** | Als versioniertes YAML exportieren/importieren — praktisch, um dieselbe Auswahl auf ein zweites System zu übernehmen |
 
 ## Installation
 
@@ -155,6 +122,38 @@ Domainfilter werden nicht mehr angeboten. Beim Upgrade werden früher
 gespeicherte Domainauswahlen einmalig in die zu diesem Zeitpunkt bekannten
 konkreten Entity-IDs umgewandelt. Für neue und später hinzukommende Entitäten
 sind Labels der bevorzugte Weg.
+
+## Datenfluss
+
+```text
+Integration geladen/neu geladen ─► aktueller Zustand
+state_changed                  ───► neue Zustandsänderung
+     │
+     ├─ nur tatsächliche Zustandsänderung?
+     ├─ Filter trifft zu und nicht ausgeschlossen?
+     └─ unterstützter Wert?
+             │
+             ▼
+       In-Memory-Queue
+       max. 5.000 Events
+             │
+             ▼
+       Batch bis 100 Events
+       oder spätestens nach 5 s
+             │
+             ▼
+       Zeitarchiv-App :8127
+```
+
+Eine stabile Event-ID macht wiederholte Übertragungen idempotent. Geht eine
+HTTP-Antwort verloren, kann derselbe Batch erneut gesendet werden, ohne in der
+App denselben Messpunkt doppelt anzulegen.
+
+Unmittelbar beim Laden oder Neuladen eines Integrationseintrags werden die
+aktuellen Zustände aller passenden Entitäten einmal in die Warteschlange
+gelegt. Dadurch erscheinen neu ausgewählte Entitäten sofort in der App; die
+Integration wartet weder auf die nächste Zustandsänderung noch auf einen
+erneuten Start von Home Assistant.
 
 ## Welche Werte werden archiviert?
 
@@ -403,5 +402,5 @@ hinzukommen, werden erst nach erneutem Speichern der Filter berücksichtigt.
 
 ## Lizenz
 
-Dieses Projekt steht unter der [Apache License 2.0](LICENSE).
+Dieses Projekt steht unter der [MIT-Lizenz](LICENSE).
 Copyright 2026 Roberto / bertel2020.
