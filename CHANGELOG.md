@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.18.1 - 2026-09-11
+
+### Neu
+
+- **Wartungshinweis** erkennt jetzt zusätzlich eine empfohlene
+  Index-Optimierung.
+
+### Geändert
+
+- Binary-Sensor „Entitäten inaktiv" heißt jetzt „Inaktive Entitäten
+  erkannt".
+
+### Entfernt
+
+- Repair-Hinweis „Zeitarchiv-Import fehlgeschlagen": ein Import läuft
+  interaktiv in der App, sein Ergebnis ist dort direkt sichtbar.
+
+### Behoben
+
+- Der Sensor **Betriebsmodus** zeigte sich selbst „Nicht verfügbar",
+  sobald die verbundene App in den Demo-Modus wechselte. Er zeigt jetzt
+  zuverlässig „Demo"; die Health-Sensoren zeigen währenddessen „Unbekannt"
+  statt fälschlich „Aus".
+
 ## 0.18.0 - 2026-09-09
 
 ### Neu
