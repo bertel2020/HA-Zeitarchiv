@@ -1,11 +1,11 @@
 name: Tag release
 
 # Setzt bei jedem Push auf main, der die Version in manifest.json ändert,
-# automatisch einen Git-Tag "vX.Y.Z" — mehr nicht, bewusst kein GitHub
-# Release (siehe Projekt-Konvention: "Release" heißt hier nur Version +
-# CHANGELOG.md bumpen). HACS erkennt neue Versionen für die
-# Update-Benachrichtigung über genau diese Tags, ein Release-Objekt ist
-# dafür nicht nötig.
+# automatisch einen Git-Tag "vX.Y.Z" und ein GitHub Release dazu — Notizen
+# kommen aus dem passenden Abschnitt von CHANGELOG.md, kein manuelles
+# Nachpflegen nötig. HACS erkennt neue Versionen für die
+# Update-Benachrichtigung über den Tag; das Release macht den Changelog-Text
+# zusätzlich in der HACS-UI/GitHub-UI sichtbar.
 
 on:
   push:
@@ -19,6 +19,8 @@ permissions:
 jobs:
   tag:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -32,12 +34,45 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Create and push tag if new
+        id: tag
         env:
           TAG: v${{ steps.version.outputs.version }}
         run: |
           if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "Tag $TAG existiert bereits, nichts zu tun."
+            echo "Tag $TAG existiert bereits."
+          else
+            git tag "$TAG"
+            git push origin "$TAG"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Extract CHANGELOG.md section for this version
+        id: notes
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          NOTES_FILE=$(mktemp)
+          awk -v version="$VERSION" '
+            $0 ~ "^## " version " " { flag=1; next }
+            /^## / { if (flag) exit }
+            flag { print }
+          ' CHANGELOG.md > "$NOTES_FILE"
+          if [ ! -s "$NOTES_FILE" ]; then
+            echo "Kein Abschnitt \"## $VERSION\" in CHANGELOG.md gefunden — Release-Notes blieben leer." >&2
+            exit 1
+          fi
+          echo "notes_file=$NOTES_FILE" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release if new
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+          NOTES_FILE: ${{ steps.notes.outputs.notes_file }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG existiert bereits, nichts zu tun."
             exit 0
           fi
-          git tag "$TAG"
-          git push origin "$TAG"
+          gh release create "$TAG" \
+            --title "Zeitarchiv Integration $VERSION" \
+            --notes-file "$NOTES_FILE"
