@@ -179,6 +179,9 @@
       },
       "health_issue": {
         "name": "Maintenance notice"
+      },
+      "background_stalled": {
+        "name": "Background service not responding"
       }
     }
   },
