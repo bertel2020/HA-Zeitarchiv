@@ -50,19 +50,6 @@ _HEALTH_SENSORS: tuple[_HealthSensorSpec, ...] = (
             "system.index_optimization",
         }),
     ),
-    # Anders als backup_failed oben (reagiert erst, wenn ein Job den
-    # Endzustand "failed" erreicht): ein hängender Hintergrund-Thread
-    # erreicht diesen Endzustand nie und bliebe sonst komplett unsichtbar —
-    # deckt genau die drei *_stalled-Meldungen der App ab (Wartungsplaner,
-    # Speicherindex-Abgleich, laufendes Backup).
-    _HealthSensorSpec(
-        "background_stalled",
-        frozenset({
-            "system.scheduler_stalled",
-            "system.storage_reconcile_stalled",
-            "system.backup_worker_stalled",
-        }),
-    ),
 )
 
 

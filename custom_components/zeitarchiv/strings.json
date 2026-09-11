@@ -179,9 +179,6 @@
       },
       "health_issue": {
         "name": "Wartungshinweis"
-      },
-      "background_stalled": {
-        "name": "Hintergrunddienst reagiert nicht"
       }
     }
   },

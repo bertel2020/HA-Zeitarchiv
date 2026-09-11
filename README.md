@@ -282,7 +282,6 @@ auffindbar bleiben):
 | Backup fehlgeschlagen | letzter Sicherungslauf fehlgeschlagen |
 | Inaktive Entitäten erkannt | eine oder mehrere Entitäten melden sich seit mehreren Tagen nicht mehr (info/warn/error gebündelt) |
 | Wartungshinweis | Speicherindex-Abgleichsfehler, fehlgeschlagene Aufbewahrung, empfohlene Bereinigung, knapper Host-Speicherplatz, empfohlene Index-Optimierung |
-| Hintergrunddienst reagiert nicht | Wartungsplaner, Speicherindex-Abgleich oder laufendes Backup melden seit mehreren Minuten keinen Fortschritt mehr — anders als „Backup fehlgeschlagen" erkennt das auch einen hängenden statt nur einen fehlgeschlagenen Lauf |
 
 Jeder Sensor trägt als Attribut `reasons`/`details` die genauen Meldungs-IDs
 und Texte, die ihn gerade auslösen — praktisch, wenn mehrere Ursachen
