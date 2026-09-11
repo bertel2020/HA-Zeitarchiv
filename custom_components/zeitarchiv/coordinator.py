@@ -17,7 +17,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api import ZeitarchivApiError, ZeitarchivClient
+from .api import ZeitarchivApiError, ZeitarchivAuthError, ZeitarchivClient
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -46,5 +46,38 @@ class ZeitarchivNoticesCoordinator(DataUpdateCoordinator[dict]):
     async def _async_update_data(self) -> dict:
         try:
             return await self.hass.async_add_executor_job(self.client.get_notices)
+        except ZeitarchivAuthError as err:
+            # /api/notices verlangt denselben Token wie /api/write und wird im
+            # Demo-Modus ebenso abgelehnt (die App nutzt dort ein eigenes
+            # Datenverzeichnis mit eigenem Token, siehe DEMO_MODUS_PLAN.md) —
+            # anders als /api/health liefert sein 401-Body kein demo_mode-Feld.
+            # Dieselbe Probe wie queue_writer.py._probe_demo_mode() klärt das
+            # separat, bevor wir auf einen echten Verbindungsfehler schließen.
+            demo_mode = await self.hass.async_add_executor_job(self._probe_demo_mode)
+            if demo_mode:
+                _LOGGER.info(
+                    "Zeitarchiv-Ziel läuft im Demo-Modus; Meldungen und Backup-Status "
+                    "bleiben unbekannt, bis wieder produktiv geschaltet wird"
+                )
+                return {
+                    "notices": [],
+                    "latest_backup": None,
+                    "demo_mode": True,
+                    "unauthenticated": True,
+                }
+            raise UpdateFailed(str(err)) from err
         except ZeitarchivApiError as err:
             raise UpdateFailed(str(err)) from err
+
+    def _probe_demo_mode(self) -> bool | None:
+        """Wie queue_writer.py._probe_demo_mode(): derselbe, gerade
+        abgelehnte Token verrät über /api/health trotzdem, ob das Ziel im
+        Demo-Modus läuft. Liefert None bei jeder Unklarheit — der Aufrufer
+        behandelt None wie False: sicherer Rückfall auf UpdateFailed."""
+        try:
+            self.client.test_connection()
+        except ZeitarchivAuthError as err:
+            return err.demo_mode
+        except Exception:  # noqa: BLE001 — Probe darf den Update-Versuch nie stören
+            return None
+        return None  # Probe erfolgreich? Token war doch gültig — kein Demo-Signal

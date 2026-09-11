@@ -96,7 +96,12 @@ class ZeitarchivHealthBinarySensor(
         return [notice for notice in notices if notice.get("id") in self._spec.notice_ids]
 
     @property
-    def is_on(self) -> bool:
+    def is_on(self) -> bool | None:
+        # "unauthenticated" (coordinator.py): Demo-Modus-Fallback ohne echte
+        # Meldungsdaten von der App — None zeigt "Unbekannt" statt fälschlich
+        # "Aus" (kein Problem erkannt), obwohl schlicht nichts geprüft wurde.
+        if (self.coordinator.data or {}).get("unauthenticated"):
+            return None
         return bool(self._matching_notices())
 
     @property

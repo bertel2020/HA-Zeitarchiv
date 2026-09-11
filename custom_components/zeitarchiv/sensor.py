@@ -23,12 +23,23 @@ Zwei unterschiedliche Muster nebeneinander, je nach Datenquelle:
   (dieselbe /api/notices-Antwort liefert seit DEMO_MODUS_PLAN.md Punkt 11
   zusätzlich "demo_mode"), ebenfalls bewusst KEIN entity_category=diagnostic
   — "läuft die verbundene Instanz gerade als Demo?" soll im normalen
-  Dashboard auffindbar sein. Der dritte, im Mockup gezeigte Zustand "Nicht
-  verbunden" ist KEIN eigener Enum-Wert, sondern der Standard-`unavailable`-
-  Zustand von `CoordinatorEntity` (siehe deren `available`-Property,
-  gekoppelt an `coordinator.last_update_success`) — dieselbe Home-Assistant-
-  Mechanik, die auch `ZeitarchivLatestBackupSensor` bei einem
-  Verbindungsausfall schon heute zeigt.
+  Dashboard auffindbar sein. Ursprünglich (Punkt 11.5) sollte ein Ausfall von
+  /api/notices — auch der 401 im Demo-Modus, weil die App dort ein eigenes
+  Datenverzeichnis mit eigenem Token nutzt — pauschal auf den Standard-
+  `unavailable`-Zustand von `CoordinatorEntity` fallen ("Nicht verbunden").
+  Das hätte aber ausgerechnet den Sensor, dessen einzige Aufgabe die Anzeige
+  von "Demo" ist, im Demo-Modus unverfügbar gemacht. Seit der Korrektur
+  erkennt `ZeitarchivNoticesCoordinator._async_update_data()` diesen Fall
+  separat (Probe über /api/health, wie `queue_writer.py._probe_demo_mode()`)
+  und liefert dann `{"unauthenticated": True, "demo_mode": True, ...}` statt
+  `UpdateFailed` — der Coordinator bleibt "erfolgreich", der Sensor zeigt
+  "Demo". "Nicht verbunden" bleibt für echte Erreichbarkeits-/Tokenfehler
+  (kein Demo-Signal von /api/health) weiterhin der reguläre `unavailable`-
+  Zustand. Die drei Health-`binary_sensor` (backup_failed, entities_inactive,
+  health_issue) und `ZeitarchivLatestBackupSensor` lesen dasselbe
+  "unauthenticated"-Flag und zeigen dann "Unbekannt" statt "Aus"/eines realen
+  Zeitstempels — es gibt im Demo-Modus schlicht keine echten Meldungsdaten,
+  und "Aus" würde fälschlich Entwarnung signalisieren.
 """
 
 from __future__ import annotations
