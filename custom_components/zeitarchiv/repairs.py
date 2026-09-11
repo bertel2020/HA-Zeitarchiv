@@ -17,14 +17,15 @@ from homeassistant.helpers import issue_registry as ir
 
 from .const import DOMAIN
 
-# import.job_failed trägt bei einem teilweise fehlgeschlagenen Import
-# (Status "partial") severity "warn" statt "error" — nur der harte
-# Fehlschlag rechtfertigt ein Repair-Issue, der Teilerfolg bleibt im
-# Glocken-Icon der App sichtbar (siehe notices.py dort). Ebenso
-# housekeeping.host_disk_space_low: die warn-Stufe (<10% frei) reicht
-# fürs binary_sensor-Bündel (siehe binary_sensor.py), erst die error-Stufe
-# (<5% frei) rechtfertigt ein eigenes Repair-Issue.
-_ERROR_ONLY_IDS = frozenset({"import.job_failed", "housekeeping.host_disk_space_low"})
+# housekeeping.host_disk_space_low: die warn-Stufe (<10% frei) reicht fürs
+# binary_sensor-Bündel (siehe binary_sensor.py), erst die error-Stufe
+# (<5% frei) rechtfertigt ein eigenes Repair-Issue. import.job_failed hatte
+# hier früher denselben Platz (nur bei komplettem Fehlschlag, Status
+# "partial" blieb außen vor) — entfernt, weil ein Import ohnehin interaktiv
+# in der App ausgelöst wird und sein Ergebnis dort direkt sichtbar ist; die
+# Integration bildete ihn nie als eigene Entity ab (kein binary_sensor), nur
+# als einmalige Repair-Karte ohne Automatisierungswert.
+_ERROR_ONLY_IDS = frozenset({"housekeeping.host_disk_space_low"})
 _ALWAYS_IDS = frozenset({
     "backup.job_failed",
     "retention.job_failed",

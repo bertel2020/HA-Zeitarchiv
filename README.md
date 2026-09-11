@@ -289,9 +289,8 @@ gleichzeitig zutreffen.
 
 **Home-Assistant-Repairs** (Einstellungen → System → Repairs) decken davon
 nur die wirklich kritischen Fälle ab, die einer bewussten Reaktion
-bedürfen: fehlgeschlagenes Backup, fehlgeschlagene Aufbewahrung,
-fehlgeschlagener Import (nur bei komplettem Fehlschlag, nicht bei
-Teilerfolg), lange inaktive Entitäten (nur die kritische Stufe), veraltete
+bedürfen: fehlgeschlagenes Backup, fehlgeschlagene Aufbewahrung, lange
+inaktive Entitäten (nur die kritische Stufe), veraltete
 Integrationsversion, sowie kritisch knapper Host-Speicherplatz. Absichtlich
 keine interaktiven Fix-Flows — die eigentliche Behebung (Backup erneut
 anstoßen, Aufbewahrung prüfen, Integration aktualisieren) passiert in der

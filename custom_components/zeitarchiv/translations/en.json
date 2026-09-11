@@ -191,10 +191,6 @@
       "title": "Zeitarchiv retention run failed",
       "description": "The latest retention run for \"{connection}\" failed: {detail}\n\nSee the Zeitarchiv app (Settings → Archiving) for details."
     },
-    "import_job_failed": {
-      "title": "Zeitarchiv import failed",
-      "description": "The latest import for \"{connection}\" failed: {detail}\n\nSee the Zeitarchiv app for details."
-    },
     "housekeeping_inactive_entities_error": {
       "title": "Zeitarchiv: entities inactive for a while",
       "description": "One or more entities for \"{connection}\" haven't reported a value in several days: {detail}\n\nSee the Zeitarchiv app for details."
