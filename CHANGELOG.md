@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.18.2 - 2026-09-15
+
+### Geändert
+
+- **Wartungshinweis** erkennt jetzt zusätzlich eine hohe Duplikatquote bei
+  der Datenübertragung.
+
+### Behoben
+
+- Ein Neuladen (z. B. nach einer Änderung der Filter-Einstellungen) sendete
+  bislang den aktuellen Zustand jeder erfassten Entität erneut, auch ohne
+  echte Änderung — bei vielen Entitäten konnte das die verbundene App
+  kurzzeitig überlasten. Die Integration merkt sich jetzt, was zuletzt
+  erfolgreich übertragen wurde, und überspringt unveränderte Werte.
+
 ## 0.18.1 - 2026-09-11
 
 ### Neu
