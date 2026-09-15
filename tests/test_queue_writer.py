@@ -228,6 +228,53 @@ def test_demo_mode_auth_error_pauses_without_reauth_and_resolves_on_recovery() -
         writer.stop()
 
 
+def test_on_batch_sent_fires_with_the_successfully_written_batch() -> None:
+    """Grundlage des persistierten Wasserstands in __init__.py — muss den
+    kompletten Batch bekommen (entity_id/ts je Event), nicht nur ein Signal,
+    damit der Aufrufer weiß, WELCHE Entitäten bis zu welchem Zeitstempel
+    bestätigt sind."""
+    client = FakeClient()
+    sent_batches: list[list[dict]] = []
+    writer = ZeitarchivQueueWriter(
+        client,
+        batch_size=2,
+        batch_timeout=10,
+        on_batch_sent=lambda batch: sent_batches.append(batch),
+    )
+    writer.start()
+    try:
+        writer.enqueue({"entity_id": "sensor.a", "ts": 1.0})
+        writer.enqueue({"entity_id": "sensor.b", "ts": 2.0})
+        _wait(client.event)
+        assert len(sent_batches) == 1
+        assert sent_batches[0] == [
+            {"entity_id": "sensor.a", "ts": 1.0},
+            {"entity_id": "sensor.b", "ts": 2.0},
+        ]
+    finally:
+        writer.stop()
+
+
+def test_on_batch_sent_does_not_fire_while_retries_are_still_failing() -> None:
+    client = FakeClient(fail_first=2)
+    sent_batches: list[list[dict]] = []
+    writer = ZeitarchivQueueWriter(
+        client,
+        batch_size=1,
+        batch_timeout=10,
+        retry_delays=(0.01,),
+        on_batch_sent=lambda batch: sent_batches.append(batch),
+    )
+    writer.start()
+    try:
+        writer.enqueue({"entity_id": "sensor.a", "ts": 1.0})
+        _wait(client.event)
+        assert len(client.calls) == 3  # 2 fehlgeschlagen, 3. gelingt
+        assert len(sent_batches) == 1  # erst beim tatsächlichen Erfolg
+    finally:
+        writer.stop()
+
+
 def test_auth_error_with_confirmed_non_demo_mode_still_triggers_reauth() -> None:
     """Regressionsschutz für den sicheren Rückfall: bestätigt die Probe
     aktiv "kein Demo-Modus" (demo_mode=False), läuft weiterhin der normale

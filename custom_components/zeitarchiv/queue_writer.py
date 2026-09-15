@@ -52,6 +52,7 @@ class ZeitarchivQueueWriter:
         on_auth_failed: Callable[[], None] | None = None,
         on_demo_mode_detected: Callable[[], None] | None = None,
         on_demo_mode_resolved: Callable[[], None] | None = None,
+        on_batch_sent: Callable[[list[dict[str, Any]]], None] | None = None,
     ) -> None:
         self._client = client
         self._batch_size = batch_size
@@ -71,6 +72,15 @@ class ZeitarchivQueueWriter:
         # gelingt, siehe _flush().
         self._on_demo_mode_detected = on_demo_mode_detected
         self._on_demo_mode_resolved = on_demo_mode_resolved
+        # Grundlage für den persistierten "zuletzt gesendet"-Wasserstand in
+        # __init__.py: ohne den wiederholt der Initial-Snapshot beim nächsten
+        # Neuladen (Options-Flow-Änderung, nicht nur ein HA-Neustart) Werte,
+        # die serverseitig längst bekannt sind — bei genügend Entitäten ein
+        # Duplikat-Sturm im Batch (siehe App-seitiger Fund dazu: ein einzelner
+        # 100-Duplikate-Batch hielt dort den Index-Lock so dicht besetzt, dass
+        # parallele Anfragen mit 503 scheiterten). Callback statt eines
+        # homeassistant-Imports hier, siehe Modul-Docstring.
+        self._on_batch_sent = on_batch_sent
         self._demo_mode_paused = False
         self._queue: queue.Queue = queue.Queue(maxsize=max_queue_size)
         self._thread: threading.Thread | None = None
@@ -231,6 +241,8 @@ class ZeitarchivQueueWriter:
                     self._demo_mode_paused = False
                     if self._on_demo_mode_resolved is not None:
                         self._on_demo_mode_resolved()
+                if self._on_batch_sent is not None:
+                    self._on_batch_sent(batch)
                 return True
             except ZeitarchivAuthError as err:
                 self._last_error = str(err)

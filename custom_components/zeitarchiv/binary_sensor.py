@@ -48,6 +48,11 @@ _HEALTH_SENSORS: tuple[_HealthSensorSpec, ...] = (
             "housekeeping.purge_available",
             "housekeeping.host_disk_space_low",
             "system.index_optimization",
+            # Kein eigener Sensor: eine hohe Duplikatquote im Ingest ist wie
+            # die übrigen hier ein "lohnt einen Blick"-Zustand, kein hartes
+            # Problem — Details stehen wie bei allen anderen in
+            # extra_state_attributes (reasons/details).
+            "ingest.duplicate_ratio_high",
         }),
     ),
 )

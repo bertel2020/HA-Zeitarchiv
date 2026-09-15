@@ -7,6 +7,7 @@ from pathlib import Path
 import _pkg  # noqa: F401  (registriert die Namespace-Pakete als Seiteneffekt)
 
 from custom_components.zeitarchiv.filtering import (
+    is_state_already_sent,
     is_state_value_change,
     normalize_entity_patterns,
     should_archive,
@@ -28,6 +29,27 @@ def test_real_state_change_is_archived() -> None:
 def test_switch_state_change_is_archived_but_same_state_is_not() -> None:
     assert is_state_value_change("off", "on") is True
     assert is_state_value_change("on", "on") is False
+
+
+def test_state_without_watermark_entry_is_not_already_sent() -> None:
+    """Vor dem ersten erfolgreichen Batch dieser Entität gibt es keinen
+    Wasserstand — der Initial-Snapshot darf sie dann nicht überspringen."""
+    assert is_state_already_sent(1_700_000_000.0, None) is False
+
+
+def test_state_older_than_or_equal_to_watermark_is_already_sent() -> None:
+    assert is_state_already_sent(1_700_000_000.0, 1_700_000_000.0) is True
+    assert is_state_already_sent(1_700_000_000.0, 1_700_000_100.0) is True
+
+
+def test_state_newer_than_watermark_is_not_already_sent() -> None:
+    """Ein echter, neuerer Zustand (z. B. seit dem letzten erfolgreichen
+    Batch geändert) muss den Initial-Snapshot weiterhin passieren."""
+    assert is_state_already_sent(1_700_000_200.0, 1_700_000_100.0) is False
+
+
+def test_state_without_last_updated_is_not_already_sent() -> None:
+    assert is_state_already_sent(None, 1_700_000_000.0) is False
 
 
 def test_state_listener_applies_value_change_filter_before_building_event() -> None:
@@ -55,7 +77,27 @@ def test_integration_enqueues_current_states_immediately_when_entry_loads() -> N
     snapshot_pos = source.index("hass.states.async_all()")
     assert listener_pos < snapshot_pos
     assert "EVENT_HOMEASSISTANT_STARTED" not in source
-    assert "_enqueue_state(state) for state in hass.states.async_all()" in source
+    assert "all_states = list(hass.states.async_all())" in source
+    assert "_enqueue_state(state) for state in all_states if not _already_sent(state)" in source
+
+
+def test_watermark_is_loaded_before_queue_writer_starts_and_persisted_on_batch_sent() -> None:
+    """__init__.py kann hier nicht ausgeführt werden (braucht echtes
+    homeassistant, siehe _pkg.py) — Positions-/Substring-Check wie bei den
+    übrigen __init__.py-Tests in dieser Datei. Zwei Dinge müssen stimmen:
+    der Wasserstand muss VOR queue_writer.start() geladen sein (sonst
+    kennt der allererste Initial-Snapshot ihn noch nicht), und
+    on_batch_sent muss verdrahtet sein, sonst wächst der Wasserstand nie."""
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "custom_components"
+        / "zeitarchiv"
+        / "__init__.py"
+    ).read_text(encoding="utf-8")
+    load_pos = source.index("await watermark_store.async_load()")
+    start_pos = source.index("queue_writer.start()")
+    assert load_pos < start_pos
+    assert "on_batch_sent=lambda batch: hass.add_job(_persist_watermark, batch)" in source
 
 
 def test_exclude_wins_over_registry_include() -> None:

@@ -30,6 +30,7 @@ from homeassistant.core import Event, EventStateChangedData, HomeAssistant, Stat
 from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.storage import Store
 from homeassistant.loader import async_get_integration
 
 from .api import ZeitarchivClient
@@ -41,7 +42,7 @@ from .const import (
 )
 from .coordinator import ZeitarchivNoticesCoordinator
 from .events import build_event
-from .filtering import is_state_value_change
+from .filtering import is_state_already_sent, is_state_value_change
 from .queue_writer import ZeitarchivQueueWriter
 from .registry_filter import ArchiveFilterMatcher, migrate_legacy_domains
 from . import repairs as repairs_mod
@@ -49,6 +50,17 @@ from . import repairs as repairs_mod
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list = ["sensor", "binary_sensor"]
+
+# Persistierter "zuletzt gesendet"-Wasserstand je Entität (entity_id → ts) —
+# verhindert, dass der Initial-Snapshot beim Neuladen (Options-Flow-Änderung,
+# nicht nur ein HA-Neustart) Werte erneut sendet, die serverseitig längst
+# bekannt sind. Ohne den Wasserstand verlässt sich der Snapshot vollständig
+# auf die serverseitige Dedup-Prüfung (siehe Kommentar bei initial_events
+# unten) — bei genügend Entitäten wird daraus ein Batch aus fast nur
+# Duplikaten, der auf der App-Seite pro Duplikat eine Archiv-Datei liest und
+# dabei den dortigen Index-Lock so dicht besetzt hält, dass parallele
+# Anfragen mit 503 scheitern (an einer echten Installation beobachtet).
+_WATERMARK_STORAGE_VERSION = 1
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -70,6 +82,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry.data[CONF_API_TOKEN],
         integration_version=str(integration.version) if integration.version else None,
     )
+    # Wasserstand VOR dem Queue-Writer laden: on_batch_sent unten schreibt
+    # bereits ab dem ersten erfolgreichen Batch in dasselbe Dict.
+    watermark_store: Store[dict[str, float]] = Store(
+        hass, _WATERMARK_STORAGE_VERSION, f"{DOMAIN}_{entry.entry_id}_watermark"
+    )
+    watermark: dict[str, float] = await watermark_store.async_load() or {}
+
+    async def _persist_watermark(batch: list[dict]) -> None:
+        changed = False
+        for event in batch:
+            entity_id = event.get("entity_id")
+            ts = event.get("ts")
+            if entity_id is None or ts is None:
+                continue
+            if ts > watermark.get(entity_id, 0.0):
+                watermark[entity_id] = ts
+                changed = True
+        if changed:
+            await watermark_store.async_save(watermark)
+
     # on_auth_failed läuft im Hintergrund-Thread des Queue-Writers (siehe
     # dessen Docstring, kein homeassistant-Import dort) — hass.add_job statt
     # eines direkten awaits, weil wir hier nicht im Event-Loop sind.
@@ -83,6 +115,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # dieselbe hass.add_job-Notwendigkeit wie on_auth_failed (Hintergrund-
     # Thread, kein Event-Loop) — repairs_mod.async_set_demo_mode_paused_issue
     # ruft ir.async_create_issue/async_delete_issue auf, beide müssen auf dem
+    # Event-Loop laufen, nicht auf dem Queue-Writer-Thread. on_batch_sent
+    # ebenso: _persist_watermark ist eine Koroutine und muss auf dem
     # Event-Loop laufen, nicht auf dem Queue-Writer-Thread.
     queue_writer = ZeitarchivQueueWriter(
         client,
@@ -93,6 +127,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         on_demo_mode_resolved=lambda: hass.add_job(
             repairs_mod.async_set_demo_mode_paused_issue, hass, entry, False
         ),
+        on_batch_sent=lambda batch: hass.add_job(_persist_watermark, batch),
     )
     queue_writer.start()
     notices_coordinator = ZeitarchivNoticesCoordinator(hass, entry, client)
@@ -142,14 +177,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Listener bewusst VOR dem Snapshot registrieren: Aendert sich ein Zustand
     # waehrend des Durchlaufs, geht das Live-Event nicht verloren. Ein eventuell
-    # doppelt gesendeter identischer Zeitstempel wird von der App dedupliziert.
+    # doppelt gesendeter identischer Zeitstempel wird von der App dedupliziert —
+    # das bleibt das Sicherheitsnetz für den seltenen Rest-Fall (z. B. ein
+    # Zustand, der sich exakt waehrend des Ladens aendert), der Regelfall
+    # (ein Neuladen ohne echte Aenderungen seit dem letzten erfolgreichen
+    # Batch) wird jetzt schon vorher ueber den Wasserstand ausgefiltert.
     remove_listener = hass.bus.async_listen(EVENT_STATE_CHANGED, _handle_state_changed)
 
-    initial_events = sum(_enqueue_state(state) for state in hass.states.async_all())
+    def _already_sent(state: State) -> bool:
+        return is_state_already_sent(
+            state.last_updated.timestamp() if state.last_updated else None,
+            watermark.get(state.entity_id),
+        )
+
+    all_states = list(hass.states.async_all())
+    already_sent_count = sum(1 for state in all_states if _already_sent(state))
+    initial_events = sum(
+        _enqueue_state(state) for state in all_states if not _already_sent(state)
+    )
     _LOGGER.info(
-        "Zeitarchiv-Initialzustand beim Laden vorgemerkt · Ziel=%s · Events=%d",
+        "Zeitarchiv-Initialzustand beim Laden vorgemerkt · Ziel=%s · Events=%d · "
+        "bereits gesendet (übersprungen)=%d",
         entry.title,
         initial_events,
+        already_sent_count,
     )
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {

@@ -62,6 +62,27 @@ def is_state_value_change(old_value: str | None, new_value: str) -> bool:
     return old_value is None or old_value != new_value
 
 
+def is_state_already_sent(
+    last_updated_ts: float | None, watermark_ts: float | None
+) -> bool:
+    """Ob ein Zustand laut dem persistierten Wasserstand bereits gesendet wurde.
+
+    Grundlage für den Initial-Snapshot beim (Neu-)Laden: ohne diese Prüfung
+    sendet jeder Config-Entry-Reload (z. B. eine Options-Flow-Änderung, nicht
+    nur ein HA-Neustart) den aktuellen Zustand JEDER passenden Entität erneut
+    — bei genügend Entitäten ein Batch aus fast nur serverseitig längst
+    bekannten Duplikaten (an einer echten Installation beobachtet: ein
+    100-Duplikate-Batch hielt dort den Index-Lock der App so dicht besetzt,
+    dass parallele Anfragen mit 503 scheiterten). watermark_ts ist der
+    zuletzt erfolgreich gesendete Zeitstempel dieser Entität, oder None vor
+    dem ersten Mal."""
+    return (
+        last_updated_ts is not None
+        and watermark_ts is not None
+        and last_updated_ts <= watermark_ts
+    )
+
+
 def should_archive(
     entity_id: str,
     included_entity_ids: set[str],
