@@ -22,6 +22,8 @@
   <a href="https://paypal.me/RobertoMartins"><img src="https://img.shields.io/badge/PayPal-donate-00457C?logo=paypal&logoColor=white" alt="PayPal"></a>
 </p>
 
+<p align="center"><em><a href="README.en.md">English version</a></em></p>
+
 Die Zeitarchiv-Integration beobachtet ausgewählte Zustandsänderungen und
 überträgt sie gebündelt an die [Zeitarchiv-App](https://github.com/bertel2020/HA-Apps/tree/main/zeitarchiv). Sie
 erzeugt keine Kopien der archivierten Entitäten in Home Assistant: Die
