@@ -170,6 +170,7 @@ async def _validate_input(hass: Any, data: dict[str, Any]) -> None:
         data[CONF_PORT],
         data[CONF_API_TOKEN],
         integration_version=str(integration.version) if integration.version else None,
+        language=hass.config.language,
     )
     await hass.async_add_executor_job(client.test_connection)
 
@@ -190,6 +191,7 @@ async def _reauth_target_is_demo_mode(hass: Any, data: dict[str, Any]) -> bool:
         data[CONF_PORT],
         data[CONF_API_TOKEN],
         integration_version=str(integration.version) if integration.version else None,
+        language=hass.config.language,
     )
     try:
         notices = await hass.async_add_executor_job(client.get_notices)

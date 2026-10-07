@@ -62,6 +62,7 @@ class ZeitarchivClient:
         port: int,
         api_token: str,
         integration_version: str | None = None,
+        language: str | None = None,
     ) -> None:
         self._base_url = f"http://{host}:{port}"
         self._headers = {
@@ -74,6 +75,12 @@ class ZeitarchivClient:
         # Aufrufer die Version nicht kennt (z. B. in Tests).
         if integration_version:
             self._headers["X-Zeitarchiv-Integration-Version"] = integration_version
+        # Sprache von Home Assistant: Die App liefert Texte wie Meldungen
+        # (Reparaturen, binary_sensor-Attribute) in der Sprache des
+        # Accept-Language-Headers, solange ihre Spracheinstellung auf
+        # "Automatisch" steht. Ohne Header käme immer Deutsch.
+        if language:
+            self._headers["Accept-Language"] = language
 
     def test_connection(self) -> None:
         """Prüft Erreichbarkeit und Token. Wirft bei Fehlschlag."""

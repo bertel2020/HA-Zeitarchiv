@@ -81,6 +81,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry.data[CONF_PORT],
         entry.data[CONF_API_TOKEN],
         integration_version=str(integration.version) if integration.version else None,
+        language=hass.config.language,
     )
     # Wasserstand VOR dem Queue-Writer laden: on_batch_sent unten schreibt
     # bereits ab dem ersten erfolgreichen Batch in dasselbe Dict.
