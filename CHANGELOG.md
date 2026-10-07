@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.19.0 - 2026-10-07
+
+### Neu
+
+- Die Integration übermittelt die Sprache von Home Assistant an die
+  Zeitarchiv-App (Header `Accept-Language`). Fehlermeldungen der App
+  erscheinen dadurch in der Sprache deiner Home-Assistant-Installation
+  (Deutsch oder Englisch).
+
+---
+
+### English
+
+#### New
+
+- The integration sends the Home Assistant language to the Zeitarchiv app
+  (`Accept-Language` header). Error messages from the app therefore appear in
+  the language of your Home Assistant installation (German or English).
+
 ## 0.18.2 - 2026-09-15
 
 ### Geändert
