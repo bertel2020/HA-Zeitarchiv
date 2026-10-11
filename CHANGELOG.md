@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.20.0 - 2026-10-11
+
+### Neu
+
+- Der Sensor **Letztes Backup** zeigt jetzt auch den Stand der Kopie auf dem
+  externen Backup-Ziel der App (Netzwerkspeicher oder WebDAV): als Attribute
+  `external_status`, `external_target` und `external_finished_at`. Ohne
+  externes Ziel oder mit einer älteren App sind sie leer.
+- Der Binary-Sensor **Backup fehlgeschlagen** schaltet jetzt auch, wenn die
+  Übertragung auf das externe Ziel scheitert. Das lokale Backup ist dann in
+  Ordnung, die App versucht die Übertragung beim nächsten Backup erneut.
+- Die Blueprint-Beschreibung für den Backup-Upload ist angepasst: NFS, SMB und
+  WebDAV übernimmt die App selbst, das Blueprint bleibt für andere Ziele wie
+  S3 oder Cloud-Dienste.
+
+---
+
+### English
+
+#### New
+
+- The **Last backup** sensor now also shows the state of the copy on the app's
+  external backup target (network storage or WebDAV), as the attributes
+  `external_status`, `external_target` and `external_finished_at`. They are
+  empty without an external target or with an older app.
+- The **Backup failed** binary sensor now also turns on when the transfer to
+  the external target fails. The local backup is fine in that case; the app
+  retries the transfer with the next backup.
+- The description of the backup upload blueprint is updated: the app handles
+  NFS, SMB and WebDAV itself, the blueprint remains for other targets such as
+  S3 or cloud services.
+
 ## 0.19.0 - 2026-10-07
 
 ### Neu
