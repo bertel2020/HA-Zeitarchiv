@@ -31,7 +31,12 @@ class _HealthSensorSpec:
 
 
 _HEALTH_SENSORS: tuple[_HealthSensorSpec, ...] = (
-    _HealthSensorSpec("backup_failed", frozenset({"backup.job_failed"})),
+    # backup.external_failed: das lokale Backup ist in Ordnung, nur die Kopie auf
+    # das externe Ziel (Netzwerkspeicher/WebDAV) fehlt. Bewusst hier und nicht
+    # als Repair (siehe repairs.py): die App wiederholt die Übertragung selbst
+    # beim nächsten erfolgreichen Backup, und wer sich auf die externe Kopie
+    # verlässt, will genau diesen Zustand automatisieren können.
+    _HealthSensorSpec("backup_failed", frozenset({"backup.job_failed", "backup.external_failed"})),
     _HealthSensorSpec(
         "entities_inactive",
         frozenset({

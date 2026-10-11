@@ -287,7 +287,7 @@ auffindbar bleiben):
 
 | Sensor | Springt an bei |
 | --- | --- |
-| Backup fehlgeschlagen | letzter Sicherungslauf fehlgeschlagen |
+| Backup fehlgeschlagen | letzter Sicherungslauf fehlgeschlagen, oder das Backup konnte nicht auf das externe Ziel der App übertragen werden |
 | Inaktive Entitäten erkannt | eine oder mehrere Entitäten melden sich seit mehreren Tagen nicht mehr (info/warn/error gebündelt) |
 | Wartungshinweis | Speicherindex-Abgleichsfehler, fehlgeschlagene Aufbewahrung, empfohlene Bereinigung, knapper Host-Speicherplatz, empfohlene Index-Optimierung |
 
@@ -324,12 +324,19 @@ Werts.
 
 ## Offsite-Backup per Automation
 
-Zeitarchiv spricht selbst kein S3/WebDAV/SMB — dafür bräuchte der Container
-neue Abhängigkeiten und Zugangsdaten, für einen Fall, den der HA-Host ohnehin
-besser löst. Stattdessen liefert die Integration einen Automations-Trigger:
-den Sensor **Letztes Backup** (State = Zeitstempel des letzten
-ERFOLGREICHEN Backups, Attribute `filename`/`size_bytes`) — bewusst keine
-Diagnose-Entity, damit er in Automationen leicht auffindbar bleibt.
+Zeitarchiv kann Backups selbst auf einen Netzwerkspeicher (NFS/SMB) oder
+einen WebDAV-Server kopieren (Seite **Sicherung → Externes Ziel** in der App).
+Dafür brauchst du keine Automation, und die Integration meldet das Ergebnis:
+Der Sensor **Letztes Backup** trägt die Attribute `external_status`
+(`ok`, `failed` oder `running`; leer, wenn kein externes Ziel eingerichtet
+ist), `external_target` und `external_finished_at`, und **Backup
+fehlgeschlagen** springt auch an, wenn nur die externe Kopie fehlt.
+
+Für alles, was die App nicht kann (S3, Cloud-Dienste, eigene Skripte), liefert
+die Integration einen Automations-Trigger: den Sensor **Letztes Backup**
+(State = Zeitstempel des letzten ERFOLGREICHEN Backups, Attribute
+`filename`/`size_bytes`) — bewusst keine Diagnose-Entity, damit er in
+Automationen leicht auffindbar bleibt.
 
 [![Blueprint importieren](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fbertel2020%2FHA-Zeitarchiv%2Fmain%2Fblueprints%2Fautomation%2Fzeitarchiv%2Fbackup_upload.yaml)
 

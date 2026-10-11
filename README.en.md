@@ -275,7 +275,7 @@ dashboard and for automations):
 
 | Sensor | Turns on when |
 | --- | --- |
-| Backup failed | the last backup run failed |
+| Backup failed | the last backup run failed, or the backup could not be transferred to the app's external target |
 | Entities inactive | one or more entities have not reported for several days (info/warn/error combined) |
 | Maintenance notice | storage index reconciliation error, failed retention run, recommended cleanup, low host disk space, recommended index optimization |
 
@@ -308,10 +308,17 @@ the Home Assistant default state "Unavailable" instead of a wrong value.
 
 ## Offsite backup via automation
 
-Zeitarchiv itself does not speak S3/WebDAV/SMB — the container would need new
-dependencies and credentials for a case the HA host solves better anyway.
-Instead, the integration provides an automation trigger: the **Latest backup**
-sensor (state = timestamp of the last SUCCESSFUL backup, attributes
+Zeitarchiv can copy backups to a network share (NFS/SMB) or a WebDAV server
+itself (page **Backup → External target** in the app). That needs no
+automation, and the integration reports the result: the **Latest backup**
+sensor carries the attributes `external_status` (`ok`, `failed` or `running`;
+empty if no external target is set up), `external_target` and
+`external_finished_at`, and **Backup failed** also turns on when only the
+external copy is missing.
+
+For everything the app cannot do (S3, cloud services, your own scripts), the
+integration provides an automation trigger: the **Latest backup** sensor
+(state = timestamp of the last SUCCESSFUL backup, attributes
 `filename`/`size_bytes`) — deliberately not a diagnostic entity, so it is easy
 to find in automations.
 

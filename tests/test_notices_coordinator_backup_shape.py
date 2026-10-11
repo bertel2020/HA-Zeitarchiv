@@ -70,3 +70,23 @@ def test_entity_sensor_translations_have_mode_key_with_both_states() -> None:
         mode = data["entity"]["sensor"]["mode"]
         assert "name" in mode
         assert set(mode["state"]) == {"produktiv", "demo"}
+
+
+def test_latest_backup_sensor_exposes_external_attributes() -> None:
+    source = (INTEGRATION_DIR / "sensor.py").read_text(encoding="utf-8")
+    start = source.index("class ZeitarchivLatestBackupSensor")
+    rest = source[start:]
+    end = rest.find("\nclass ", 1)
+    class_source = rest if end == -1 else rest[:end]
+
+    for key in ("external_status", "external_target", "external_finished_at"):
+        assert f'"{key}"' in class_source
+    # Additives Feld der App: fehlt es, bleiben die Attribute None.
+    assert 'backup.get("external") or {}' in class_source
+
+
+def test_backup_failed_binary_sensor_covers_external_transfer_failure() -> None:
+    source = (INTEGRATION_DIR / "binary_sensor.py").read_text(encoding="utf-8")
+    assert '"backup.external_failed"' in source
+    # Kein eigenes Repair: die App wiederholt die Übertragung selbst.
+    assert "backup.external_failed" not in (INTEGRATION_DIR / "repairs.py").read_text(encoding="utf-8")

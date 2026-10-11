@@ -214,7 +214,22 @@ class ZeitarchivLatestBackupSensor(
     @property
     def extra_state_attributes(self) -> dict:
         backup = self._latest_backup() or {}
-        return {"filename": backup.get("filename"), "size_bytes": backup.get("size_bytes")}
+        # "external" fehlt bei einer App ohne externes Ziel (oder einer älteren
+        # Version) — dann bleiben die drei Attribute None statt zu verschwinden,
+        # damit Vorlagen nicht auf ein fehlendes Attribut laufen.
+        external = backup.get("external") or {}
+        external_finished = external.get("finished_at")
+        return {
+            "filename": backup.get("filename"),
+            "size_bytes": backup.get("size_bytes"),
+            "external_status": external.get("status"),
+            "external_target": external.get("target"),
+            "external_finished_at": (
+                datetime.fromtimestamp(external_finished, tz=timezone.utc).isoformat()
+                if external_finished is not None
+                else None
+            ),
+        }
 
 
 class ZeitarchivModeSensor(CoordinatorEntity[ZeitarchivNoticesCoordinator], SensorEntity):

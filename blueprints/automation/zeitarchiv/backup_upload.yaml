@@ -3,8 +3,10 @@ blueprint:
   description: >
     Löst beim nächsten erfolgreichen Zeitarchiv-Backup eine eigene Aktion
     aus — z. B. `shell_command` mit `rclone copy`, ein Cloud-Backup-Addon
-    oder Node-RED. Zeitarchiv selbst spricht kein S3/WebDAV/SMB; dieses
-    Blueprint verdrahtet nur "wann", nicht "wohin".
+    oder Node-RED. Netzwerkspeicher (NFS/SMB) und WebDAV kann Zeitarchiv
+    selbst (Sicherung → Externes Ziel in der App) und braucht dafür dieses
+    Blueprint nicht; es ist für alles andere gedacht, etwa S3 oder einen
+    Cloud-Dienst. Es verdrahtet nur "wann", nicht "wohin".
   domain: automation
   source_url: https://github.com/bertel2020/HA-Zeitarchiv/blob/main/blueprints/automation/zeitarchiv/backup_upload.yaml
   input:
