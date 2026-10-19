@@ -32,6 +32,12 @@ BATCH_TIMEOUT = 5  # Sekunden
 # Neustarts/Updates, ohne Home Assistant oder dessen Event-Loop zu blockieren.
 RETRY_DELAYS = (1, 2, 4, 8, 15, 30, 60)
 
+# Grenzen von /api/write in der App (limits.py bzw. storage/paths.py). Ein
+# Event darüber lehnt die App mit 422 ab — die Integration hält sich deshalb
+# schon vor dem Enqueue daran (siehe events.py).
+APP_EVENT_TEXT_MAX_LENGTH = 255
+APP_ENTITY_ID_MAX_LENGTH = 240
+
 # Domains, deren Zustand als Schalter (on/off → 1/0) archiviert wird,
 # unabhängig von state_class (die haben ohnehin meist keine).
 SWITCH_DOMAINS = {"binary_sensor", "switch", "input_boolean"}

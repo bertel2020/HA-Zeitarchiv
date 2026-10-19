@@ -107,3 +107,28 @@ def _run_all() -> None:
 
 if __name__ == "__main__":
     _run_all()
+
+
+def test_text_fields_are_cut_to_the_app_limit() -> None:
+    """Die App lehnt Texte über 255 Zeichen mit 422 ab — und mit ihnen den
+    ganzen Batch. Gekürzt statt verworfen: der Messwert selbst ist gültig."""
+    event = build_event(
+        "sensor.temp", "sensor", "21.4", "measurement", "x" * 300, 100.0, "N" * 1000
+    )
+    assert event["unit"] == "x" * 255
+    assert event["friendly_name"] == "N" * 255
+
+
+def test_non_string_attributes_become_text() -> None:
+    event = build_event("sensor.temp", "sensor", "21.4", 42, "°C", 100.0, 123)
+    assert event["state_class"] == "42"
+    assert event["friendly_name"] == "123"
+
+
+def test_entity_id_the_app_would_reject_is_skipped() -> None:
+    # HA erlaubt 255 Zeichen, die App nur 240.
+    too_long = "sensor." + "a" * 234
+    assert len(too_long) == 241
+    assert build_event(too_long, "sensor", "1", None, None, 100.0) is None
+    longest = "sensor." + "a" * 233
+    assert build_event(longest, "sensor", "1", None, None, 100.0) is not None

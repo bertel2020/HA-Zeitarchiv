@@ -37,6 +37,20 @@ class ZeitarchivAuthError(ZeitarchivApiError):
         self.demo_mode = demo_mode
 
 
+class ZeitarchivRejectedError(ZeitarchivApiError):
+    """Die App hat den Batch inhaltlich abgelehnt (400/413/422).
+
+    Anders als ein Netzwerkfehler oder 5xx wird ein erneuter Versuch mit
+    demselben Batch nie gelingen — queue_writer.py verwirft ihn deshalb,
+    statt alle nachfolgenden Messwerte dahinter festzuhalten."""
+
+
+# Statuscodes, bei denen derselbe Batch nie angenommen wird. 401 hat einen
+# eigenen Pfad (Reauth), 404/408/429/5xx bleiben wiederholbar — ein falsch
+# konfiguriertes Ziel oder eine überlastete App sollen keine Daten verwerfen.
+_REJECTED_STATUS_CODES = frozenset({400, 413, 422})
+
+
 def _demo_mode_from_error_body(response: requests.Response) -> bool | None:
     """Best-effort: liest demo_mode aus dem 401-Body von /api/health
     ({"detail": {"message": ..., "demo_mode": bool}}, siehe api_routes.py
@@ -156,6 +170,11 @@ class ZeitarchivClient:
 
         if response.status_code == 401:
             raise ZeitarchivAuthError("API-Token wurde von der App abgelehnt")
+        if response.status_code in _REJECTED_STATUS_CODES:
+            raise ZeitarchivRejectedError(
+                f"App lehnte den Batch mit Status {response.status_code} ab: "
+                f"{response.text[:200]}"
+            )
         if response.status_code != 200:
             raise ZeitarchivApiError(
                 f"App antwortete beim Schreiben mit Status {response.status_code}: "

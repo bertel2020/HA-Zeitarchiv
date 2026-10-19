@@ -9,9 +9,14 @@ from __future__ import annotations
 
 import threading
 import time
+from unittest.mock import patch
 
 import _pkg  # noqa: F401  (registriert die Namespace-Pakete als Seiteneffekt)
-from custom_components.zeitarchiv.api import ZeitarchivAuthError
+from custom_components.zeitarchiv.api import (
+    ZeitarchivAuthError,
+    ZeitarchivClient,
+    ZeitarchivRejectedError,
+)
 from custom_components.zeitarchiv.queue_writer import ZeitarchivQueueWriter
 
 
@@ -336,6 +341,74 @@ def test_stop_interrupts_long_retry_backoff() -> None:
     started = time.monotonic()
     assert writer.stop(timeout=1, drain_timeout=0)
     assert time.monotonic() - started < 0.5
+
+
+class RejectingClient:
+    """Lehnt den ersten Batch inhaltlich ab (422), alle weiteren gelingen."""
+
+    def __init__(self) -> None:
+        self.calls: list[list[dict]] = []
+        self.event = threading.Event()
+
+    def write_batch(self, events: list[dict]) -> None:
+        self.calls.append(list(events))
+        if len(self.calls) == 1:
+            raise ZeitarchivRejectedError("App lehnte den Batch mit Status 422 ab")
+        self.event.set()
+
+
+def test_rejected_batch_is_dropped_and_later_batches_still_flow() -> None:
+    """Ein 422 darf die Queue nicht auf Dauer festhalten: der Batch wird
+    genau einmal versucht, verworfen, und der nächste geht normal raus."""
+    client = RejectingClient()
+    sent_batches: list[list[dict]] = []
+    writer = ZeitarchivQueueWriter(
+        client,
+        batch_size=1,
+        batch_timeout=10,
+        retry_delays=(60,),
+        on_batch_sent=lambda batch: sent_batches.append(batch),
+    )
+    writer.start()
+    try:
+        writer.enqueue({"entity_id": "sensor.kaputt"})
+        writer.enqueue({"entity_id": "sensor.gut"})
+        _wait(client.event)
+    finally:
+        assert writer.stop(timeout=2)
+    assert client.calls == [[{"entity_id": "sensor.kaputt"}], [{"entity_id": "sensor.gut"}]]
+    assert writer.dropped_count == 1
+    assert sent_batches == [[{"entity_id": "sensor.gut"}]]
+
+
+class _WriteResp:
+    def __init__(self, status_code: int) -> None:
+        self.status_code = status_code
+        self.text = "detail"
+
+
+def _write_batch_error(status_code: int) -> type[Exception] | None:
+    client = ZeitarchivClient("localhost", 8127, "token")
+    with patch(
+        "custom_components.zeitarchiv.api.requests.post",
+        return_value=_WriteResp(status_code),
+    ):
+        try:
+            client.write_batch([{"entity_id": "sensor.a"}])
+        except Exception as err:  # noqa: BLE001
+            return type(err)
+    return None
+
+
+def test_write_batch_marks_only_payload_errors_as_rejected() -> None:
+    for status in (400, 413, 422):
+        assert _write_batch_error(status) is ZeitarchivRejectedError, status
+    # Wiederholbar: falsches Ziel, Timeout, Überlast, Serverfehler.
+    for status in (404, 408, 429, 500, 503):
+        error = _write_batch_error(status)
+        assert error is not None and error is not ZeitarchivRejectedError, status
+    assert _write_batch_error(401) is ZeitarchivAuthError
+    assert _write_batch_error(200) is None
 
 
 def _run_all() -> None:

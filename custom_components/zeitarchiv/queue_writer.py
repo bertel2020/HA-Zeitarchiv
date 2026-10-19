@@ -18,7 +18,7 @@ import threading
 import time
 from typing import Any, Callable, Protocol
 
-from .api import ZeitarchivAuthError
+from .api import ZeitarchivAuthError, ZeitarchivRejectedError
 from .const import BATCH_SIZE, BATCH_TIMEOUT, MAX_QUEUE_SIZE, RETRY_DELAYS
 
 _LOGGER = logging.getLogger(__name__)
@@ -225,7 +225,13 @@ class ZeitarchivQueueWriter:
         return None  # Probe erfolgreich? Token war doch gültig — kein Demo-Signal ableitbar
 
     def _flush(self, batch: list[dict[str, Any]]) -> bool:
-        """Wiederholt einen Batch bis zum Erfolg oder bis zum expliziten Stopp."""
+        """Wiederholt einen Batch bis zum Erfolg oder bis zum expliziten Stopp.
+
+        Einzige Ausnahme: eine inhaltliche Ablehnung (ZeitarchivRejectedError).
+        Der Batch wird dann verworfen und als erledigt behandelt — sonst hielte
+        er die Queue auf Dauer fest, bis sie voll ist und jedes neue Event
+        verloren geht. on_batch_sent bleibt dabei aus: der Wasserstand darf
+        nur bestätigte Werte enthalten."""
         attempt = 0
         auth_notified = False
         while not self._abort_event.is_set():
@@ -243,6 +249,17 @@ class ZeitarchivQueueWriter:
                         self._on_demo_mode_resolved()
                 if self._on_batch_sent is not None:
                     self._on_batch_sent(batch)
+                return True
+            except ZeitarchivRejectedError as err:
+                self._last_error = str(err)
+                self._dropped_count += len(batch)
+                _LOGGER.error(
+                    "Zeitarchiv hat einen Batch mit %d Events abgelehnt; er wird verworfen "
+                    "(insgesamt %d verworfen): %s",
+                    len(batch),
+                    self._dropped_count,
+                    err,
+                )
                 return True
             except ZeitarchivAuthError as err:
                 self._last_error = str(err)

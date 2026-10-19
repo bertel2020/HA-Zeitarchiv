@@ -6,9 +6,34 @@ Getrennt von __init__.py gehalten, damit sich die eigentliche Entscheidungslogik
 
 from __future__ import annotations
 
+import re
 import uuid
 
-from .const import IGNORED_STATES, PRESENCE_DOMAINS, SWITCH_DOMAINS
+from .const import (
+    APP_ENTITY_ID_MAX_LENGTH,
+    APP_EVENT_TEXT_MAX_LENGTH,
+    IGNORED_STATES,
+    PRESENCE_DOMAINS,
+    SWITCH_DOMAINS,
+)
+
+# Spiegel von ENTITY_ID_PATTERN der App (storage/paths.py). Home Assistant
+# erlaubt bis zu 255 Zeichen, die App nur 240 — eine längere ID würde dort mit
+# 422 abgelehnt und mit ihr der komplette Batch.
+_APP_ENTITY_ID_RE = re.compile(r"^[a-z][a-z0-9_]*\.[a-z0-9_]+$")
+
+
+def _event_text(value: object) -> str | None:
+    """Attributwert als Text in den Grenzen der App, sonst None.
+
+    Attribute sind in Home Assistant beliebige Objekte. Ein Nicht-String oder
+    ein überlanger Text liefe in der App in einen 422 — gekürzt statt
+    verworfen, weil der Messwert selbst gültig ist.
+    """
+    if value is None:
+        return None
+    text = value if isinstance(value, str) else str(value)
+    return text[:APP_EVENT_TEXT_MAX_LENGTH]
 
 
 def build_event(
@@ -31,6 +56,9 @@ def build_event(
     nicht-numerische Text-Sensoren werden in Phase 1 bewusst nicht archiviert, weil das
     Speicherformat aus dem Konzept (timestamp, value) dafür nicht ausgelegt ist.
     """
+    if len(entity_id) > APP_ENTITY_ID_MAX_LENGTH or not _APP_ENTITY_ID_RE.fullmatch(entity_id):
+        return None
+
     normalized_state = state.strip().lower()
     if normalized_state in IGNORED_STATES:
         return None
@@ -57,10 +85,10 @@ def build_event(
         # wiederholen, ohne denselben Messwert doppelt anzuhängen.
         "event_id": uuid.uuid4().hex,
         "entity_id": entity_id,
-        "domain": domain,
+        "domain": _event_text(domain),
         "ts": timestamp,
         "value": value,
-        "state_class": state_class,
-        "unit": unit,
-        "friendly_name": friendly_name,
+        "state_class": _event_text(state_class),
+        "unit": _event_text(unit),
+        "friendly_name": _event_text(friendly_name),
     }
