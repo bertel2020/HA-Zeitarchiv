@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.0.0 - 2026-10-19
+
+### Geändert
+
+- Neues Icon und Logo, passend zum neuen Logo der Zeitarchiv-App.
+
+### Behoben
+
+- Lehnte die App ein einzelnes Ereignis ab, etwa wegen eines Texts mit mehr
+  als 255 Zeichen, blieb die ganze Übertragung daran hängen: Die
+  Warteschlange lief voll, und neue Zustandsänderungen aller Entitäten gingen
+  verloren. Überlange Texte werden jetzt gekürzt, und ein abgelehnter Batch
+  wird verworfen, statt die übrigen aufzuhalten.
+
+---
+
+### English
+
+#### Changed
+
+- New icon and logo, matching the new logo of the Zeitarchiv app.
+
+#### Fixed
+
+- If the app rejected a single event, for example because of a text longer
+  than 255 characters, the whole transfer got stuck on it: the queue filled up
+  and new state changes of all entities were lost. Overlong texts are now
+  shortened, and a rejected batch is dropped instead of holding up the rest.
+
 ## 0.20.0 - 2026-10-11
 
 ### Neu
