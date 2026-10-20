@@ -96,7 +96,9 @@ Mehrere Verbindungen können parallel eingerichtet werden. Jede Verbindung hat
 eine eigene Warteschlange, eigene Filter und eigene Diagnose-Sensoren. Dadurch
 kann derselbe Home Assistant seine Zustandsänderungen beispielsweise zugleich
 an ein Produktiv- und ein Test-Zeitarchiv senden; auch zwei benannte Einträge
-mit identischem Host und Port sind zulässig.
+mit identischem Host und Port sind zulässig. Nur ein zweiter Eintrag mit
+demselben Host, Port **und** Token wird abgelehnt, weil er jeden Wert doppelt
+an dieselbe App schicken würde.
 
 #### 4. Archivfilter wählen
 
@@ -420,6 +422,25 @@ hinzukommen, werden erst nach erneutem Speichern der Filter berücksichtigt.
 - Die Verbindung verwendet einen gemeinsamen statischen Token und kein OAuth.
 - Die Integration ist ein Schreibpfad; archivierte Werte werden nicht als neue
   Home-Assistant-Entitäten zurückgelesen.
+
+## Entfernen
+
+1. **Einstellungen → Geräte & Dienste → Zeitarchiv** öffnen, beim Eintrag
+   **⋮ → Löschen** wählen. Bei mehreren Verbindungen jede einzeln löschen.
+2. Bei Installation über HACS die Integration zusätzlich in HACS entfernen,
+   bei manueller Installation den Ordner `/config/custom_components/zeitarchiv`
+   löschen.
+3. Home Assistant neu starten.
+
+Mit dem Löschen einer Verbindung verschwinden ihr Dienst-Gerät, die Diagnose-
+und Health-Sensoren sowie ihre Repair-Karten. Werte, die zu diesem Zeitpunkt
+noch in der Warteschlange stehen, werden nicht mehr übertragen.
+
+Das Archiv selbst bleibt unberührt: Alle bereits übertragenen Werte liegen in
+der Zeitarchiv-App und bleiben dort erhalten. Wer auch sie entfernen will,
+deinstalliert die App getrennt davon. Der API-Token kann in der App unter
+**Einstellungen → Verbindung** neu generiert werden, damit der alte nicht
+weiter gültig ist.
 
 ---
 

@@ -28,6 +28,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, SIGNAL_TEXT_STATES
 from .coordinator import ZeitarchivNoticesCoordinator
+from .data import ZeitarchivConfigEntry
 
 
 @dataclass(frozen=True)
@@ -70,10 +71,11 @@ _HEALTH_SENSORS: tuple[_HealthSensorSpec, ...] = (
 
 
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant,
+    entry: ZeitarchivConfigEntry,
+    async_add_entities: AddEntitiesCallback,
 ) -> None:
-    entry_data = hass.data[DOMAIN][entry.entry_id]
-    coordinator: ZeitarchivNoticesCoordinator = entry_data["notices_coordinator"]
+    coordinator = entry.runtime_data.notices_coordinator
     device_info = DeviceInfo(
         identifiers={(DOMAIN, entry.entry_id)},
         name=entry.title,
@@ -85,7 +87,7 @@ async def async_setup_entry(
         for spec in _HEALTH_SENSORS
     ]
     entities.append(
-        ZeitarchivTextStatesBinarySensor(entry, device_info, entry_data["text_states"])
+        ZeitarchivTextStatesBinarySensor(entry, device_info, entry.runtime_data.text_states)
     )
     async_add_entities(entities)
 

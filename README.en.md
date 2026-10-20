@@ -93,7 +93,9 @@ Multiple connections can be set up in parallel. Each connection has its own
 queue, its own filters and its own diagnostic sensors. This allows the same
 Home Assistant to send its state changes to a production and a test
 Zeitarchiv at the same time, for example; two named entries with identical
-host and port are also allowed.
+host and port are also allowed. Only a second entry with the same host, port
+**and** token is rejected, because it would send every value twice to the
+same app.
 
 #### 4. Choose archive filters
 
@@ -398,6 +400,23 @@ only taken into account after the filters are saved again.
 - The connection uses a shared static token, not OAuth.
 - The integration is a write path; archived values are not read back as new
   Home Assistant entities.
+
+## Removal
+
+1. Open **Settings → Devices & services → Zeitarchiv** and choose
+   **⋮ → Delete** on the entry. With several connections, delete each one.
+2. If installed via HACS, also remove the integration in HACS; for a manual
+   installation, delete the `/config/custom_components/zeitarchiv` folder.
+3. Restart Home Assistant.
+
+Deleting a connection removes its service device, its diagnostic and health
+sensors and its repair cards. Values still waiting in the queue at that moment
+are no longer transmitted.
+
+The archive itself is left untouched: all values transmitted so far live in
+the Zeitarchiv app and stay there. To remove them as well, uninstall the app
+separately. The API token can be regenerated in the app under
+**Settings → Connection** so the old one is no longer valid.
 
 ---
 

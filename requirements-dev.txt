@@ -1,7 +1,7 @@
 # Nur für CI/lokale Tests (siehe .github/workflows/tests.yml) — nicht Teil der
-# Integration: pyyaml und requests liefert Home Assistant Core zur Laufzeit
-# selbst, deshalb bleibt manifest.json "requirements" leer. Versionen wie in
-# der lokalen Entwicklungsumgebung, gegen die die Suite zuletzt grün lief.
-pytest
-pyyaml==6.0.3
-requests==2.34.2
+# Integration, deshalb bleibt manifest.json "requirements" leer.
+# pytest-homeassistant-custom-component bringt Home Assistant Core in genau
+# der Version mit, gegen die tests/ha/ läuft (0.13.373 = HA 2026.10.2), und
+# damit auch pytest, pyyaml und requests in den dort gepinnten Versionen.
+# Setzt Python 3.14 voraus.
+pytest-homeassistant-custom-component==0.13.373

@@ -16,6 +16,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import issue_registry as ir
 
 from .const import DOMAIN
+from .data import ZeitarchivConfigEntry
 
 # housekeeping.host_disk_space_low: die warn-Stufe (<10% frei) reicht fürs
 # binary_sensor-Bündel (siehe binary_sensor.py), erst die error-Stufe
@@ -43,15 +44,16 @@ def _relevant_notices(notices: list[dict]) -> dict[str, dict]:
     }
 
 
-def async_sync_issues(hass: HomeAssistant, entry: ConfigEntry, notices: list[dict]) -> None:
+def async_sync_issues(
+    hass: HomeAssistant, entry: ZeitarchivConfigEntry, notices: list[dict]
+) -> None:
     """Gleicht aktive Repair-Issues mit den aktuellen Meldungen ab — erzeugt
     neue, aktualisiert bestehende, entfernt nicht mehr zutreffende. Wird bei
     jedem Coordinator-Update aufgerufen (siehe __init__.py). issue_id trägt
     die entry_id, damit mehrere parallel eingerichtete Verbindungen (siehe
     __init__.py-Docstring: "Produktiv- und Testsystem") sich nicht
     überschreiben."""
-    entry_data = hass.data[DOMAIN][entry.entry_id]
-    previous_issue_ids: set[str] = entry_data.get("active_repair_issues", set())
+    previous_issue_ids = entry.runtime_data.active_repair_issues
 
     current = _relevant_notices(notices)
     current_issue_ids: set[str] = set()
@@ -79,7 +81,7 @@ def async_sync_issues(hass: HomeAssistant, entry: ConfigEntry, notices: list[dic
     for stale_issue_id in previous_issue_ids - current_issue_ids:
         ir.async_delete_issue(hass, DOMAIN, stale_issue_id)
 
-    entry_data["active_repair_issues"] = current_issue_ids
+    entry.runtime_data.active_repair_issues = current_issue_ids
 
 
 # @callback ist hier Pflicht, nicht Stil: Aufgerufen wird ausschließlich über
@@ -144,7 +146,7 @@ def async_set_text_states_issue(
     )
 
 
-def async_clear_issues(hass: HomeAssistant, entry: ConfigEntry) -> None:
+def async_clear_issues(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -> None:
     """Entfernt alle noch offenen Repair-Issues eines Entries — beim Entladen/
     Entfernen der Verbindung, damit keine verwaisten Karten stehen bleiben."""
     # Nicht Teil von active_repair_issues (das führt nur async_sync_issues()
@@ -153,9 +155,6 @@ def async_clear_issues(hass: HomeAssistant, entry: ConfigEntry) -> None:
     # unbedingt statt bedingt aufgerufen.
     ir.async_delete_issue(hass, DOMAIN, f"{entry.entry_id}_demo_mode_paused")
     ir.async_delete_issue(hass, DOMAIN, f"{entry.entry_id}_text_states")
-    entry_data = hass.data[DOMAIN].get(entry.entry_id)
-    if not entry_data:
-        return
-    for issue_id in entry_data.get("active_repair_issues", set()):
+    for issue_id in entry.runtime_data.active_repair_issues:
         ir.async_delete_issue(hass, DOMAIN, issue_id)
-    entry_data["active_repair_issues"] = set()
+    entry.runtime_data.active_repair_issues = set()

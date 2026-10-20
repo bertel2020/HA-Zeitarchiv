@@ -1,0 +1,125 @@
+# Selbsteinschätzung nach der Home Assistant Integration Quality Scale
+# (https://developers.home-assistant.io/docs/core/integration-quality-scale/).
+# Für Custom Integrations rein informativ — dient als Arbeitsliste.
+rules:
+  # Bronze
+  action-setup:
+    status: exempt
+    comment: Die Integration registriert keine Aktionen (Services).
+  appropriate-polling: done
+  brands: done
+  common-modules:
+    status: todo
+    comment: >-
+      coordinator.py vorhanden; eine gemeinsame Entity-Basis (entity.py) fehlt,
+      DeviceInfo wird in sensor.py und binary_sensor.py doppelt aufgebaut.
+  config-flow-test-coverage:
+    status: done
+    comment: tests/ha/test_config_flow.py, 100 % von config_flow.py.
+  config-flow: done
+  dependency-transparency:
+    status: done
+    comment: Keine Requirements; requests liefert Home Assistant Core selbst.
+  docs-actions:
+    status: exempt
+    comment: Die Integration registriert keine Aktionen (Services).
+  docs-conditions:
+    status: exempt
+    comment: Die Integration stellt keine eigenen Bedingungen bereit.
+  docs-high-level-description: done
+  docs-installation-instructions: done
+  docs-removal-instructions: done
+  docs-triggers:
+    status: exempt
+    comment: Die Integration stellt keine eigenen Auslöser bereit.
+  entity-event-setup: done
+  entity-unique-id: done
+  has-entity-name: done
+  runtime-data: done
+  test-before-configure: done
+  test-before-setup:
+    status: exempt
+    comment: >-
+      Teilweise umgesetzt: Ein abgelehnter Token löst beim Setup
+      ConfigEntryAuthFailed aus (außer im Demo-Modus). Eine nicht erreichbare
+      App dagegen bewusst kein ConfigEntryNotReady — der Queue-Writer puffert
+      und wiederholt, mit ConfigEntryNotReady gingen alle Zustandsänderungen
+      bis zum nächsten Setup-Versuch verloren.
+  unique-config-entry:
+    status: done
+    comment: >-
+      Kein unique_id: Mehrere Ziele (z. B. Produktiv- und Testsystem) sind
+      gewollt, auch auf demselben Host/Port. Abgelehnt wird ein Eintrag mit
+      identischem Host, Port und Token, im Einrichten wie im Neu-Konfigurieren.
+
+  # Silver
+  action-exceptions:
+    status: exempt
+    comment: Die Integration registriert keine Aktionen (Services).
+  config-entry-unloading: done
+  docs-configuration-parameters: done
+  docs-installation-parameters: done
+  entity-unavailable: done
+  integration-owner: done
+  log-when-unavailable:
+    status: todo
+    comment: >-
+      Der Queue-Writer warnt jeden zehnten Versuch erneut und meldet die
+      Wiederherstellung nicht.
+  parallel-updates: todo
+  reauthentication-flow: done
+  test-coverage:
+    status: todo
+    comment: >-
+      Gesamt 89 %; Lücken vor allem in diagnostics.py, repairs.py und dem
+      Schreibpfad in __init__.py.
+
+  # Gold
+  devices:
+    status: todo
+    comment: entry_type als String statt DeviceEntryType.SERVICE.
+  diagnostics: done
+  discovery:
+    status: todo
+    comment: Möglich über Supervisor-Discovery der Zeitarchiv-App (async_step_hassio).
+  discovery-update-info:
+    status: todo
+    comment: Hängt an discovery.
+  docs-data-update: done
+  docs-examples: done
+  docs-known-limitations: done
+  docs-supported-devices:
+    status: exempt
+    comment: Dienst-Integration ohne physische Geräte.
+  docs-supported-functions: done
+  docs-troubleshooting:
+    status: todo
+    comment: Inhalte vorhanden, aber ohne eigenen Abschnitt.
+  docs-use-cases:
+    status: todo
+    comment: Inhalte vorhanden, aber ohne eigenen Abschnitt.
+  dynamic-devices:
+    status: exempt
+    comment: Genau ein Dienst-Gerät je Config-Entry.
+  entity-category: done
+  entity-device-class: done
+  entity-disabled-by-default:
+    status: todo
+    comment: Kandidaten sind die Zähler-Sensoren sent_count, dropped_count und queue_size.
+  entity-translations: done
+  exception-translations: todo
+  icon-translations: todo
+  reconfiguration-flow: done
+  repair-issues: done
+  stale-devices:
+    status: exempt
+    comment: Genau ein Dienst-Gerät je Config-Entry, es entfällt mit dem Entry.
+
+  # Platinum
+  async-dependency:
+    status: todo
+    comment: Der Client nutzt requests im Executor.
+  inject-websession:
+    status: todo
+    comment: Hängt an async-dependency.
+  strict-typing: todo

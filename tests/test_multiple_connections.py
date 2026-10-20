@@ -40,11 +40,18 @@ def test_reconfigure_and_reauth_rely_on_update_listener_for_reload() -> None:
     """Drei Aufrufstellen seit DEMO_MODUS_REAUTH_PLAN.md: reconfigure,
     reauth_confirm und der neue reauth_confirm_demo_warning-Zwischenschritt
     (Bestätigung der Demo-Modus-Warnung) — alle drei nutzen denselben
-    sicheren Reload-Weg über den bestehenden Update-Listener."""
+    sicheren Reload-Weg: über den bestehenden Update-Listener, solange der
+    Entry läuft, sonst (Setup gescheitert, Listener schon entfernt) über
+    async_update_reload_and_abort. Das Verhalten selbst prüft
+    tests/ha/test_config_flow.py."""
     source = FLOW_PATH.read_text(encoding="utf-8")
 
-    assert source.count("self.async_update_and_abort(") == 3
-    assert "return self.async_update_reload_and_abort(" not in source
+    assert source.count("self._async_update_and_finish(") == 3
+    helper = source[source.index("def _async_update_and_finish("):]
+    helper = helper[: helper.index("\n    async def ")]
+    assert "if entry.update_listeners:" in helper
+    assert source.count("self.async_update_and_abort(") == 1
+    assert source.count("self.async_update_reload_and_abort(") == 1
     assert "await self.hass.config_entries.async_reload(" not in source
 
 

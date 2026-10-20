@@ -9,6 +9,12 @@
           "host": "Host",
           "port": "Port",
           "api_token": "API-Token"
+        },
+        "data_description": {
+          "name": "Frei wählbar, z. B. „Produktivsystem“ oder „Testsystem“. Erscheint im Titel der Integration und im Gerätenamen.",
+          "host": "Hostname oder IP-Adresse, unter der Home Assistant die Zeitarchiv-App erreicht.",
+          "port": "Port der Zeitarchiv-App, standardmäßig 8127.",
+          "api_token": "Steht in der Zeitarchiv-App unter Einstellungen → Verbindung."
         }
       },
       "reconfigure": {
@@ -19,6 +25,12 @@
           "host": "Host",
           "port": "Port",
           "api_token": "API-Token"
+        },
+        "data_description": {
+          "name": "Frei wählbar, z. B. „Produktivsystem“ oder „Testsystem“. Erscheint im Titel der Integration und im Gerätenamen.",
+          "host": "Hostname oder IP-Adresse, unter der Home Assistant die Zeitarchiv-App erreicht.",
+          "port": "Port der Zeitarchiv-App, standardmäßig 8127.",
+          "api_token": "Steht in der Zeitarchiv-App unter Einstellungen → Verbindung."
         }
       },
       "reauth_confirm": {
@@ -26,6 +38,9 @@
         "description": "Die App hat den hinterlegten API-Token abgelehnt — vermutlich wurde er in den App-Einstellungen (Bereich \"Verbindung\") neu generiert oder gelöscht. Neuen Token eintragen.",
         "data": {
           "api_token": "API-Token"
+        },
+        "data_description": {
+          "api_token": "Der aktuelle Token aus der Zeitarchiv-App, Einstellungen → Verbindung."
         }
       },
       "reauth_confirm_demo_warning": {
@@ -33,6 +48,9 @@
         "description": "Der neue Token gehört zu einer Instanz, die gerade im Demo-Modus läuft — vermutlich, weil die App umgeschaltet wurde, während „{connection}\" noch den alten Token hatte. Trotzdem übernehmen? Bei Abbruch bleibt der bisherige Token unverändert und funktioniert von selbst wieder, sobald die App zurück auf Produktiv geschaltet wird.",
         "data": {
           "confirm": "Trotzdem übernehmen"
+        },
+        "data_description": {
+          "confirm": "Nur anhaken, wenn diese Verbindung tatsächlich an die Demo-Instanz schreiben soll."
         }
       }
     },
@@ -40,12 +58,14 @@
       "invalid_name": "Bitte einen Verbindungsnamen eingeben.",
       "cannot_connect": "Verbindung zur App fehlgeschlagen. Läuft sie und ist der Port erreichbar?",
       "invalid_auth": "API-Token wurde von der App abgelehnt.",
-      "unknown": "Unerwarteter Fehler."
+      "unknown": "Unerwarteter Fehler.",
+      "already_configured": "Für diesen Host, Port und Token gibt es bereits eine Verbindung."
     },
     "abort": {
       "reconfigure_successful": "Verbindung aktualisiert.",
       "reauth_successful": "Neuer Token gespeichert.",
-      "demo_mode_reauth_cancelled": "Abgebrochen — der bisherige Token bleibt unverändert."
+      "demo_mode_reauth_cancelled": "Abgebrochen — der bisherige Token bleibt unverändert.",
+      "already_configured": "Für diesen Host, Port und Token gibt es bereits eine Verbindung."
     }
   },
   "options": {

@@ -25,6 +25,14 @@ def _register_namespace_package(dotted_name: str, path: Path) -> None:
 
 
 _register_namespace_package("custom_components", _ROOT / "custom_components")
-_register_namespace_package(
-    "custom_components.zeitarchiv", _ROOT / "custom_components" / "zeitarchiv"
-)
+
+# Mit installiertem homeassistant (HA-Zeitarchiv, tests/ha/ über
+# pytest-homeassistant-custom-component) bleibt das echte Paket unangetastet:
+# Ein leerer Platzhalter in sys.modules würde dort sonst die Integration
+# selbst ersetzen, und Home Assistant fände kein async_setup_entry mehr.
+try:
+    import homeassistant  # noqa: F401
+except ImportError:
+    _register_namespace_package(
+        "custom_components.zeitarchiv", _ROOT / "custom_components" / "zeitarchiv"
+    )

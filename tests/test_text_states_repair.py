@@ -44,7 +44,7 @@ def test_init_publishes_text_states_on_the_event_loop() -> None:
     publish = source[source.index("def _publish_text_states"):]
     publish = publish[:publish.index("\n    def ", 1)]
     assert "hass.add_job(_async_text_states_changed," in publish
-    assert '"text_states": text_states_view,' in source
+    assert "text_states=text_states_view," in source
 
 
 def test_binary_sensor_follows_the_text_states_signal() -> None:
@@ -56,7 +56,10 @@ def test_binary_sensor_follows_the_text_states_signal() -> None:
     assert 'f"{entry.entry_id}_text_states"' in sensor
     assert "SIGNAL_TEXT_STATES.format(self._entry_id)" in sensor
     assert '{"entities": list(entities), "count": len(entities)}' in sensor
-    assert 'ZeitarchivTextStatesBinarySensor(entry, device_info, entry_data["text_states"])' in source
+    assert (
+        "ZeitarchivTextStatesBinarySensor(entry, device_info, entry.runtime_data.text_states)"
+        in source
+    )
 
 
 def test_text_states_binary_sensor_has_a_name_in_every_language() -> None:

@@ -13,23 +13,21 @@ import time
 from typing import Any
 
 from homeassistant.components.diagnostics import async_redact_data
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.core import HomeAssistant
 
-from .api import ZeitarchivApiError, ZeitarchivClient
-from .const import CONF_API_TOKEN, DOMAIN
-from .registry_filter import ArchiveFilterMatcher
+from .api import ZeitarchivApiError
+from .const import CONF_API_TOKEN
+from .data import ZeitarchivConfigEntry
 
 TO_REDACT = {CONF_API_TOKEN}
 
 
 async def async_get_config_entry_diagnostics(
-    hass: HomeAssistant, entry: ConfigEntry
+    hass: HomeAssistant, entry: ZeitarchivConfigEntry
 ) -> dict[str, Any]:
-    data = hass.data[DOMAIN][entry.entry_id]
-    client: ZeitarchivClient = data["client"]
-    queue_writer = data["queue_writer"]
+    client = entry.runtime_data.client
+    queue_writer = entry.runtime_data.queue_writer
 
     # Live-Verbindungstest statt nur die Zähler unten zu zeigen — genau die
     # Frage "funktioniert es JETZT" lässt sich aus reinen Zählwerten allein
@@ -43,7 +41,7 @@ async def async_get_config_entry_diagnostics(
         reachable = False
         connect_error = str(err)
 
-    filters: ArchiveFilterMatcher = data["filters"]
+    filters = entry.runtime_data.filters
     matching_now = sum(
         1 for state in hass.states.async_all() if filters.matches(state.entity_id)
     )

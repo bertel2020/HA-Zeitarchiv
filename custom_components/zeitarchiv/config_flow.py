@@ -175,6 +175,13 @@ async def _validate_input(hass: Any, data: dict[str, Any]) -> None:
     await hass.async_add_executor_job(client.test_connection)
 
 
+def _same_target(entry: config_entries.ConfigEntry, data: dict[str, Any]) -> bool:
+    """Gleicher Host, Port UND Token — dann ginge jeder Wert doppelt an dieselbe App."""
+    return all(
+        entry.data.get(key) == data[key] for key in (CONF_HOST, CONF_PORT, CONF_API_TOKEN)
+    )
+
+
 async def _reauth_target_is_demo_mode(hass: Any, data: dict[str, Any]) -> bool:
     """DEMO_MODUS_REAUTH_PLAN.md, zweite Sicherheitsebene (die erste sitzt
     in queue_writer.py::_probe_demo_mode() und vermeidet den Reauth meist
@@ -205,6 +212,22 @@ class ZeitarchivConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     VERSION = 2
 
+    def _async_update_and_finish(
+        self, entry: config_entries.ConfigEntry, **kwargs: Any
+    ) -> FlowResult:
+        """Speichert die Änderung und sorgt für genau einen Reload.
+
+        Läuft der Entry, plant der in __init__.py registrierte Update-Listener
+        den Reload — async_update_reload_and_abort() würde ihn dann ab HA
+        2026.12 ein zweites Mal anstoßen und fehlschlagen. Ist das Setup
+        dagegen gescheitert (z. B. ConfigEntryAuthFailed beim Start), hat HA
+        den Listener beim Aufräumen schon entfernt; dann muss der Flow selbst
+        neu laden, sonst bliebe der Entry trotz neuem Token im Fehlerzustand.
+        """
+        if entry.update_listeners:
+            return self.async_update_and_abort(entry, **kwargs)
+        return self.async_update_reload_and_abort(entry, **kwargs)
+
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
@@ -215,6 +238,22 @@ class ZeitarchivConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors[CONF_NAME] = "invalid_name"
             else:
                 user_input = {**user_input, CONF_NAME: name}
+                # Ein Home Assistant darf mehrere Zeitarchiv-Ziele parallel
+                # bedienen (z. B. Produktiv- und Testsystem). Deshalb ist der
+                # Endpunkt ausdrücklich keine Config-Entry-Unique-ID: Auch
+                # derselbe Host/Port kann mit einem zweiten benannten Eintrag
+                # eingerichtet werden (etwa mit einem zweiten Token einer
+                # Demo-Instanz). Laufzeitdaten und Diagnose-Entities sind
+                # ohnehin über entry.entry_id voneinander getrennt. Nur ein
+                # Eintrag mit demselben Token schickte jeden Wert doppelt an
+                # dieselbe App — das ist nie gewollt.
+                self._async_abort_entries_match(
+                    {
+                        CONF_HOST: user_input[CONF_HOST],
+                        CONF_PORT: user_input[CONF_PORT],
+                        CONF_API_TOKEN: user_input[CONF_API_TOKEN],
+                    }
+                )
                 try:
                     await _validate_input(self.hass, user_input)
                 except ZeitarchivAuthError:
@@ -225,12 +264,6 @@ class ZeitarchivConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     _LOGGER.exception("Unerwarteter Fehler beim Verbindungstest")
                     errors["base"] = "unknown"
                 else:
-                    # Ein Home Assistant darf mehrere Zeitarchiv-Ziele parallel
-                    # bedienen (z. B. Produktiv- und Testsystem). Deshalb ist der
-                    # Endpunkt ausdrücklich keine Config-Entry-Unique-ID: Auch
-                    # derselbe Host/Port kann mit einem zweiten benannten Eintrag
-                    # eingerichtet werden. Laufzeitdaten und Diagnose-Entities
-                    # sind ohnehin über entry.entry_id voneinander getrennt.
                     return self.async_create_entry(
                         title=f"Zeitarchiv ({name})", data=user_input
                     )
@@ -255,21 +288,24 @@ class ZeitarchivConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors[CONF_NAME] = "invalid_name"
             else:
                 user_input = {**user_input, CONF_NAME: name}
-                try:
-                    await _validate_input(self.hass, user_input)
-                except ZeitarchivAuthError:
-                    errors["base"] = "invalid_auth"
-                except ZeitarchivApiError:
-                    errors["base"] = "cannot_connect"
-                except Exception:  # noqa: BLE001
-                    _LOGGER.exception("Unerwarteter Fehler beim Verbindungstest")
-                    errors["base"] = "unknown"
+                if any(
+                    _same_target(other, user_input)
+                    for other in self._async_current_entries(include_ignore=False)
+                    if other.entry_id != entry.entry_id
+                ):
+                    errors["base"] = "already_configured"
                 else:
-                    # Der in __init__.py registrierte Update-Listener plant den
-                    # einzigen Reload. async_update_reload_and_abort() oder ein
-                    # zusätzlicher async_reload() würden ab HA 2026.12 wegen des
-                    # doppelten Reload-Mechanismus fehlschlagen.
-                    return self.async_update_and_abort(
+                    try:
+                        await _validate_input(self.hass, user_input)
+                    except ZeitarchivAuthError:
+                        errors["base"] = "invalid_auth"
+                    except ZeitarchivApiError:
+                        errors["base"] = "cannot_connect"
+                    except Exception:  # noqa: BLE001
+                        _LOGGER.exception("Unerwarteter Fehler beim Verbindungstest")
+                        errors["base"] = "unknown"
+                if not errors:
+                    return self._async_update_and_finish(
                         entry,
                         data=user_input,
                         title=f"Zeitarchiv ({name})",
@@ -335,9 +371,7 @@ class ZeitarchivConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 if await _reauth_target_is_demo_mode(self.hass, data):
                     self._pending_reauth_data = data
                     return await self.async_step_reauth_confirm_demo_warning()
-                # Wie beim Reconfigure übernimmt ausschließlich der vorhandene
-                # Update-Listener den Reload.
-                return self.async_update_and_abort(self._get_reauth_entry(), data=data)
+                return self._async_update_and_finish(self._get_reauth_entry(), data=data)
 
         return self.async_show_form(
             step_id="reauth_confirm",
@@ -365,7 +399,7 @@ class ZeitarchivConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data = self._pending_reauth_data
             self._pending_reauth_data = None
             if user_input.get("confirm"):
-                return self.async_update_and_abort(self._get_reauth_entry(), data=data)
+                return self._async_update_and_finish(self._get_reauth_entry(), data=data)
             return self.async_abort(reason="demo_mode_reauth_cancelled")
 
         return self.async_show_form(

@@ -9,6 +9,12 @@
           "host": "Host",
           "port": "Port",
           "api_token": "API token"
+        },
+        "data_description": {
+          "name": "Freely chosen, e.g. \"Production\" or \"Test\". Shown in the integration title and the device name.",
+          "host": "Hostname or IP address at which Home Assistant reaches the Zeitarchiv add-on.",
+          "port": "Port of the Zeitarchiv add-on, 8127 by default.",
+          "api_token": "Found in the Zeitarchiv add-on under Settings → Connection."
         }
       },
       "reconfigure": {
@@ -19,6 +25,12 @@
           "host": "Host",
           "port": "Port",
           "api_token": "API token"
+        },
+        "data_description": {
+          "name": "Freely chosen, e.g. \"Production\" or \"Test\". Shown in the integration title and the device name.",
+          "host": "Hostname or IP address at which Home Assistant reaches the Zeitarchiv add-on.",
+          "port": "Port of the Zeitarchiv add-on, 8127 by default.",
+          "api_token": "Found in the Zeitarchiv add-on under Settings → Connection."
         }
       },
       "reauth_confirm": {
@@ -26,6 +38,9 @@
         "description": "The add-on rejected the stored API token — it was probably regenerated or cleared in the add-on's settings (\"Connection\" section). Enter the new token.",
         "data": {
           "api_token": "API token"
+        },
+        "data_description": {
+          "api_token": "The current token from the Zeitarchiv add-on, Settings → Connection."
         }
       },
       "reauth_confirm_demo_warning": {
@@ -33,6 +48,9 @@
         "description": "The new token belongs to an instance that is currently running in demo mode — probably because the app was switched over while \"{connection}\" still had the old token. Use it anyway? If you cancel, the previous token stays unchanged and will work again on its own once the app switches back to production.",
         "data": {
           "confirm": "Use it anyway"
+        },
+        "data_description": {
+          "confirm": "Only tick this if this connection should really write to the demo instance."
         }
       }
     },
@@ -40,12 +58,14 @@
       "invalid_name": "Enter a connection name.",
       "cannot_connect": "Failed to connect to the add-on. Is it running and is the port reachable?",
       "invalid_auth": "The add-on rejected the API token.",
-      "unknown": "Unexpected error."
+      "unknown": "Unexpected error.",
+      "already_configured": "A connection with this host, port and token already exists."
     },
     "abort": {
       "reconfigure_successful": "Connection updated.",
       "reauth_successful": "New token saved.",
-      "demo_mode_reauth_cancelled": "Cancelled — the previous token stays unchanged."
+      "demo_mode_reauth_cancelled": "Cancelled — the previous token stays unchanged.",
+      "already_configured": "A connection with this host, port and token already exists."
     }
   },
   "options": {

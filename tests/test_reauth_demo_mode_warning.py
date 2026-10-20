@@ -38,7 +38,7 @@ def test_demo_warning_step_uses_the_reauth_entry_title_and_can_be_cancelled() ->
     body = CONFIG_FLOW[start:end]
     assert 'description_placeholders={"connection": self._get_reauth_entry().title}' in body
     assert 'self.async_abort(reason="demo_mode_reauth_cancelled")' in body
-    assert "self.async_update_and_abort(self._get_reauth_entry(), data=data)" in body
+    assert "self._async_update_and_finish(self._get_reauth_entry(), data=data)" in body
 
 
 def test_user_and_reconfigure_steps_do_not_check_demo_mode() -> None:

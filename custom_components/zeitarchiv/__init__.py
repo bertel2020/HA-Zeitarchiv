@@ -33,6 +33,7 @@ from homeassistant.core import (
     State,
     callback,
 )
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
@@ -40,7 +41,7 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.storage import Store
 from homeassistant.loader import async_get_integration
 
-from .api import ZeitarchivClient
+from .api import ZeitarchivApiError, ZeitarchivAuthError, ZeitarchivClient
 from .const import (
     CONF_API_TOKEN,
     CONF_DECIMAL_PLACES,
@@ -49,6 +50,7 @@ from .const import (
     SIGNAL_TEXT_STATES,
 )
 from .coordinator import ZeitarchivNoticesCoordinator
+from .data import ZeitarchivConfigEntry, ZeitarchivRuntimeData
 from .events import build_event, is_text_state
 from .filtering import is_state_already_sent, is_state_value_change
 from .queue_writer import ZeitarchivQueueWriter
@@ -81,7 +83,7 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -> bool:
     """Richtet Zeitarchiv aus einem Config-Entry ein."""
     integration = await async_get_integration(hass, DOMAIN)
     client = ZeitarchivClient(
@@ -91,11 +93,29 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         integration_version=str(integration.version) if integration.version else None,
         language=hass.config.language,
     )
+    # Verbindungstest vor allem anderen, damit ein Abbruch weder Thread noch
+    # Listener zurücklässt. Nur ein abgelehnter Token bricht ab: mit ihm kann
+    # ohnehin nichts geschrieben werden, und ConfigEntryAuthFailed startet
+    # direkt den Reauth. Eine nicht erreichbare App dagegen bewusst KEIN
+    # ConfigEntryNotReady — der Queue-Writer puffert und wiederholt, bis sie
+    # wieder da ist; mit ConfigEntryNotReady gingen alle Zustandsänderungen
+    # bis zum nächsten Setup-Versuch verloren. Im Demo-Modus ebenfalls kein
+    # Abbruch: dort pausiert der Queue-Writer ruhig (siehe repairs.py,
+    # demo_mode_paused), statt einen Tokenwechsel zu verlangen.
+    try:
+        await hass.async_add_executor_job(client.test_connection)
+    except ZeitarchivAuthError as err:
+        if err.demo_mode is not True:
+            raise ConfigEntryAuthFailed(str(err)) from err
+    except ZeitarchivApiError as err:
+        _LOGGER.info(
+            "Zeitarchiv-Ziel %s beim Start nicht erreichbar, Events werden gepuffert: %s",
+            entry.title,
+            err,
+        )
     # Wasserstand VOR dem Queue-Writer laden: on_batch_sent unten schreibt
     # bereits ab dem ersten erfolgreichen Batch in dasselbe Dict.
-    watermark_store: Store[dict[str, float]] = Store(
-        hass, _WATERMARK_STORAGE_VERSION, f"{DOMAIN}_{entry.entry_id}_watermark"
-    )
+    watermark_store = _watermark_store(hass, entry)
     watermark: dict[str, float] = await watermark_store.async_load() or {}
 
     async def _persist_watermark(batch: list[dict]) -> None:
@@ -262,16 +282,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         already_sent_count,
     )
 
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
-        "client": client,
-        "queue_writer": queue_writer,
-        "remove_listener": remove_listener,
-        # Für diagnostics.py — derselbe Live-Matcher verhindert abweichende
-        # Auswertungen zwischen Schreibpfad und Diagnose-Download.
-        "filters": filters,
-        "notices_coordinator": notices_coordinator,
-        "text_states": text_states_view,
-    }
+    entry.runtime_data = ZeitarchivRuntimeData(
+        client=client,
+        queue_writer=queue_writer,
+        remove_listener=remove_listener,
+        filters=filters,
+        notices_coordinator=notices_coordinator,
+        text_states=text_states_view,
+    )
 
     def _sync_repairs() -> None:
         repairs_mod.async_sync_issues(
@@ -289,31 +307,40 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     _sync_repairs()
 
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
-    # Erst NACH dem obigen hass.data-Eintrag weiterreichen — sensor.py liest
-    # genau diesen Eintrag in seinem eigenen async_setup_entry.
+    # Erst NACH dem obigen runtime_data weiterreichen — sensor.py liest
+    # genau diese Daten in seinem eigenen async_setup_entry.
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
 
-async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
+async def async_remove_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -> None:
+    """Löscht den Wasserstand einer entfernten Verbindung aus .storage —
+    sonst bliebe je gelöschtem Entry eine verwaiste Datei zurück."""
+    await _watermark_store(hass, entry).async_remove()
+
+
+def _watermark_store(hass: HomeAssistant, entry: ConfigEntry) -> Store[dict[str, float]]:
+    return Store(hass, _WATERMARK_STORAGE_VERSION, f"{DOMAIN}_{entry.entry_id}_watermark")
+
+
+async def _async_update_listener(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -> None:
     """Lädt den Entry neu, wenn sich die Options-Flow-Filter ändern."""
     await hass.config_entries.async_reload(entry.entry_id)
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -> bool:
     """Räumt Listener, Sensoren und Hintergrund-Thread beim Entfernen/Neuladen auf."""
     if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         return False
-    data = hass.data[DOMAIN][entry.entry_id]
-    data["remove_listener"]()
+    data = entry.runtime_data
+    data.remove_listener()
     # Sonst blieben Repair-Karten einer entfernten/neu geladenen Verbindung
     # verwaist stehen, bis zufällig dieselbe Meldung erneut aktiv wird.
     repairs_mod.async_clear_issues(hass, entry)
-    stopped = await hass.async_add_executor_job(data["queue_writer"].stop)
+    stopped = await hass.async_add_executor_job(data.queue_writer.stop)
     if not stopped:
         _LOGGER.error("Zeitarchiv-Queue-Worker konnte nicht sauber beendet werden")
         return False
-    hass.data[DOMAIN].pop(entry.entry_id)
     return True
 
 

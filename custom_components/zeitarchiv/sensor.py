@@ -59,15 +59,17 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import ZeitarchivNoticesCoordinator
+from .data import ZeitarchivConfigEntry
 from .queue_writer import ZeitarchivQueueWriter
 
 
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant,
+    entry: ZeitarchivConfigEntry,
+    async_add_entities: AddEntitiesCallback,
 ) -> None:
-    entry_data = hass.data[DOMAIN][entry.entry_id]
-    queue_writer: ZeitarchivQueueWriter = entry_data["queue_writer"]
-    notices_coordinator: ZeitarchivNoticesCoordinator = entry_data["notices_coordinator"]
+    queue_writer = entry.runtime_data.queue_writer
+    notices_coordinator = entry.runtime_data.notices_coordinator
     device_info = DeviceInfo(
         identifiers={(DOMAIN, entry.entry_id)},
         name=entry.title,
