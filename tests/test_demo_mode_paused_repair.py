@@ -31,6 +31,14 @@ def test_repairs_defines_a_standalone_demo_mode_paused_issue() -> None:
     assert 'translation_key="demo_mode_paused"' in body
 
 
+
+def test_demo_mode_paused_issue_is_a_callback() -> None:
+    """hass.add_job führt nur @callback-Ziele auf dem Event-Loop aus — eine
+    undekorierte Funktion liefe im Executor, wo ir.async_create_issue/
+    async_delete_issue nicht laufen dürfen."""
+    source = (INTEGRATION_DIR / "repairs.py").read_text(encoding="utf-8")
+    assert "@callback\ndef async_set_demo_mode_paused_issue(" in source
+
 def test_clear_issues_removes_the_demo_mode_paused_issue_unconditionally() -> None:
     """Das Issue hängt nicht an active_repair_issues (das führt nur
     async_sync_issues() nach) — ohne einen expliziten Aufruf hier bliebe es

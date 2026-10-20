@@ -12,7 +12,7 @@ weniger kritische) siehe binary_sensor.py, Bucket B."""
 from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import issue_registry as ir
 
 from .const import DOMAIN
@@ -82,6 +82,11 @@ def async_sync_issues(hass: HomeAssistant, entry: ConfigEntry, notices: list[dic
     entry_data["active_repair_issues"] = current_issue_ids
 
 
+# @callback ist hier Pflicht, nicht Stil: Aufgerufen wird ausschließlich über
+# hass.add_job vom Queue-Writer-Thread (siehe __init__.py), und add_job schickt
+# eine undekorierte Funktion in den Executor statt auf den Event-Loop — dort
+# dürfen ir.async_create_issue/async_delete_issue nicht laufen.
+@callback
 def async_set_demo_mode_paused_issue(hass: HomeAssistant, entry: ConfigEntry, active: bool) -> None:
     """Eigenständiges Issue, NICHT über async_sync_issues()/die Notices-Liste
     (DEMO_MODUS_REAUTH_PLAN.md). Grund: während der Token abgelehnt wird,
