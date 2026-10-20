@@ -179,6 +179,9 @@
       },
       "health_issue": {
         "name": "Maintenance notice"
+      },
+      "text_states": {
+        "name": "Non-archivable entities"
       }
     }
   },
@@ -206,6 +209,10 @@
     "demo_mode_paused": {
       "title": "Zeitarchiv connection paused",
       "description": "The connection \"{connection}\" is not sending right now because the app is running in demo mode — not a token problem. Resumes on its own once the app switches back to production."
+    },
+    "text_states_not_archived": {
+      "title": "Zeitarchiv: entities with text values are not archived",
+      "description": "\"{connection}\" has entities selected whose state is text instead of a number: {entities}\n\nZeitarchiv only archives numbers as well as on/off and presence states. These entities therefore never reach the app and do not show up in its selection either. This notice disappears once no selected entity reports text anymore or they are removed from the selection."
     }
   }
 }

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import _pkg  # noqa: F401  (registriert die Namespace-Pakete als Seiteneffekt)
-from custom_components.zeitarchiv.events import build_event
+from custom_components.zeitarchiv.events import build_event, is_text_state
 
 
 def test_numeric_sensor_parses_to_float() -> None:
@@ -132,3 +132,22 @@ def test_entity_id_the_app_would_reject_is_skipped() -> None:
     assert build_event(too_long, "sensor", "1", None, None, 100.0) is None
     longest = "sensor." + "a" * 233
     assert build_event(longest, "sensor", "1", None, None, 100.0) is not None
+
+
+def test_text_state_is_detected_for_numeric_domains() -> None:
+    """Issue #24: "Heating"/"Idle" eines Thermostat-Sensors kommt nie in der App an."""
+    assert is_text_state("sensor", "Heating")
+    assert is_text_state("sensor", "Baumwolle 60")
+
+
+def test_numbers_and_transient_states_are_no_text_states() -> None:
+    assert not is_text_state("sensor", "21.4")
+    for state in ("unavailable", "unknown", "none", "", "  "):
+        assert not is_text_state("sensor", state)
+
+
+def test_switch_and_presence_domains_are_never_text_states() -> None:
+    """Deren Zustände bildet build_event() selbst ab (bzw. verwirft
+    Unerwartetes wie "problem") — dafür gibt es keinen Texthinweis."""
+    assert not is_text_state("binary_sensor", "problem")
+    assert not is_text_state("person", "Arbeit")

@@ -179,6 +179,9 @@
       },
       "health_issue": {
         "name": "Wartungshinweis"
+      },
+      "text_states": {
+        "name": "Nicht archivierbare Entitäten"
       }
     }
   },
@@ -206,6 +209,10 @@
     "demo_mode_paused": {
       "title": "Zeitarchiv-Verbindung pausiert",
       "description": "Die Verbindung „{connection}\" sendet aktuell nicht, weil die App im Demo-Modus läuft — kein Tokenproblem. Läuft von selbst weiter, sobald die App zurück auf Produktiv geschaltet wird."
+    },
+    "text_states_not_archived": {
+      "title": "Zeitarchiv: Entitäten mit Textwerten werden nicht archiviert",
+      "description": "Für „{connection}\" sind Entitäten ausgewählt, deren Zustand Text statt einer Zahl ist: {entities}\n\nZeitarchiv archiviert nur Zahlen sowie on/off- und Anwesenheits-Zustände. Diese Entitäten kommen deshalb nicht in der App an und erscheinen dort auch nicht in der Auswahl. Der Hinweis verschwindet, sobald keine ausgewählte Entität mehr Text liefert oder sie aus der Auswahl entfernt werden."
     }
   }
 }

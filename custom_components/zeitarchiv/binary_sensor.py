@@ -4,7 +4,12 @@ Bewusst eine Teilmenge der App-Meldungen (siehe notices.py dort, "Bucket B"
 der Roadmap-Planung 1.1/1.5) — nur Zustände mit sinnvollem Automations-
 Anwendungsfall werden zu Entities, nicht der volle Meldungskatalog (der
 bleibt im Zeitarchiv-Glocken-Icon bzw. für kritische Fälle als Repair-Issue,
-siehe repairs.py)."""
+siehe repairs.py).
+
+Ausnahme: `ZeitarchivTextStatesBinarySensor` kommt nicht aus den Meldungen,
+sondern aus dem Schreibpfad der Integration (siehe __init__.py) — nur sie
+sieht ausgewählte Entitäten, die Text liefern; die App erfährt von ihnen nie
+etwas."""
 
 from __future__ import annotations
 
@@ -15,12 +20,13 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import DOMAIN, SIGNAL_TEXT_STATES
 from .coordinator import ZeitarchivNoticesCoordinator
 
 
@@ -66,19 +72,22 @@ _HEALTH_SENSORS: tuple[_HealthSensorSpec, ...] = (
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    coordinator: ZeitarchivNoticesCoordinator = hass.data[DOMAIN][entry.entry_id][
-        "notices_coordinator"
-    ]
+    entry_data = hass.data[DOMAIN][entry.entry_id]
+    coordinator: ZeitarchivNoticesCoordinator = entry_data["notices_coordinator"]
     device_info = DeviceInfo(
         identifiers={(DOMAIN, entry.entry_id)},
         name=entry.title,
         manufacturer="Zeitarchiv",
         entry_type="service",
     )
-    async_add_entities(
+    entities: list[BinarySensorEntity] = [
         ZeitarchivHealthBinarySensor(coordinator, entry, device_info, spec)
         for spec in _HEALTH_SENSORS
+    ]
+    entities.append(
+        ZeitarchivTextStatesBinarySensor(entry, device_info, entry_data["text_states"])
     )
+    async_add_entities(entities)
 
 
 class ZeitarchivHealthBinarySensor(
@@ -122,3 +131,53 @@ class ZeitarchivHealthBinarySensor(
             "reasons": [notice["id"] for notice in matches],
             "details": [notice.get("detail") for notice in matches],
         }
+
+
+class ZeitarchivTextStatesBinarySensor(BinarySensorEntity):
+    """An, solange ausgewählte Entitäten Text statt einer Zahl liefern.
+
+    Gegenstück zur Repair-Karte "text_states_not_archived" (repairs.py) für
+    Dashboards und Automationen. Anders als die Karte nennt das Attribut
+    `entities` die vollständige Liste. Push statt Polling: __init__.py
+    sendet bei jeder Änderung ein Dispatcher-Signal. Kein "Unbekannt" im
+    Demo-Modus wie bei ZeitarchivHealthBinarySensor — die Prüfung läuft
+    vollständig in der Integration und braucht keine Meldungsdaten der App.
+    """
+
+    _attr_device_class = BinarySensorDeviceClass.PROBLEM
+    _attr_has_entity_name = True
+    _attr_should_poll = False
+    _attr_translation_key = "text_states"
+
+    def __init__(
+        self,
+        entry: ConfigEntry,
+        device_info: DeviceInfo,
+        text_states: dict[str, tuple[str, ...]],
+    ) -> None:
+        self._entry_id = entry.entry_id
+        self._text_states = text_states
+        self._attr_unique_id = f"{entry.entry_id}_text_states"
+        self._attr_device_info = device_info
+
+    async def async_added_to_hass(self) -> None:
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                SIGNAL_TEXT_STATES.format(self._entry_id),
+                self._handle_text_states_changed,
+            )
+        )
+
+    @callback
+    def _handle_text_states_changed(self) -> None:
+        self.async_write_ha_state()
+
+    @property
+    def is_on(self) -> bool:
+        return bool(self._text_states["entities"])
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        entities = self._text_states["entities"]
+        return {"entities": list(entities), "count": len(entities)}

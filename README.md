@@ -182,7 +182,12 @@ zusätzlichen Archivpunkt.
   `home → 1`, jeder andere Zustand (`not_home` oder eine benannte Zone
   ungleich `home`) `→ 0`.
 - Textwerte sowie `unknown`, `unavailable`, `none` und leere Zustände werden
-  nicht archiviert.
+  nicht archiviert. Eine ausgewählte Entität, die nur Text liefert (z. B.
+  `Heating`/`Idle` eines Thermostats oder das Programm einer Waschmaschine),
+  kommt deshalb nie in der App an und ist dort auch nicht auswählbar. Damit
+  das nicht unbemerkt bleibt, meldet die Integration solche Entitäten als
+  Repair-Karte und im Log (siehe
+  [Wartungshinweise](#wartungshinweise-repairs-und-health-sensoren)).
 
 Auflösung, Aufbewahrung und Bereinigungsschwellen gehören nicht in diesen
 Filter. Sie werden global oder je Entität in der App konfiguriert.
@@ -309,6 +314,15 @@ Handlungsanweisung im Text.
 Verbindung pausiert" (siehe [Token ändern](#token-ändern)) entsteht
 eigenständig direkt aus dem Schreibpfad, weil der normale, meldungsbasierte
 Weg in genau dem Moment (abgelehnter Token) selbst nicht erreichbar ist.
+Ebenso direkt aus dem Schreibpfad kommt „Zeitarchiv: Entitäten mit
+Textwerten werden nicht archiviert": Sie listet ausgewählte Entitäten, deren
+Zustand Text statt einer Zahl ist — die App erfährt von ihnen nie etwas. Die
+Karte verschwindet, sobald keine ausgewählte Entität mehr Text liefert.
+Dasselbe zeigt der `binary_sensor` **Nicht archivierbare Entitäten** am
+Zeitarchiv-Gerät für Dashboards und Automationen: „OK“, solange alle
+ausgewählten Entitäten archivierbare Werte liefern, sonst „Problem“. Die
+Attribute `entities` (vollständige Liste) und `count` nennen die betroffenen
+Entitäten; der Sensor aktualisiert sich sofort, nicht im 60-s-Takt.
 
 ## Betriebsmodus
 
@@ -399,7 +413,8 @@ hinzukommen, werden erst nach erneutem Speichern der Filter berücksichtigt.
 
 ## Bekannte Grenzen
 
-- Nichtnumerische Textsensoren werden nicht archiviert.
+- Nichtnumerische Textsensoren werden nicht archiviert; ausgewählte werden
+  als Repair-Karte gemeldet.
 - Bereichs- und Gerätezuordnungen werden nicht laufend neu aufgelöst.
 - Queue und Übertragungszähler bestehen nur für die Laufzeit der Integration.
 - Die Verbindung verwendet einen gemeinsamen statischen Token und kein OAuth.

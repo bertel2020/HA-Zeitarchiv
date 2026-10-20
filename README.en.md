@@ -173,7 +173,11 @@ archive point.
 - `device_tracker` and `person` are transmitted as presence: `home → 1`, any
   other state (`not_home` or a named zone other than `home`) `→ 0`.
 - Text values as well as `unknown`, `unavailable`, `none` and empty states are
-  not archived.
+  not archived. A selected entity that only reports text (e.g. `Heating`/`Idle`
+  of a thermostat or a washing machine's programme) therefore never reaches
+  the app and cannot be selected there either. So this does not go unnoticed,
+  the integration reports such entities as a repair card and in the log (see
+  [Maintenance notices](#maintenance-notices-repairs-and-health-sensors)).
 
 Resolution, retention and cleanup thresholds do not belong in this filter.
 They are configured globally or per entity in the app.
@@ -293,7 +297,15 @@ HACS; the repair card serves as a notice with instructions in its text.
 **One exception does not come from the notices:** the repair issue "Zeitarchiv
 connection paused" (see [Changing the token](#changing-the-token)) arises on
 its own directly from the write path, because the normal notice-based path is
-itself unreachable at exactly that moment (rejected token).
+itself unreachable at exactly that moment (rejected token). Likewise straight
+from the write path comes "Zeitarchiv: entities with text values are not
+archived": it lists selected entities whose state is text instead of a number —
+the app never learns about them. The card disappears once no selected entity
+reports text anymore. The `binary_sensor` **Non-archivable entities** on the
+Zeitarchiv device shows the same for dashboards and automations: "OK" as long
+as all selected entities report archivable values, otherwise "Problem". The
+attributes `entities` (full list) and `count` name the affected entities; the
+sensor updates immediately, not on the 60 s cycle.
 
 ## Operating mode
 
@@ -379,7 +391,8 @@ only taken into account after the filters are saved again.
 
 ## Known limitations
 
-- Non-numeric text sensors are not archived.
+- Non-numeric text sensors are not archived; selected ones are reported as a
+  repair card.
 - Area and device assignments are not continuously re-resolved.
 - Queue and transmission counters exist only for the lifetime of the integration.
 - The connection uses a shared static token, not OAuth.

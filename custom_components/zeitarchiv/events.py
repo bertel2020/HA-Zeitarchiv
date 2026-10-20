@@ -36,6 +36,27 @@ def _event_text(value: object) -> str | None:
     return text[:APP_EVENT_TEXT_MAX_LENGTH]
 
 
+def is_text_state(domain: str, state: str) -> bool:
+    """Ob build_event() diesen Zustand allein deshalb verwirft, weil er Text ist.
+
+    Grundlage für den Hinweis an den Nutzer (Repair-Karte, siehe repairs.py):
+    eine ausgewählte Entität, die nur Text liefert (z. B. "Heating"/"Idle"
+    oder ein Waschprogramm), kommt nie in der App an und taucht dort deshalb
+    auch nicht in der Auswahl auf. Vorübergehende Zustände wie "unavailable"
+    zählen nicht — die verwirft build_event() bei jeder Entität.
+    """
+    normalized_state = state.strip().lower()
+    if normalized_state in IGNORED_STATES:
+        return False
+    if domain in SWITCH_DOMAINS or domain in PRESENCE_DOMAINS:
+        return False
+    try:
+        float(state)
+    except (TypeError, ValueError):
+        return True
+    return False
+
+
 def build_event(
     entity_id: str,
     domain: str,

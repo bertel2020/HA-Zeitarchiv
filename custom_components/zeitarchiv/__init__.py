@@ -26,10 +26,17 @@ import time
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT, EVENT_STATE_CHANGED
-from homeassistant.core import Event, EventStateChangedData, HomeAssistant, State
+from homeassistant.core import (
+    Event,
+    EventStateChangedData,
+    HomeAssistant,
+    State,
+    callback,
+)
 from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.storage import Store
 from homeassistant.loader import async_get_integration
 
@@ -39,9 +46,10 @@ from .const import (
     CONF_DECIMAL_PLACES,
     DEFAULT_DECIMAL_PLACES,
     DOMAIN,
+    SIGNAL_TEXT_STATES,
 )
 from .coordinator import ZeitarchivNoticesCoordinator
-from .events import build_event
+from .events import build_event, is_text_state
 from .filtering import is_state_already_sent, is_state_value_change
 from .queue_writer import ZeitarchivQueueWriter
 from .registry_filter import ArchiveFilterMatcher, migrate_legacy_domains
@@ -136,6 +144,50 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     filters = _resolve_filters(hass, entry.options)
     decimal_places = entry.options.get(CONF_DECIMAL_PLACES, DEFAULT_DECIMAL_PLACES)
 
+    # Ausgewählte Entitäten, deren letzter Zustand reiner Text war (siehe
+    # events.is_text_state) — Grundlage der Repair-Karte und des Binärsensors
+    # "Nicht archivierbare Entitäten". Ohne sie fällt eine solche Entität
+    # stillschweigend weg: sie kommt nie in der App an und ist dort deshalb
+    # auch nicht auswählbar. Während des Initial-Snapshots wird nur gesammelt
+    # und danach einmal aktualisiert, statt je Entität.
+    text_state_entities: set[str] = set()
+    snapshot_done = False
+    # Zuletzt veröffentlichter Stand, nur auf dem Event-Loop geschrieben —
+    # der Binärsensor liest ihn beim Anlegen, danach kommt jede Änderung per
+    # Dispatcher-Signal.
+    text_states_view: dict[str, tuple[str, ...]] = {"entities": ()}
+
+    @callback
+    def _async_text_states_changed(entity_ids: tuple[str, ...]) -> None:
+        text_states_view["entities"] = entity_ids
+        repairs_mod.async_set_text_states_issue(hass, entry, entity_ids)
+        async_dispatcher_send(hass, SIGNAL_TEXT_STATES.format(entry.entry_id))
+
+    def _publish_text_states() -> None:
+        # hass.add_job statt eines direkten Aufrufs: state_changed-Listener
+        # ohne @callback laufen im Executor, Repair-Registry und Dispatcher
+        # brauchen den Event-Loop — erst das @callback oben bringt den Job
+        # dorthin (eine undekorierte Funktion schickte add_job wiederum in den
+        # Executor). Als Tupel übergeben, damit der Job eine stabile Kopie sieht.
+        hass.add_job(_async_text_states_changed, tuple(sorted(text_state_entities)))
+
+    def _track_text_state(entity_id: str, is_text: bool) -> None:
+        if is_text == (entity_id in text_state_entities):
+            return
+        if is_text:
+            text_state_entities.add(entity_id)
+            _LOGGER.warning(
+                "Zeitarchiv archiviert %s nicht: der Zustand ist Text statt "
+                "einer Zahl (Ziel=%s). Archiviert werden nur Zahlen sowie "
+                "on/off- und Anwesenheits-Zustände",
+                entity_id,
+                entry.title,
+            )
+        else:
+            text_state_entities.discard(entity_id)
+        if snapshot_done:
+            _publish_text_states()
+
     def _enqueue_state(state: State) -> bool:
         """Filtert und uebergibt einen aktuellen oder geaenderten Zustand."""
         entity_id = state.entity_id
@@ -156,7 +208,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             decimal_places=decimal_places,
         )
         if payload is None:
+            if is_text_state(domain, state.state):
+                _track_text_state(entity_id, True)
             return False
+        _track_text_state(entity_id, False)
         queue_writer.enqueue(payload)
         return True
 
@@ -196,6 +251,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     initial_events = sum(
         _enqueue_state(state) for state in all_states if not _already_sent(state)
     )
+    snapshot_done = True
+    if text_state_entities:
+        _publish_text_states()
     _LOGGER.info(
         "Zeitarchiv-Initialzustand beim Laden vorgemerkt · Ziel=%s · Events=%d · "
         "bereits gesendet (übersprungen)=%d",
@@ -212,6 +270,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         # Auswertungen zwischen Schreibpfad und Diagnose-Download.
         "filters": filters,
         "notices_coordinator": notices_coordinator,
+        "text_states": text_states_view,
     }
 
     def _sync_repairs() -> None:

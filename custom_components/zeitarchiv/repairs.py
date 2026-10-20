@@ -107,6 +107,38 @@ def async_set_demo_mode_paused_issue(hass: HomeAssistant, entry: ConfigEntry, ac
         ir.async_delete_issue(hass, DOMAIN, issue_id)
 
 
+# Mehr Entity-IDs würden die Repair-Karte unlesbar machen — der Rest wird
+# nur gezählt, die vollständige Liste steht im Log (siehe __init__.py).
+_TEXT_STATES_MAX_LISTED = 10
+
+
+def async_set_text_states_issue(
+    hass: HomeAssistant, entry: ConfigEntry, entity_ids: tuple[str, ...]
+) -> None:
+    """Hinweis auf ausgewählte Entitäten, die nur Text liefern und deshalb
+    nicht archiviert werden (siehe events.is_text_state). Wie
+    demo_mode_paused eigenständig statt über die Notices-Liste: die App
+    erfährt von diesen Entitäten nie etwas, nur die Integration sieht sie.
+    Eine leere Liste entfernt die Karte."""
+    issue_id = f"{entry.entry_id}_text_states"
+    if not entity_ids:
+        ir.async_delete_issue(hass, DOMAIN, issue_id)
+        return
+    listed = ", ".join(entity_ids[:_TEXT_STATES_MAX_LISTED])
+    remaining = len(entity_ids) - _TEXT_STATES_MAX_LISTED
+    if remaining > 0:
+        listed += f" (+{remaining})"
+    ir.async_create_issue(
+        hass,
+        DOMAIN,
+        issue_id,
+        is_fixable=False,
+        severity=ir.IssueSeverity.WARNING,
+        translation_key="text_states_not_archived",
+        translation_placeholders={"connection": entry.title, "entities": listed},
+    )
+
+
 def async_clear_issues(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Entfernt alle noch offenen Repair-Issues eines Entries — beim Entladen/
     Entfernen der Verbindung, damit keine verwaisten Karten stehen bleiben."""
@@ -115,6 +147,7 @@ def async_clear_issues(hass: HomeAssistant, entry: ConfigEntry) -> None:
     # ist ein No-op, falls das Issue gerade nicht aktiv ist, deshalb hier
     # unbedingt statt bedingt aufgerufen.
     ir.async_delete_issue(hass, DOMAIN, f"{entry.entry_id}_demo_mode_paused")
+    ir.async_delete_issue(hass, DOMAIN, f"{entry.entry_id}_text_states")
     entry_data = hass.data[DOMAIN].get(entry.entry_id)
     if not entry_data:
         return

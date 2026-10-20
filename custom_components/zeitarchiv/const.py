@@ -50,3 +50,8 @@ PRESENCE_DOMAINS = {"device_tracker", "person"}
 
 # Zustände, die nie archiviert werden.
 IGNORED_STATES = {"unavailable", "unknown", "none", ""}
+
+# Dispatcher-Signal (je Config-Entry formatiert) für die Liste der
+# ausgewählten Entitäten mit Textwerten — __init__.py sendet,
+# binary_sensor.ZeitarchivTextStatesBinarySensor hört zu.
+SIGNAL_TEXT_STATES = f"{DOMAIN}_text_states_{{}}"
