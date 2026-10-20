@@ -95,6 +95,10 @@ class ZeitarchivQueueWriter:
         self._sent_count = 0
         self._last_success_ts: float | None = None
         self._last_error: str | None = None
+        # Über Batches hinweg, nicht je Batch: ein App-Ausfall wird genau
+        # einmal als Warnung gemeldet und genau einmal als behoben, statt das
+        # Log bei längeren Ausfällen periodisch zu füllen.
+        self._unavailable_logged = False
 
     def start(self) -> None:
         if self._thread is not None and self._thread.is_alive():
@@ -243,6 +247,9 @@ class ZeitarchivQueueWriter:
                 self._sent_count += len(batch)
                 self._last_success_ts = time.time()
                 self._last_error = None
+                if self._unavailable_logged:
+                    self._unavailable_logged = False
+                    _LOGGER.info("Zeitarchiv-App wieder erreichbar, Übertragung läuft weiter")
                 if self._demo_mode_paused:
                     self._demo_mode_paused = False
                     if self._on_demo_mode_resolved is not None:
@@ -285,12 +292,16 @@ class ZeitarchivQueueWriter:
                 auth_notified = True
             except Exception as err:  # noqa: BLE001 — jeder andere Client-Fehler ist hier retry-würdig
                 self._last_error = str(err)
-                # Erster Fehler sowie danach nur noch periodisch loggen, damit
-                # ein längerer App-Ausfall das HA-Log nicht flutet.
-                if attempt == 0 or attempt % 10 == 0:
+                if not self._unavailable_logged:
+                    self._unavailable_logged = True
                     _LOGGER.warning(
-                        "Zeitarchiv-Batch (%d Events) fehlgeschlagen (Versuch %d); "
-                        "wird weiter versucht: %s",
+                        "Zeitarchiv-App nicht erreichbar, Events werden gepuffert "
+                        "und weiter übertragen, sobald sie wieder erreichbar ist: %s",
+                        err,
+                    )
+                else:
+                    _LOGGER.debug(
+                        "Zeitarchiv-Batch (%d Events) erneut fehlgeschlagen (Versuch %d): %s",
                         len(batch),
                         attempt + 1,
                         err,

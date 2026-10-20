@@ -7,6 +7,7 @@ injiziert; die produktiven Intervalle bleiben davon unberührt.
 
 from __future__ import annotations
 
+import logging
 import threading
 import time
 from unittest.mock import patch
@@ -133,6 +134,39 @@ def test_retries_then_succeeds() -> None:
         assert all(call == [{"entity_id": "sensor.a"}] for call in client.calls)
     finally:
         writer.stop()
+
+
+def test_outage_is_logged_once_and_recovery_once(caplog) -> None:
+    """Quality Scale log-when-unavailable: ein Ausfall über viele Versuche
+    ergibt genau eine Warnung, die Wiederherstellung genau eine Info —
+    früher kam bei längeren Ausfällen jeder zehnte Versuch erneut ins Log."""
+    client = FakeClient(fail_first=25)
+    writer = ZeitarchivQueueWriter(
+        client, batch_size=1, batch_timeout=10, retry_delays=(0,)
+    )
+    caplog.set_level(logging.DEBUG, logger="custom_components.zeitarchiv.queue_writer")
+    writer.start()
+    try:
+        writer.enqueue({"entity_id": "sensor.a"})
+        _wait(client.event)
+        client.event.clear()
+        writer.enqueue({"entity_id": "sensor.b"})
+        _wait(client.event)
+    finally:
+        writer.stop()
+
+    records = [
+        record
+        for record in caplog.records
+        if record.name == "custom_components.zeitarchiv.queue_writer"
+    ]
+    warnings = [r for r in records if r.levelno == logging.WARNING]
+    infos = [r for r in records if r.levelno == logging.INFO]
+    assert len(warnings) == 1
+    assert "nicht erreichbar" in warnings[0].getMessage()
+    assert len(infos) == 1
+    assert "wieder erreichbar" in infos[0].getMessage()
+    assert len([r for r in records if r.levelno == logging.DEBUG]) == 24
 
 
 def test_keeps_batch_until_service_recovers() -> None:
@@ -263,17 +297,25 @@ def test_on_batch_sent_fires_with_the_successfully_written_batch() -> None:
 def test_on_batch_sent_does_not_fire_while_retries_are_still_failing() -> None:
     client = FakeClient(fail_first=2)
     sent_batches: list[list[dict]] = []
+    # Auf den Callback selbst warten, nicht auf client.event: das setzt der
+    # Fake schon innerhalb von write_batch(), on_batch_sent läuft erst danach.
+    sent = threading.Event()
+
+    def _on_batch_sent(batch: list[dict]) -> None:
+        sent_batches.append(batch)
+        sent.set()
+
     writer = ZeitarchivQueueWriter(
         client,
         batch_size=1,
         batch_timeout=10,
         retry_delays=(0.01,),
-        on_batch_sent=lambda batch: sent_batches.append(batch),
+        on_batch_sent=_on_batch_sent,
     )
     writer.start()
     try:
         writer.enqueue({"entity_id": "sensor.a", "ts": 1.0})
-        _wait(client.event)
+        _wait(sent)
         assert len(client.calls) == 3  # 2 fehlgeschlagen, 3. gelingt
         assert len(sent_batches) == 1  # erst beim tatsächlichen Erfolg
     finally:

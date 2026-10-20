@@ -62,6 +62,10 @@ from .coordinator import ZeitarchivNoticesCoordinator
 from .data import ZeitarchivConfigEntry
 from .queue_writer import ZeitarchivQueueWriter
 
+# Keine Begrenzung nötig: die Diagnose-Sensoren lesen nur Attribute des
+# Queue-Writers, die übrigen hängen am Coordinator, der selbst serialisiert.
+PARALLEL_UPDATES = 0
+
 
 async def async_setup_entry(
     hass: HomeAssistant,

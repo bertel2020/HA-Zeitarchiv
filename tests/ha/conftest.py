@@ -8,8 +8,10 @@ HTTP-Client wird ersetzt — die Zeitarchiv-App läuft hier nicht.
 
 from __future__ import annotations
 
+import asyncio
 import sys
 from collections.abc import AsyncGenerator, Generator
+from functools import partial
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -26,6 +28,7 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from custom_components.zeitarchiv.const import CONF_API_TOKEN, DOMAIN  # noqa: E402
+from custom_components.zeitarchiv.queue_writer import ZeitarchivQueueWriter  # noqa: E402
 
 TOKEN = "geheimer-token"
 ENTRY_DATA = {
@@ -66,6 +69,36 @@ def mock_client() -> Generator[MagicMock]:
         ),
     ):
         yield client
+
+
+@pytest.fixture
+def written(mock_client: MagicMock) -> list[dict]:
+    """Alle an die App geschickten Events, in Sendereihenfolge."""
+    events: list[dict] = []
+    mock_client.write_batch.side_effect = events.extend
+    return events
+
+
+@pytest.fixture(autouse=True)
+def fast_queue_writer() -> Generator[None]:
+    """Kurze Batch- und Retry-Zeiten statt 5 s bzw. bis zu 60 s — sonst
+    wartete jeder Schreibpfad-Test auf den produktiven Batch-Timeout."""
+    with patch(
+        "custom_components.zeitarchiv.ZeitarchivQueueWriter",
+        partial(ZeitarchivQueueWriter, batch_timeout=0.02, retry_delays=(0.01,)),
+    ):
+        yield
+
+
+async def wait_for_events(
+    hass: HomeAssistant, written: list[dict], count: int
+) -> None:
+    """Wartet, bis der Queue-Writer-Thread `count` Events geschickt hat, und
+    danach auf die Jobs, die er auf den Event-Loop zurückgibt (Wasserstand)."""
+    async with asyncio.timeout(3):
+        while len(written) < count:
+            await asyncio.sleep(0.01)
+    await hass.async_block_till_done()
 
 
 @pytest.fixture

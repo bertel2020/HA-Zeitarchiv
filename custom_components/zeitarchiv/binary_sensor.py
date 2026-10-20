@@ -30,6 +30,10 @@ from .const import DOMAIN, SIGNAL_TEXT_STATES
 from .coordinator import ZeitarchivNoticesCoordinator
 from .data import ZeitarchivConfigEntry
 
+# Keine Begrenzung nötig: die Health-Sensoren hängen am Coordinator, der
+# Text-Sensor wird per Dispatcher gepusht — keiner pollt selbst.
+PARALLEL_UPDATES = 0
+
 
 @dataclass(frozen=True)
 class _HealthSensorSpec:

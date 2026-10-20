@@ -62,17 +62,15 @@ rules:
   entity-unavailable: done
   integration-owner: done
   log-when-unavailable:
-    status: todo
+    status: done
     comment: >-
-      Der Queue-Writer warnt jeden zehnten Versuch erneut und meldet die
-      Wiederherstellung nicht.
-  parallel-updates: todo
+      Coordinator über UpdateFailed; der Queue-Writer meldet einen Ausfall
+      einmal als Warnung und die Wiederherstellung einmal als Info.
+  parallel-updates: done
   reauthentication-flow: done
   test-coverage:
-    status: todo
-    comment: >-
-      Gesamt 89 %; Lücken vor allem in diagnostics.py, repairs.py und dem
-      Schreibpfad in __init__.py.
+    status: done
+    comment: Gesamt 97 % (tests/ha/ gegen echtes Home Assistant plus Modultests).
 
   # Gold
   devices:
