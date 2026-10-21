@@ -188,7 +188,32 @@ class ZeitarchivClient:
             "latest_backup": latest_backup,
             "demo_mode": demo_mode,
             "capabilities": sorted(capabilities_from(payload)),
+            # Zählt jede Änderung am KI-Zugriff der App hoch; ai.py holt die
+            # Konfiguration neu, sobald sich der Wert ändert. None bei einer App
+            # ohne KI-Zugriff.
+            "ai_config_rev": payload.get("ai_config_rev") if isinstance(payload.get("ai_config_rev"), int) else None,
         }
+
+    def get_ai_config(self, api_id: str) -> dict[str, Any]:
+        """Konfiguration des KI-Zugriffs (GET /api/ai/config): ob er eingeschaltet
+        ist, welche Werkzeuge mit welchen Texten die App anbietet, der API-Prompt.
+        Die ID der LLM-API geht mit, damit die Einstellungsseite der App die
+        fertige MCP-Adresse zeigen kann."""
+        try:
+            response = requests.get(
+                f"{self._base_url}/api/ai/config",
+                params={"api_id": api_id},
+                headers=self._headers,
+                timeout=_TIMEOUT,
+            )
+        except requests.RequestException as err:
+            raise ZeitarchivApiError(f"KI-Konfiguration nicht abrufbar: {err}") from err
+        if response.status_code == 401:
+            raise ZeitarchivAuthError("API-Token wurde von der App abgelehnt")
+        body = _json_or_none(response)
+        if response.status_code != 200 or not isinstance(body, dict):
+            raise ZeitarchivApiError(f"App antwortete beim Abrufen der KI-Konfiguration mit Status {response.status_code}")
+        return body
 
     def ai_call(self, tool: str, arguments: dict[str, Any]) -> tuple[int, dict[str, Any]]:
         """Ruft ein Lese-Werkzeug der App auf (POST /api/ai/<tool>, ROADMAP 1.31).

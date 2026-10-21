@@ -122,13 +122,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
             entry.title,
             err,
         )
-    # KI-Zugriff (ROADMAP 1.31): Die App meldet "ai", sobald sie /api/ai/*
-    # kennt. Ob der Zugriff eingeschaltet ist, entscheidet sie selbst (403);
-    # die Werkzeuge reichen ihre Antwort dann unverändert an das Modell weiter.
-    # Die Fähigkeit wird nur beim Start gelesen: Nach einem App-Update braucht
-    # es ein Neuladen der Integration (V1 führt das über /api/notices nach).
-    if "ai" in caps:
-        _register_ai(hass, entry, client)
     # Wasserstand VOR dem Queue-Writer laden: on_batch_sent unten schreibt
     # bereits ab dem ersten erfolgreichen Batch in dasselbe Dict.
     watermark_store = _watermark_store(hass, entry)
@@ -353,6 +346,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
     # unangemessen (siehe coordinator.py).
     await notices_coordinator.async_refresh()
     _sync_repairs()
+    _setup_ai(hass, entry, client, notices_coordinator)
 
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     # Erst NACH dem obigen runtime_data weiterreichen — sensor.py liest
@@ -361,11 +355,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
     return True
 
 
-def _register_ai(hass: HomeAssistant, entry: ZeitarchivConfigEntry, client: ZeitarchivClient) -> None:
-    """Meldet die LLM-API an, wenn Home Assistant neu genug ist (2026.10).
+def _setup_ai(
+    hass: HomeAssistant, entry: ZeitarchivConfigEntry, client: ZeitarchivClient,
+    coordinator: ZeitarchivNoticesCoordinator,
+) -> None:
+    """Hält die LLM-API von Zeitarchiv im Takt mit dem KI-Schalter der App (ROADMAP 1.31).
 
     Der Import steht hier und nicht oben: ai.py braucht probatio und die neuen
-    Tool-Bausteine und lässt sich auf älterem Home Assistant gar nicht laden.
+    Tool-Bausteine und lässt sich auf Home Assistant vor 2026.10 gar nicht laden.
     Statt Kompatibilitätscode für voluptuous gibt es dort einmal einen Hinweis.
     """
     try:
@@ -376,7 +373,11 @@ def _register_ai(hass: HomeAssistant, entry: ZeitarchivConfigEntry, client: Zeit
             "und bleibt bis dahin ausgeschaltet"
         )
         return
-    entry.async_on_unload(ai_mod.async_register(hass, entry, client))
+    manager = ai_mod.ZeitarchivAiManager(hass, entry, client)
+    entry.async_on_unload(manager.async_shutdown)
+    entry.async_on_unload(coordinator.async_add_listener(lambda: manager.handle_notices(coordinator.data)))
+    # Die Daten des ersten Abrufs sind schon da; der Listener meldet sich erst beim nächsten.
+    manager.handle_notices(coordinator.data)
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -> None:

@@ -34,7 +34,7 @@ def test_get_notices_returns_both_notices_and_latest_backup() -> None:
     }
     with patch("custom_components.zeitarchiv.api.requests.get", return_value=_Resp(payload)):
         result = _client().get_notices()
-    assert result == {**payload, "capabilities": []}
+    assert result == {**payload, "capabilities": [], "ai_config_rev": None}
 
 
 def test_get_notices_passes_the_app_capabilities_on() -> None:
@@ -48,10 +48,18 @@ def test_get_notices_passes_the_app_capabilities_on() -> None:
     assert capabilities_from(result) == {"state", "ai"}
 
 
+def test_get_notices_passes_the_ai_config_rev_on_only_as_an_integer() -> None:
+    base = {"notices": [], "latest_backup": None}
+    with patch("custom_components.zeitarchiv.api.requests.get", return_value=_Resp({**base, "ai_config_rev": 7})):
+        assert _client().get_notices()["ai_config_rev"] == 7
+    with patch("custom_components.zeitarchiv.api.requests.get", return_value=_Resp({**base, "ai_config_rev": "x"})):
+        assert _client().get_notices()["ai_config_rev"] is None
+
+
 def test_get_notices_defaults_latest_backup_to_none_when_absent() -> None:
     with patch("custom_components.zeitarchiv.api.requests.get", return_value=_Resp({"notices": []})):
         result = _client().get_notices()
-    assert result == {"notices": [], "latest_backup": None, "demo_mode": False, "capabilities": []}
+    assert result == {"notices": [], "latest_backup": None, "demo_mode": False, "capabilities": [], "ai_config_rev": None}
 
 
 def test_get_notices_defaults_demo_mode_to_false_when_absent() -> None:
