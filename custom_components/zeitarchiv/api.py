@@ -215,19 +215,26 @@ class ZeitarchivClient:
             raise ZeitarchivApiError(f"App antwortete beim Abrufen der KI-Konfiguration mit Status {response.status_code}")
         return body
 
-    def ai_call(self, tool: str, arguments: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+    def ai_call(
+        self, tool: str, arguments: dict[str, Any], account: str | None = None,
+    ) -> tuple[int, dict[str, Any]]:
         """Ruft ein Lese-Werkzeug der App auf (POST /api/ai/<tool>, ROADMAP 1.31).
 
         Liefert Statuscode und JSON-Body, auch bei 4xx: Die App erklärt dort
         in ``error``/``message``, was das Modell anders machen soll (z. B.
         ``ai_disabled`` oder ``entity_not_found``) — das gehört unverändert zum
         Modell, nicht in eine Ausnahme. Nur Netzwerkfehler, ein abgelehnter
-        Token und unlesbare Antworten werfen."""
+        Token und unlesbare Antworten werfen.
+
+        account ("admin" oder "user") sagt der App, mit was für einem Konto der
+        Client in Home Assistant angemeldet ist; sie zeigt es nur an (Einstellungen
+        → KI-Zugriff → Nutzung), gesperrt wird nichts."""
+        headers = {**self._headers, "X-Zeitarchiv-Ai-User": account} if account else self._headers
         try:
             response = requests.post(
                 f"{self._base_url}/api/ai/{tool}",
                 json=arguments,
-                headers=self._headers,
+                headers=headers,
                 timeout=_AI_TIMEOUT,
             )
         except requests.RequestException as err:

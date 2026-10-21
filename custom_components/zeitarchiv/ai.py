@@ -99,14 +99,27 @@ class ZeitarchivTool(llm.Tool):
         self, hass: HomeAssistant, tool_input: llm.ToolInput, llm_context: llm.LLMContext
     ) -> llm.ToolResult:
         arguments = self.parameters(tool_input.tool_args)
+        account = await _account_kind(hass, llm_context)
         try:
-            status, body = await hass.async_add_executor_job(self._client.ai_call, self.app_tool, arguments)
+            status, body = await hass.async_add_executor_job(self._client.ai_call, self.app_tool, arguments, account)
         except ZeitarchivAuthError:
             return _error("unauthorized", "Zeitarchiv rejected the API token; the user must renew it in Home Assistant.")
         except ZeitarchivApiError as err:
             _LOGGER.warning("Zeitarchiv-Abfrage fehlgeschlagen: %s", err)
             return _error("archive_unreachable", "The Zeitarchiv app did not answer; try again later.")
         return llm.ToolResult(data=body, error=status >= 400)
+
+
+async def _account_kind(hass: HomeAssistant, llm_context: llm.LLMContext) -> str | None:
+    """"admin" oder "user", je nach Konto, mit dem der Client angemeldet ist.
+    None, wenn die Anfrage kein Konto trägt (etwa ein lokaler Gesprächsagent)."""
+    user_id = llm_context.context.user_id if llm_context.context else None
+    if not user_id:
+        return None
+    user = await hass.auth.async_get_user(user_id)
+    if user is None:
+        return None
+    return "admin" if user.is_admin else "user"
 
 
 def _error(code: str, message: str) -> llm.ToolResult:

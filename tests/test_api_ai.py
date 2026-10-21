@@ -53,6 +53,14 @@ def test_ai_call_returns_error_bodies_instead_of_raising() -> None:
     assert post.call_args.kwargs["json"] == {"period": "day"}
 
 
+def test_ai_call_sends_the_account_kind_only_when_known() -> None:
+    with patch("custom_components.zeitarchiv.api.requests.post", return_value=_Resp({}, 200)) as post:
+        _client().ai_call("get_notices", {}, "admin")
+        assert post.call_args.kwargs["headers"]["X-Zeitarchiv-Ai-User"] == "admin"
+        _client().ai_call("get_notices", {})
+        assert "X-Zeitarchiv-Ai-User" not in post.call_args.kwargs["headers"]
+
+
 def test_ai_call_raises_on_rejected_token_and_unreadable_answers() -> None:
     with patch("custom_components.zeitarchiv.api.requests.post", return_value=_Resp({}, 401)):
         with pytest.raises(ZeitarchivAuthError):

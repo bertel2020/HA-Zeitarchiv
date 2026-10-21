@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 import probatio
 import pytest
 from homeassistant.config_entries import ConfigEntryState
-from homeassistant.core import HomeAssistant
+from homeassistant.core import Context, HomeAssistant
 from homeassistant.helpers import llm
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -232,7 +232,7 @@ async def test_tool_call_passes_arguments_and_returns_the_app_answer(
 
     assert result.error is False and result.data == {"results": [{"entity_id": "sensor.a"}]}
     ai_client.ai_call.assert_called_once_with(
-        "compare_periods", {"entity_ids": ["sensor.a"], "period": "month", "compare_to": "previous_period"}
+        "compare_periods", {"entity_ids": ["sensor.a"], "period": "month", "compare_to": "previous_period"}, None
     )
 
 
@@ -285,3 +285,21 @@ async def test_two_connections_get_distinct_namespaced_tools(
 
     assert await hass.config_entries.async_unload(second.entry_id)
     await hass.async_block_till_done()
+
+
+async def test_the_account_kind_is_sent_to_the_app(
+    hass: HomeAssistant, ai_client: MagicMock, unload_after_test: MockConfigEntry
+) -> None:
+    await _setup(hass, unload_after_test)
+    admin = await hass.auth.async_create_user("Chef", group_ids=["system-admin"])
+    member = await hass.auth.async_create_user("Gast", group_ids=["system-users"])
+    tool = (await _tools(hass, unload_after_test))["zeitarchiv_get_notices"]
+
+    for user, expected in ((admin, "admin"), (member, "user"), (None, None)):
+        ai_client.ai_call.reset_mock()
+        context = Context(user_id=user.id) if user else None
+        llm_context = llm.LLMContext(
+            platform="mcp_server", context=context, language="de", assistant="conversation", device_id=None
+        )
+        await tool.async_call(hass, llm.ToolInput(tool_name=tool.name, tool_args={}), llm_context)
+        ai_client.ai_call.assert_called_once_with("get_notices", {}, expected)
