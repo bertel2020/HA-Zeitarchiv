@@ -180,7 +180,15 @@ class ZeitarchivClient:
         if not isinstance(demo_mode, bool):
             raise ZeitarchivApiError("App lieferte eine unerwartete Antwortstruktur")
 
-        return {"notices": notices, "latest_backup": latest_backup, "demo_mode": demo_mode}
+        # Die Fähigkeiten gehören in die Koordinatordaten: _sync_capabilities()
+        # (__init__.py) führt sie daraus jede Minute nach. Fehlten sie hier,
+        # fiele "state" nach dem ersten Abruf wieder auf False zurück.
+        return {
+            "notices": notices,
+            "latest_backup": latest_backup,
+            "demo_mode": demo_mode,
+            "capabilities": sorted(capabilities_from(payload)),
+        }
 
     def ai_call(self, tool: str, arguments: dict[str, Any]) -> tuple[int, dict[str, Any]]:
         """Ruft ein Lese-Werkzeug der App auf (POST /api/ai/<tool>, ROADMAP 1.31).

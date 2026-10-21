@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import _pkg  # noqa: F401  (registriert die Namespace-Pakete als Seiteneffekt)
 
-from custom_components.zeitarchiv.api import ZeitarchivApiError, ZeitarchivClient
+from custom_components.zeitarchiv.api import ZeitarchivApiError, ZeitarchivClient, capabilities_from
 
 
 def _client() -> ZeitarchivClient:
@@ -34,13 +34,24 @@ def test_get_notices_returns_both_notices_and_latest_backup() -> None:
     }
     with patch("custom_components.zeitarchiv.api.requests.get", return_value=_Resp(payload)):
         result = _client().get_notices()
-    assert result == payload
+    assert result == {**payload, "capabilities": []}
+
+
+def test_get_notices_passes_the_app_capabilities_on() -> None:
+    """Regression: get_notices() ließ "capabilities" früher fallen. Die
+    Tests der Integration mockten die ganze Methode samt Fähigkeiten und
+    sahen das nicht — _sync_capabilities() setzte "state" dadurch nach dem
+    ersten Abruf auf False zurück, Text-Zustände blieben liegen."""
+    payload = {"notices": [], "latest_backup": None, "demo_mode": False, "capabilities": ["state", "ai"]}
+    with patch("custom_components.zeitarchiv.api.requests.get", return_value=_Resp(payload)):
+        result = _client().get_notices()
+    assert capabilities_from(result) == {"state", "ai"}
 
 
 def test_get_notices_defaults_latest_backup_to_none_when_absent() -> None:
     with patch("custom_components.zeitarchiv.api.requests.get", return_value=_Resp({"notices": []})):
         result = _client().get_notices()
-    assert result == {"notices": [], "latest_backup": None, "demo_mode": False}
+    assert result == {"notices": [], "latest_backup": None, "demo_mode": False, "capabilities": []}
 
 
 def test_get_notices_defaults_demo_mode_to_false_when_absent() -> None:
