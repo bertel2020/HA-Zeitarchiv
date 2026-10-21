@@ -233,6 +233,14 @@
     "text_states_not_archived": {
       "title": "Zeitarchiv: entities with text values are not archived yet",
       "description": "\"{connection}\" has entities selected whose state is text instead of a number: {entities}\n\nThe connected Zeitarchiv app cannot accept text states yet. After updating the app, these entities are archived automatically and this notice disappears by itself. It also disappears once the entities are removed from the selection."
+    },
+    "entities_state_type_mismatch": {
+      "title": "Zeitarchiv: values discarded, type does not match",
+      "description": "\"{connection}\" discards values because an entity reports text instead of numbers or vice versa: {detail}\n\nThe first value sets an entity's type. If it keeps reporting the other type, delete the entity in the Zeitarchiv app (it then starts over) or deselect it in the integration."
+    },
+    "entities_state_limit_reached": {
+      "title": "Zeitarchiv: states discarded, limit reached",
+      "description": "\"{connection}\" discards new states: {detail}\n\nFree-text sensors should not be archived — deselect the entity in the integration."
     }
   }
 }

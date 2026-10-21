@@ -32,6 +32,11 @@ _ALWAYS_IDS = frozenset({
     "retention.job_failed",
     "housekeeping.inactive_entities_error",
     "integration.outdated",
+    # Zustands-Entitäten (App-Roadmap 1.29): Werte werden verworfen, weil der
+    # Typ nicht mehr passt oder die Obergrenze an Zuständen erreicht ist.
+    # Ohne Karte gingen diese Werte unbemerkt verloren.
+    "entities.state_type_mismatch",
+    "entities.state_limit_reached",
 })
 
 

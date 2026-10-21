@@ -77,6 +77,31 @@ async def test_notices_drive_health_sensors_and_repairs(
     assert hass.states.get(backup.entity_id).state == "off"
 
 
+async def test_discarded_state_values_become_warning_repairs(
+    hass: HomeAssistant, loaded_entry: MockConfigEntry, mock_client: MagicMock
+) -> None:
+    """Verworfene Zustandswerte (Typ passt nicht, Obergrenze) gingen sonst
+    unbemerkt verloren — beide werden eine Repair-Karte mit eigenem Text."""
+    mock_client.get_notices.return_value = {
+        **NOTICES,
+        "notices": [
+            {"id": "entities.state_type_mismatch", "severity": "warn", "detail": "sensor.a"},
+            {"id": "entities.state_limit_reached", "severity": "warn", "detail": "sensor.b"},
+        ],
+    }
+    await _refresh(hass, loaded_entry)
+
+    registry = ir.async_get(hass)
+    for notice_id, detail in (
+        ("entities.state_type_mismatch", "sensor.a"),
+        ("entities.state_limit_reached", "sensor.b"),
+    ):
+        issue = registry.async_get_issue(DOMAIN, f"{loaded_entry.entry_id}_{notice_id}")
+        assert issue.severity is ir.IssueSeverity.WARNING
+        assert issue.translation_key == notice_id.replace(".", "_")
+        assert issue.translation_placeholders["detail"] == detail
+
+
 async def test_repairs_are_removed_on_unload(
     hass: HomeAssistant, loaded_entry: MockConfigEntry, mock_client: MagicMock
 ) -> None:

@@ -233,6 +233,14 @@
     "text_states_not_archived": {
       "title": "Zeitarchiv: Entitäten mit Textwerten werden noch nicht archiviert",
       "description": "Für „{connection}\" sind Entitäten ausgewählt, deren Zustand Text statt einer Zahl ist: {entities}\n\nDie verbundene Zeitarchiv-App kann Text-Zustände noch nicht annehmen. Nach einem Update der App werden diese Entitäten automatisch archiviert, und der Hinweis verschwindet von selbst. Er verschwindet auch, wenn die Entitäten aus der Auswahl entfernt werden."
+    },
+    "entities_state_type_mismatch": {
+      "title": "Zeitarchiv: Werte verworfen, Typ passt nicht",
+      "description": "„{connection}\" verwirft Werte, weil eine Entität Text statt Zahlen liefert oder umgekehrt: {detail}\n\nDer erste Wert legt den Typ einer Entität fest. Liefert sie dauerhaft den anderen Typ, die Entität in der Zeitarchiv-App löschen (sie beginnt dann neu) oder in der Integration abwählen."
+    },
+    "entities_state_limit_reached": {
+      "title": "Zeitarchiv: Zustände verworfen, Obergrenze erreicht",
+      "description": "„{connection}\" verwirft neue Zustände: {detail}\n\nFreitext-Sensoren sollten nicht archiviert werden — die Entität in der Integration abwählen."
     }
   }
 }
