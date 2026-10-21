@@ -67,6 +67,25 @@ def _demo_mode_from_error_body(response: requests.Response) -> bool | None:
     return demo_mode if isinstance(demo_mode, bool) else None
 
 
+def _json_or_none(response: requests.Response) -> Any:
+    try:
+        return response.json()
+    except ValueError:
+        return None
+
+
+def capabilities_from(payload: Any) -> frozenset[str]:
+    """Die Fähigkeiten aus einer Antwort von /api/health oder /api/notices.
+    Fehlt das Feld (ältere App) oder ist es kaputt, gilt: keine Fähigkeiten —
+    der sichere Rückfall auf das bisherige Verhalten."""
+    if not isinstance(payload, dict):
+        return frozenset()
+    caps = payload.get("capabilities")
+    if not isinstance(caps, list):
+        return frozenset()
+    return frozenset(cap for cap in caps if isinstance(cap, str))
+
+
 class ZeitarchivClient:
     """Dünner Wrapper um die REST-API der Zeitarchiv-App."""
 
@@ -96,8 +115,11 @@ class ZeitarchivClient:
         if language:
             self._headers["Accept-Language"] = language
 
-    def test_connection(self) -> None:
-        """Prüft Erreichbarkeit und Token. Wirft bei Fehlschlag."""
+    def test_connection(self) -> frozenset[str]:
+        """Prüft Erreichbarkeit und Token. Wirft bei Fehlschlag.
+
+        Liefert die Fähigkeiten, die die App meldet (z. B. "state" für
+        Text-Zustände) — leer bei einer App, die das Feld noch nicht kennt."""
         try:
             response = requests.get(
                 f"{self._base_url}/api/health", headers=self._headers, timeout=_TIMEOUT
@@ -113,6 +135,7 @@ class ZeitarchivClient:
             raise ZeitarchivApiError(
                 f"App antwortete mit Status {response.status_code}"
             )
+        return capabilities_from(_json_or_none(response))
 
     def get_notices(self) -> dict[str, Any]:
         """Aktuell aktive, nicht stummgeschaltete Meldungen UND das letzte

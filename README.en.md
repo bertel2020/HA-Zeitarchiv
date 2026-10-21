@@ -175,12 +175,21 @@ archive point.
   transmitted as `on → 1` and `off → 0`.
 - `device_tracker` and `person` are transmitted as presence: `home → 1`, any
   other state (`not_home` or a named zone other than `home`) `→ 0`.
-- Text values as well as `unknown`, `unavailable`, `none` and empty states are
-  not archived. A selected entity that only reports text (e.g. `Heating`/`Idle`
-  of a thermostat or a washing machine's programme) therefore never reaches
-  the app and cannot be selected there either. So this does not go unnoticed,
-  the integration reports such entities as a repair card and in the log (see
-  [Maintenance notices](#maintenance-notices-repairs-and-health-sensors)).
+- Text values (e.g. `Heating`/`Idle` of a thermostat or a washing machine's
+  programme) are transmitted as a state, with the translation from Home
+  Assistant where one exists. This only applies to **individually selected**
+  entities: text sensors deliberately do not come along via a pattern or a
+  selection by area, device or label. For such entities `unknown` and
+  `unavailable` are sent to the app as well, which records them as
+  "unavailable".
+- If the connected app cannot accept states yet (older version), text values
+  are not archived. So this does not go unnoticed, the integration then
+  reports individually selected entities with text values as a repair card
+  and in the log (see
+  [Maintenance notices](#maintenance-notices-repairs-and-health-sensors));
+  after an app update they are transmitted automatically.
+- Otherwise `unknown`, `unavailable`, `none` and empty states are not
+  archived.
 
 Resolution, retention and cleanup thresholds do not belong in this filter.
 They are configured globally or per entity in the app.
@@ -302,9 +311,10 @@ connection paused" (see [Changing the token](#changing-the-token)) arises on
 its own directly from the write path, because the normal notice-based path is
 itself unreachable at exactly that moment (rejected token). Likewise straight
 from the write path comes "Zeitarchiv: entities with text values are not
-archived": it lists selected entities whose state is text instead of a number —
-the app never learns about them. The card disappears once no selected entity
-reports text anymore. The `binary_sensor` **Non-archivable entities** on the
+archived yet": it lists individually selected entities whose state is text
+instead of a number, as long as the connected app cannot accept states yet —
+the app then never learns about them. The card disappears by itself after an
+app update, or once none of these entities reports text anymore. The `binary_sensor` **Non-archivable entities** on the
 Zeitarchiv device shows the same for dashboards and automations: "OK" as long
 as all selected entities report archivable values, otherwise "Problem". The
 attributes `entities` (full list) and `count` name the affected entities; the

@@ -12,9 +12,9 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.zeitarchiv.const import CONF_ENTITIES, DOMAIN
+from custom_components.zeitarchiv.const import CONF_ENTITIES, CONF_ENTITY_PATTERNS, DOMAIN
 
-from .conftest import ENTRY_DATA, wait_for_events
+from .conftest import ENTRY_DATA, NOTICES, wait_for_events
 
 SELECTED = "sensor.temperatur"
 
@@ -98,6 +98,71 @@ async def test_text_states_raise_repair_and_binary_sensor(
 
     assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is None
     assert hass.states.get(sensor_id).state == "off"
+
+
+async def test_selected_text_states_are_sent_when_the_app_accepts_them(
+    hass: HomeAssistant,
+    mock_client: MagicMock,
+    written: list[dict],
+    unload_after_test: MockConfigEntry,
+) -> None:
+    mock_client.test_connection.return_value = frozenset({"state"})
+    # Die minütliche Meldungsabfrage führt die Fähigkeit nach — ohne das Feld
+    # hieße ihre Antwort "ältere App" und schaltete Text wieder ab.
+    mock_client.get_notices.return_value = {**NOTICES, "capabilities": ["state"]}
+    hass.states.async_set(SELECTED, "Idle")
+    await _setup(hass, unload_after_test)
+    await wait_for_events(hass, written, 1)
+
+    assert written[0]["state"] == "Idle"
+    assert "value" not in written[0]
+    issue_id = f"{unload_after_test.entry_id}_text_states"
+    assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is None
+
+    hass.states.async_set(SELECTED, "unavailable")
+    await wait_for_events(hass, written, 2)
+    assert written[1]["state"] == "unavailable"
+
+
+async def test_pattern_matched_text_states_are_neither_sent_nor_flagged(
+    hass: HomeAssistant,
+    mock_client: MagicMock,
+    written: list[dict],
+    unload_after_test: MockConfigEntry,
+) -> None:
+    mock_client.test_connection.return_value = frozenset({"state"})
+    mock_client.get_notices.return_value = {**NOTICES, "capabilities": ["state"]}
+    hass.states.async_set(SELECTED, "21.5")
+    hass.states.async_set("sensor.addon_version", "6.3.0")
+    hass.states.async_set("sensor.addon_strom", "3")
+    await _setup(hass, unload_after_test, **{CONF_ENTITY_PATTERNS: ["sensor.addon_*"]})
+    await wait_for_events(hass, written, 2)
+
+    assert sorted(e["entity_id"] for e in written) == ["sensor.addon_strom", SELECTED]
+    issue_id = f"{unload_after_test.entry_id}_text_states"
+    assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is None
+
+
+async def test_capability_from_notices_sends_the_waiting_text_state(
+    hass: HomeAssistant,
+    mock_client: MagicMock,
+    written: list[dict],
+    unload_after_test: MockConfigEntry,
+) -> None:
+    """App-Update im laufenden Betrieb: /api/notices meldet "state" — die
+    bisher abgewiesene Entität geht sofort hinaus, die Karte verschwindet."""
+    mock_client.test_connection.return_value = frozenset()
+    hass.states.async_set(SELECTED, "Idle")
+    await _setup(hass, unload_after_test)
+    issue_id = f"{unload_after_test.entry_id}_text_states"
+    assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is not None
+
+    mock_client.get_notices.return_value = {**NOTICES, "capabilities": ["state"]}
+    await unload_after_test.runtime_data.notices_coordinator.async_refresh()
+    await wait_for_events(hass, written, 1)
+
+    assert written[0]["state"] == "Idle"
+    assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is None
 
 
 async def test_migration_replaces_legacy_domains_with_entities(

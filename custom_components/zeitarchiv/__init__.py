@@ -39,9 +39,10 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.storage import Store
+from homeassistant.helpers.translation import async_get_cached_translations
 from homeassistant.loader import async_get_integration
 
-from .api import ZeitarchivApiError, ZeitarchivAuthError, ZeitarchivClient
+from .api import ZeitarchivApiError, ZeitarchivAuthError, ZeitarchivClient, capabilities_from
 from .const import (
     CONF_API_TOKEN,
     CONF_DECIMAL_PLACES,
@@ -102,8 +103,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
     # bis zum nächsten Setup-Versuch verloren. Im Demo-Modus ebenfalls kein
     # Abbruch: dort pausiert der Queue-Writer ruhig (siehe repairs.py,
     # demo_mode_paused), statt einen Tokenwechsel zu verlangen.
+    # Fähigkeiten der App (siehe api.capabilities_from): "state" heißt, sie
+    # nimmt Text-Zustände an. Beim Start aus /api/health, danach jede Minute
+    # aus /api/notices nachgeführt (_sync_capabilities unten) — so greift
+    # ein App-Update ohne Neustart von Home Assistant. Bis zur ersten
+    # Antwort gilt: keine Fähigkeit, also das bisherige Verhalten.
+    app_capabilities: dict[str, bool] = {"state": False}
     try:
-        await hass.async_add_executor_job(client.test_connection)
+        caps = await hass.async_add_executor_job(client.test_connection)
+        app_capabilities["state"] = "state" in caps
     except ZeitarchivAuthError as err:
         if err.demo_mode is not True:
             raise ConfigEntryAuthFailed(str(err)) from err
@@ -191,15 +199,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
         # Executor). Als Tupel übergeben, damit der Job eine stabile Kopie sieht.
         hass.add_job(_async_text_states_changed, tuple(sorted(text_state_entities)))
 
+    def _text_allowed(entity_id: str) -> bool:
+        # Nur EINZELN ausgewählte Entitäten: ein Muster wie sensor.* oder
+        # eine Auswahl über Bereich/Gerät/Label holt Text-Sensoren nicht mit
+        # (ROADMAP 1.29 — sonst kämen Versionsnummern, Geräte-IDs & Co. mit).
+        return app_capabilities["state"] and entity_id in filters.included_entities
+
     def _track_text_state(entity_id: str, is_text: bool) -> None:
         if is_text == (entity_id in text_state_entities):
             return
         if is_text:
             text_state_entities.add(entity_id)
             _LOGGER.warning(
-                "Zeitarchiv archiviert %s nicht: der Zustand ist Text statt "
-                "einer Zahl (Ziel=%s). Archiviert werden nur Zahlen sowie "
-                "on/off- und Anwesenheits-Zustände",
+                "Zeitarchiv archiviert %s noch nicht: der Zustand ist Text statt "
+                "einer Zahl, und die App (Ziel=%s) kann Text-Zustände noch "
+                "nicht annehmen. Nach einem Update der App geschieht das automatisch",
                 entity_id,
                 entry.title,
             )
@@ -215,6 +229,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
         if not filters.matches(entity_id):
             return False
 
+        allow_text = _text_allowed(entity_id)
+        is_text = is_text_state(domain, state.state)
         payload = build_event(
             entity_id=entity_id,
             domain=domain,
@@ -226,9 +242,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
             else time.time(),
             friendly_name=state.attributes.get("friendly_name"),
             decimal_places=decimal_places,
+            allow_text=allow_text,
+            state_label=_state_label(hass, state) if allow_text and is_text else None,
         )
         if payload is None:
-            if is_text_state(domain, state.state):
+            # Hinweis nur für einzeln ausgewählte Entitäten (dann kann die
+            # App sie nur noch nicht annehmen) — über ein Muster getroffene
+            # Text-Sensoren sind gewollt außen vor, eine Karte dafür wäre bei
+            # breiten Mustern schlicht voll.
+            if is_text and entity_id in filters.included_entities:
                 _track_text_state(entity_id, True)
             return False
         _track_text_state(entity_id, False)
@@ -296,6 +318,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
             hass, entry, (notices_coordinator.data or {}).get("notices", [])
         )
 
+    @callback
+    def _sync_capabilities() -> None:
+        data = notices_coordinator.data
+        if not data or data.get("unauthenticated"):
+            return
+        had_state = app_capabilities["state"]
+        app_capabilities["state"] = "state" in capabilities_from(data)
+        if app_capabilities["state"] and not had_state:
+            # Die App kann Text-Zustände jetzt annehmen (App-Update): den
+            # aktuellen Zustand der bisher abgewiesenen Entitäten gleich
+            # nachreichen, statt auf ihre nächste Änderung zu warten.
+            for entity_id in sorted(text_state_entities):
+                current = hass.states.get(entity_id)
+                if current is not None:
+                    _enqueue_state(current)
+
+    entry.async_on_unload(notices_coordinator.async_add_listener(_sync_capabilities))
+
     entry.async_on_unload(notices_coordinator.async_add_listener(_sync_repairs))
     # Erster Abruf bewusst mit async_refresh() statt
     # async_config_entry_first_refresh(): Letzteres würde bei Fehlschlag
@@ -342,6 +382,31 @@ async def async_unload_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) 
         _LOGGER.error("Zeitarchiv-Queue-Worker konnte nicht sauber beendet werden")
         return False
     return True
+
+
+def _state_label(hass: HomeAssistant, state: State) -> str | None:
+    """HA-Übersetzung eines Text-Zustands (z. B. "heat" → "Heizen"), oder
+    None, wenn HA keine kennt. Dieselben Schlüssel wie der Template-Filter
+    state_translated, aber je eine gezielte Abfrage für genau eine
+    Integration statt der dort zusammengeführten Übersetzungen aller
+    geladenen Integrationen — das läuft hier bei jeder Zustandsänderung.
+    Liest nur den Übersetzungs-Cache, lädt nichts nach."""
+    domain = state.domain
+    language = hass.config.language
+    registry_entry = er.async_get(hass).async_get(state.entity_id)
+    if registry_entry is not None and registry_entry.translation_key:
+        platform = registry_entry.platform
+        translations = async_get_cached_translations(hass, language, "entity", platform)
+        key = f"component.{platform}.entity.{domain}.{registry_entry.translation_key}.state.{state.state}"
+        if key in translations:
+            return translations[key]
+    translations = async_get_cached_translations(hass, language, "entity_component", domain)
+    device_class = state.attributes.get("device_class")
+    for group in ((device_class,) if device_class else ()) + ("_",):
+        key = f"component.{domain}.entity_component.{group}.state.{state.state}"
+        if key in translations:
+            return translations[key]
+    return None
 
 
 def _resolve_filters(hass: HomeAssistant, options: dict) -> ArchiveFilterMatcher:

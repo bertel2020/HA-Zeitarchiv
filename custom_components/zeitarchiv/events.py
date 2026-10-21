@@ -66,6 +66,9 @@ def build_event(
     timestamp: float,
     friendly_name: str | None = None,
     decimal_places: int = 3,
+    *,
+    allow_text: bool = False,
+    state_label: str | None = None,
 ) -> dict | None:
     """Baut das Event-Payload für die Queue, oder None wenn der Zustand verworfen wird.
 
@@ -74,15 +77,24 @@ def build_event(
     Anwesenheits-Domains (device_tracker/person) ebenso, aber mit eigenem
     State-Vokabular: "home" → 1, alles andere (auch eine benannte Zone
     ungleich "home") → 0.
-    Alles andere muss sich als float parsen lassen (Standard- und Zähler-Entitäten) —
-    nicht-numerische Text-Sensoren werden in Phase 1 bewusst nicht archiviert, weil das
-    Speicherformat aus dem Konzept (timestamp, value) dafür nicht ausgelegt ist.
+    Alles andere muss sich als float parsen lassen (Standard- und Zähler-Entitäten).
+
+    allow_text=True (einzeln ausgewählte Entität UND die App meldet die
+    Fähigkeit "state"): ein Text-Zustand geht als ``state`` statt ``value``
+    hinaus, mit ``state_label`` als HA-Übersetzung; die App bildet ihn auf
+    einen Index ab (Typ "state"). Dann gehen auch "unavailable"/"unknown" als
+    ``state`` hinaus — ob sie zählen, entscheidet die App (nur bei einer schon
+    bestehenden Zustands-Entität). Ohne allow_text bleibt alles wie bisher:
+    Text wird verworfen.
     """
     if len(entity_id) > APP_ENTITY_ID_MAX_LENGTH or not _APP_ENTITY_ID_RE.fullmatch(entity_id):
         return None
 
     normalized_state = state.strip().lower()
     if normalized_state in IGNORED_STATES:
+        if allow_text and normalized_state in ("unavailable", "unknown"):
+            return _payload(entity_id, domain, timestamp, state_class, unit, friendly_name,
+                            state=normalized_state)
         return None
 
     if domain in SWITCH_DOMAINS:
@@ -99,9 +111,27 @@ def build_event(
             # Nachkommastellen als konfiguriert in der App.
             value = round(float(state), decimal_places)
         except (TypeError, ValueError):
-            return None
+            if not allow_text:
+                return None
+            return _payload(entity_id, domain, timestamp, state_class, unit, friendly_name,
+                            state=state.strip(), state_label=state_label)
 
-    return {
+    return _payload(entity_id, domain, timestamp, state_class, unit, friendly_name, value=value)
+
+
+def _payload(
+    entity_id: str,
+    domain: str,
+    timestamp: float,
+    state_class: str | None,
+    unit: str | None,
+    friendly_name: str | None,
+    *,
+    value: float | None = None,
+    state: str | None = None,
+    state_label: str | None = None,
+) -> dict:
+    payload = {
         # Bleibt vom Enqueue bis über alle HTTP-Retries stabil. Der Server
         # persistiert diese ID und kann dadurch eine verlorene HTTP-Antwort
         # wiederholen, ohne denselben Messwert doppelt anzuhängen.
@@ -114,3 +144,12 @@ def build_event(
         "unit": _event_text(unit),
         "friendly_name": _event_text(friendly_name),
     }
+    if state is not None:
+        # Nur bei Text-Zuständen: eine ältere App ignorierte die Felder,
+        # bekäme dann aber auch kein value — deshalb schickt __init__.py
+        # Text nur, wenn die App die Fähigkeit "state" meldet.
+        del payload["value"]
+        payload["state"] = _event_text(state)
+        if state_label and state_label != state:
+            payload["state_label"] = _event_text(state_label)
+    return payload

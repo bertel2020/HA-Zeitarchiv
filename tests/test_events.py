@@ -167,3 +167,34 @@ def test_switch_and_presence_domains_are_never_text_states() -> None:
     assert not is_text_state("person", "Arbeit")
     assert not is_text_state("light", "on")
     assert not is_text_state("automation", "off")
+
+
+def test_text_state_is_sent_as_state_when_allowed() -> None:
+    """ROADMAP 1.29: einzeln ausgewählt und die App kann es — dann geht Text
+    als ``state`` hinaus, ohne ``value``, mit der HA-Übersetzung."""
+    event = build_event(
+        "sensor.thermostat", "sensor", "heat", None, None, 1.0,
+        allow_text=True, state_label="Heizen",
+    )
+    assert event["state"] == "heat"
+    assert event["state_label"] == "Heizen"
+    assert "value" not in event
+
+
+def test_label_equal_to_the_raw_state_is_omitted() -> None:
+    event = build_event("sensor.k11", "sensor", "Laden", None, None, 1.0,
+                        allow_text=True, state_label="Laden")
+    assert "state_label" not in event
+
+
+def test_unavailable_is_sent_as_state_only_when_text_is_allowed() -> None:
+    assert build_event("sensor.k11", "sensor", "unavailable", None, None, 1.0) is None
+    event = build_event("sensor.k11", "sensor", "Unavailable", None, None, 1.0, allow_text=True)
+    assert event["state"] == "unavailable"
+    assert build_event("sensor.k11", "sensor", "none", None, None, 1.0, allow_text=True) is None
+
+
+def test_numbers_stay_numbers_even_when_text_is_allowed() -> None:
+    event = build_event("sensor.temp", "sensor", "21.4", None, None, 1.0, allow_text=True)
+    assert event["value"] == 21.4
+    assert "state" not in event

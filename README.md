@@ -184,13 +184,21 @@ zusätzlichen Archivpunkt.
 - `device_tracker` und `person` werden als Anwesenheit übertragen:
   `home → 1`, jeder andere Zustand (`not_home` oder eine benannte Zone
   ungleich `home`) `→ 0`.
-- Textwerte sowie `unknown`, `unavailable`, `none` und leere Zustände werden
-  nicht archiviert. Eine ausgewählte Entität, die nur Text liefert (z. B.
-  `Heating`/`Idle` eines Thermostats oder das Programm einer Waschmaschine),
-  kommt deshalb nie in der App an und ist dort auch nicht auswählbar. Damit
-  das nicht unbemerkt bleibt, meldet die Integration solche Entitäten als
+- Textwerte (z. B. `Heating`/`Idle` eines Thermostats oder das Programm einer
+  Waschmaschine) werden als Zustand übertragen, mit der Übersetzung aus Home
+  Assistant, sofern es eine gibt. Das gilt nur für **einzeln ausgewählte**
+  Entitäten: Über ein Muster oder eine Auswahl nach Bereich, Gerät oder Label
+  kommen Text-Sensoren bewusst nicht mit. Bei solchen Entitäten gehen auch
+  `unknown` und `unavailable` an die App, die sie als „nicht verfügbar“
+  einträgt.
+- Kann die verbundene App noch keine Zustände annehmen (ältere Version),
+  werden Textwerte nicht archiviert. Damit das nicht unbemerkt bleibt, meldet
+  die Integration einzeln ausgewählte Entitäten mit Textwerten dann als
   Repair-Karte und im Log (siehe
-  [Wartungshinweise](#wartungshinweise-repairs-und-health-sensoren)).
+  [Wartungshinweise](#wartungshinweise-repairs-und-health-sensoren)); nach
+  einem Update der App werden sie automatisch übertragen.
+- `unknown`, `unavailable`, `none` und leere Zustände werden sonst nicht
+  archiviert.
 
 Auflösung, Aufbewahrung und Bereinigungsschwellen gehören nicht in diesen
 Filter. Sie werden global oder je Entität in der App konfiguriert.
@@ -318,9 +326,11 @@ Verbindung pausiert" (siehe [Token ändern](#token-ändern)) entsteht
 eigenständig direkt aus dem Schreibpfad, weil der normale, meldungsbasierte
 Weg in genau dem Moment (abgelehnter Token) selbst nicht erreichbar ist.
 Ebenso direkt aus dem Schreibpfad kommt „Zeitarchiv: Entitäten mit
-Textwerten werden nicht archiviert": Sie listet ausgewählte Entitäten, deren
-Zustand Text statt einer Zahl ist — die App erfährt von ihnen nie etwas. Die
-Karte verschwindet, sobald keine ausgewählte Entität mehr Text liefert.
+Textwerten werden noch nicht archiviert": Sie listet einzeln ausgewählte
+Entitäten, deren Zustand Text statt einer Zahl ist, solange die verbundene
+App noch keine Zustände annehmen kann — die App erfährt von ihnen dann nie
+etwas. Die Karte verschwindet nach einem Update der App von selbst, oder
+sobald keine dieser Entitäten mehr Text liefert.
 Dasselbe zeigt der `binary_sensor` **Nicht archivierbare Entitäten** am
 Zeitarchiv-Gerät für Dashboards und Automationen: „OK“, solange alle
 ausgewählten Entitäten archivierbare Werte liefern, sonst „Problem“. Die
