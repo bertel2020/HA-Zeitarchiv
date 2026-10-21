@@ -170,8 +170,9 @@ archive point.
   places improve the compressibility of the app's long-term storage and can
   noticeably save space with very many entities and long retention, but cost
   precision for fine-grained measurements (e.g. current in A).
-- `binary_sensor`, `switch` and `input_boolean` are transmitted as `on → 1`
-  and `off → 0`.
+- `binary_sensor`, `switch`, `input_boolean`, `light`, `fan`, `automation`,
+  `script`, `remote`, `siren`, `humidifier`, `update` and `calendar` are
+  transmitted as `on → 1` and `off → 0`.
 - `device_tracker` and `person` are transmitted as presence: `home → 1`, any
   other state (`not_home` or a named zone other than `home`) `→ 0`.
 - Text values as well as `unknown`, `unavailable`, `none` and empty states are

@@ -69,7 +69,8 @@ def build_event(
 ) -> dict | None:
     """Baut das Event-Payload für die Queue, oder None wenn der Zustand verworfen wird.
 
-    Schalter-Domains (binary_sensor/switch/input_boolean) werden auf 1/0 normalisiert.
+    Schalter-Domains (SWITCH_DOMAINS: binary_sensor/switch/input_boolean/light/…)
+    werden auf 1/0 normalisiert.
     Anwesenheits-Domains (device_tracker/person) ebenso, aber mit eigenem
     State-Vokabular: "home" → 1, alles andere (auch eine benannte Zone
     ungleich "home") → 0.

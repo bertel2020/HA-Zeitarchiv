@@ -178,8 +178,9 @@ zusätzlichen Archivpunkt.
   Langzeitspeicherung in der App und können bei sehr vielen Entitäten und
   langer Aufbewahrung spürbar Speicherplatz sparen, kosten bei kleinteiligen
   Messwerten (z. B. Strom in A) aber Genauigkeit.
-- `binary_sensor`, `switch` und `input_boolean` werden als `on → 1` und
-  `off → 0` übertragen.
+- `binary_sensor`, `switch`, `input_boolean`, `light`, `fan`, `automation`,
+  `script`, `remote`, `siren`, `humidifier`, `update` und `calendar` werden
+  als `on → 1` und `off → 0` übertragen.
 - `device_tracker` und `person` werden als Anwesenheit übertragen:
   `home → 1`, jeder andere Zustand (`not_home` oder eine benannte Zone
   ungleich `home`) `→ 0`.

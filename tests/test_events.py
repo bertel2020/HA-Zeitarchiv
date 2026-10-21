@@ -56,6 +56,20 @@ def test_switch_on_off_normalized_case_insensitive() -> None:
     assert event["value"] == 1.0
 
 
+def test_on_off_domains_beyond_switch_become_one_zero() -> None:
+    """Lichter, Automationen & Co. kannten nur on/off, wurden aber früher als
+    Zahl geparst und deshalb kommentarlos verworfen."""
+    assert build_event("light.flur", "light", "on", None, None, 1.0)["value"] == 1.0
+    assert build_event("automation.abend", "automation", "off", None, None, 1.0)["value"] == 0.0
+    assert build_event("update.core", "update", "ON", None, None, 1.0)["value"] == 1.0
+
+
+def test_domains_with_more_than_on_off_are_no_switches() -> None:
+    """climate/media_player zeigen teils "off", haben aber weitere Zustände."""
+    assert build_event("climate.bad", "climate", "off", None, None, 1.0) is None
+    assert build_event("media_player.tv", "media_player", "on", None, None, 1.0) is None
+
+
 def test_unavailable_is_dropped() -> None:
     assert build_event("sensor.temp", "sensor", "unavailable", None, None, 1.0) is None
 
@@ -151,3 +165,5 @@ def test_switch_and_presence_domains_are_never_text_states() -> None:
     Unerwartetes wie "problem") — dafür gibt es keinen Texthinweis."""
     assert not is_text_state("binary_sensor", "problem")
     assert not is_text_state("person", "Arbeit")
+    assert not is_text_state("light", "on")
+    assert not is_text_state("automation", "off")

@@ -39,8 +39,26 @@ APP_EVENT_TEXT_MAX_LENGTH = 255
 APP_ENTITY_ID_MAX_LENGTH = 240
 
 # Domains, deren Zustand als Schalter (on/off → 1/0) archiviert wird,
-# unabhängig von state_class (die haben ohnehin meist keine).
-SWITCH_DOMAINS = {"binary_sensor", "switch", "input_boolean"}
+# unabhängig von state_class (die haben ohnehin meist keine). Nur Domains,
+# deren Zustand wirklich ausschließlich on/off ist — climate, media_player,
+# cover, lock & Co. zeigen zwar teils "on"/"off", haben aber weitere Zustände
+# und gehören nicht hierher. Bei automation heißt "on" aktiviert (nicht:
+# läuft gerade), bei script läuft gerade, bei update Update verfügbar, bei
+# calendar Termin aktiv.
+SWITCH_DOMAINS = {
+    "binary_sensor",
+    "switch",
+    "input_boolean",
+    "light",
+    "fan",
+    "automation",
+    "script",
+    "remote",
+    "siren",
+    "humidifier",
+    "update",
+    "calendar",
+}
 
 # Domains mit Anwesenheits-Zuständen ("home"/"not_home"/Zonenname statt
 # "on"/"off") — werden wie SWITCH_DOMAINS als Schalter archiviert (Zuhause →
