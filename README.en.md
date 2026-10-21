@@ -203,6 +203,10 @@ They are configured globally or per entity in the app.
 3. **Export filters as YAML** – show a portable copy.
 4. **Import filters from YAML** – replace all filters with a copy.
 
+You normally select entities directly in the UI via **Edit archive filters**.
+The YAML export and import is optional and only serves to transfer the same
+selection to another system.
+
 ### YAML export for test systems
 
 The export contains only the filters and never host, port or API token. The

@@ -212,6 +212,10 @@ Filter. Sie werden global oder je Entität in der App konfiguriert.
 3. **Filter als YAML exportieren** – eine portable Kopie anzeigen.
 4. **Filter aus YAML importieren** – alle Filter aus einer Kopie ersetzen.
 
+Die Auswahl der Entitäten erfolgt normalerweise direkt in der Oberfläche über
+**Archivfilter bearbeiten**. Der YAML-Export und -Import ist optional und dient
+nur dazu, dieselbe Auswahl auf ein anderes System zu übertragen.
+
 ### YAML-Export für Testsysteme
 
 Der Export enthält ausschließlich die Filter und niemals Host, Port oder
