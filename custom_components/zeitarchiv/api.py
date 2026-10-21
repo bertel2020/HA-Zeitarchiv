@@ -15,6 +15,9 @@ import requests
 _LOGGER = logging.getLogger(__name__)
 
 _TIMEOUT = 10  # Sekunden
+# Auswertungen über lange Zeiträume dürfen länger dauern; die App bricht selbst
+# vor HAs 60-s-Limit pro MCP-Anfrage ab.
+_AI_TIMEOUT = 45
 
 
 class ZeitarchivApiError(Exception):
@@ -178,6 +181,30 @@ class ZeitarchivClient:
             raise ZeitarchivApiError("App lieferte eine unerwartete Antwortstruktur")
 
         return {"notices": notices, "latest_backup": latest_backup, "demo_mode": demo_mode}
+
+    def ai_call(self, tool: str, arguments: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+        """Ruft ein Lese-Werkzeug der App auf (POST /api/ai/<tool>, ROADMAP 1.31).
+
+        Liefert Statuscode und JSON-Body, auch bei 4xx: Die App erklärt dort
+        in ``error``/``message``, was das Modell anders machen soll (z. B.
+        ``ai_disabled`` oder ``entity_not_found``) — das gehört unverändert zum
+        Modell, nicht in eine Ausnahme. Nur Netzwerkfehler, ein abgelehnter
+        Token und unlesbare Antworten werfen."""
+        try:
+            response = requests.post(
+                f"{self._base_url}/api/ai/{tool}",
+                json=arguments,
+                headers=self._headers,
+                timeout=_AI_TIMEOUT,
+            )
+        except requests.RequestException as err:
+            raise ZeitarchivApiError(f"Zeitarchiv nicht erreichbar: {err}") from err
+        if response.status_code == 401:
+            raise ZeitarchivAuthError("API-Token wurde von der App abgelehnt")
+        body = _json_or_none(response)
+        if not isinstance(body, dict):
+            raise ZeitarchivApiError(f"App antwortete mit Status {response.status_code} ohne JSON")
+        return response.status_code, body
 
     def write_batch(self, events: list[dict[str, Any]]) -> None:
         """Schickt einen Batch Events an /api/write. Wirft bei Fehlschlag."""

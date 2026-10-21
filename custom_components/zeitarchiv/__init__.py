@@ -109,6 +109,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
     # ein App-Update ohne Neustart von Home Assistant. Bis zur ersten
     # Antwort gilt: keine Fähigkeit, also das bisherige Verhalten.
     app_capabilities: dict[str, bool] = {"state": False}
+    caps: frozenset[str] = frozenset()
     try:
         caps = await hass.async_add_executor_job(client.test_connection)
         app_capabilities["state"] = "state" in caps
@@ -121,6 +122,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
             entry.title,
             err,
         )
+    # KI-Zugriff (ROADMAP 1.31): Die App meldet "ai", sobald sie /api/ai/*
+    # kennt. Ob der Zugriff eingeschaltet ist, entscheidet sie selbst (403);
+    # die Werkzeuge reichen ihre Antwort dann unverändert an das Modell weiter.
+    # Die Fähigkeit wird nur beim Start gelesen: Nach einem App-Update braucht
+    # es ein Neuladen der Integration (V1 führt das über /api/notices nach).
+    if "ai" in caps:
+        _register_ai(hass, entry, client)
     # Wasserstand VOR dem Queue-Writer laden: on_batch_sent unten schreibt
     # bereits ab dem ersten erfolgreichen Batch in dasselbe Dict.
     watermark_store = _watermark_store(hass, entry)
@@ -351,6 +359,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
     # genau diese Daten in seinem eigenen async_setup_entry.
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
+
+
+def _register_ai(hass: HomeAssistant, entry: ZeitarchivConfigEntry, client: ZeitarchivClient) -> None:
+    """Meldet die LLM-API an, wenn Home Assistant neu genug ist (2026.10).
+
+    Der Import steht hier und nicht oben: ai.py braucht probatio und die neuen
+    Tool-Bausteine und lässt sich auf älterem Home Assistant gar nicht laden.
+    Statt Kompatibilitätscode für voluptuous gibt es dort einmal einen Hinweis.
+    """
+    try:
+        from . import ai as ai_mod  # noqa: PLC0415
+    except (ImportError, AttributeError):
+        _LOGGER.warning(
+            "Der KI-Zugriff von Zeitarchiv braucht Home Assistant 2026.10 oder neuer "
+            "und bleibt bis dahin ausgeschaltet"
+        )
+        return
+    entry.async_on_unload(ai_mod.async_register(hass, entry, client))
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -> None:
