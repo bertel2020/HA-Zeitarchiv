@@ -1,5 +1,67 @@
 # Changelog
 
+## 1.1.0 - 2026-10-22
+
+### Neu
+
+- **KI-Zugriff**: Zeitarchiv steht als API für den MCP Server von Home
+  Assistant bereit. Claude, ChatGPT oder der Gesprächsagent von Home Assistant
+  können damit Fragen zum Archiv beantworten, rein lesend. Welche Werkzeuge
+  und Texte angeboten werden, bestimmt die App unter Einstellungen →
+  KI-Zugriff; Ein- und Ausschalten wirkt ohne Neustart von Home Assistant.
+  Braucht die Zeitarchiv-App ab 1.9.0.
+- **Zustände**: Entitäten, die Text statt einer Zahl liefern (z. B. ein
+  Thermostat mit „Heizen“/„Leerlauf“), werden an die App übertragen, wenn sie
+  einzeln ausgewählt sind, auch „nicht verfügbar“. Braucht die App ab 1.9.0;
+  bei einer älteren App erscheint wie bisher eine Reparatur-Karte samt
+  Binärsensor „Nicht archivierbare Entitäten“. Werden Werte verworfen, weil
+  der Typ nicht passt oder eine Entität mehr als 50 Zustände liefert, meldet
+  eine Reparatur-Karte das.
+- Lichter, Ventilatoren, Automationen, Skripte, Fernbedienungen, Sirenen,
+  Luftbefeuchter, Updates und Kalender werden wie Schalter (an/aus)
+  übertragen. Bisher kamen sie nicht in der App an.
+
+### Geändert
+
+- Ein abgelehnter Token beim Start löst jetzt die erneute Anmeldung aus,
+  statt still nichts zu übertragen.
+- Dieselbe Verbindung (gleicher Host, Port und Token) lässt sich nicht
+  zweimal einrichten. Beim Entfernen einer Verbindung wird ihr gemerkter
+  Übertragungsstand mit gelöscht.
+- Fällt die App aus, meldet die Integration das einmal und die
+  Wiederherstellung einmal, statt alle zehn Minuten zu warnen.
+
+---
+
+### English
+
+#### New
+
+- **AI access**: Zeitarchiv is available as an API for Home Assistant's MCP
+  server. Claude, ChatGPT or Home Assistant's conversation agent can use it to
+  answer questions about the archive, read-only. Which tools and texts are
+  offered is decided by the app under Settings → AI access; switching it on or
+  off takes effect without restarting Home Assistant. Needs the Zeitarchiv app
+  1.9.0 or later.
+- **States**: entities that report text instead of a number (e.g. a thermostat
+  with "Heating"/"Idle") are sent to the app when they are selected
+  individually, including "unavailable". Needs app 1.9.0 or later; with an
+  older app, a repair card and the binary sensor "Non-archivable entities" appear
+  as before. When values are discarded because the type does not match or an
+  entity reports more than 50 states, a repair card says so.
+- Lights, fans, automations, scripts, remotes, sirens, humidifiers, updates
+  and calendars are sent like switches (on/off). Previously they never reached
+  the app.
+
+#### Changed
+
+- A rejected token at startup now starts the re-authentication instead of
+  silently transferring nothing.
+- The same connection (same host, port and token) cannot be set up twice.
+  Removing a connection also deletes its stored transfer position.
+- If the app is unreachable, the integration reports it once and the recovery
+  once, instead of warning every ten minutes.
+
 ## 1.0.0 - 2026-10-19
 
 ### Geändert
