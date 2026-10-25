@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.2.1 - 2026-10-25
+
+### Behoben
+
+- **Thermostate fehlten bei Auswahl über Label, Gerät oder Bereich**:
+  Heizkörperthermostate und andere Klimageräte (`climate`) werden jetzt auch
+  dann archiviert, wenn du sie über ein Label, ein Gerät, einen Bereich oder
+  ein Muster auswählst. Ihr Zustand (z. B. „heat“, „auto“, „off“) ist Text und
+  wurde bisher nur bei Einzelauswahl übernommen. Andere Textentitäten
+  erfasst weiterhin nur die Einzelauswahl.
+
+---
+
+### English
+
+#### Fixed
+
+- **Thermostats were missing when selected by label, device or area**:
+  Radiator thermostats and other climate devices (`climate`) are now archived
+  even when you select them by label, device, area or pattern. Their state
+  (e.g. “heat”, “auto”, “off”) is text and was previously only taken over when
+  selected individually. Other text entities are still only covered by
+  individual selection.
+
 ## 1.2.0 - 2026-10-25
 
 ### Neu
