@@ -20,8 +20,7 @@
   - **Herkunft**: Die Integration merkt sich, was der Assistent ausgewählt hat,
     und erkennt Änderungen, die du in Home Assistant machst, auch an Labels,
     Bereichen und Geräten. Die App zeigt sie im Verlauf.
-- Braucht eine neuere Version der Zeitarchiv-App. Mit der bisherigen läuft alles
-  wie zuvor.
+- Braucht die Zeitarchiv-App ab 1.11.0. Mit einer älteren läuft alles wie zuvor.
 
 ---
 
@@ -45,8 +44,8 @@
   - **Origin**: The integration remembers what the assistant selected and
     detects changes you make in Home Assistant, including changes to labels,
     areas and devices. The app shows them in its history.
-- Needs a newer version of the Zeitarchiv app. With the current one everything
-  works as before.
+- Needs the Zeitarchiv app 1.11.0 or later. With an older one everything works as
+  before.
 
 ## 1.1.0 - 2026-10-22
 
