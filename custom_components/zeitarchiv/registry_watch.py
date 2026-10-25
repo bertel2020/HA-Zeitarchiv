@@ -22,7 +22,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import Event, HomeAssistant, State, callback
+from homeassistant.core import Event, HassJob, HomeAssistant, State, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.event import async_call_later
 
@@ -124,7 +124,11 @@ class RegistryWatcher:
                 ):
                     self._drift.add(change.entity_id)
             if self._cancel_timer is None:
-                self._cancel_timer = async_call_later(self._hass, FLUSH_DELAY, self._fire)
+                # cancel_on_shutdown: Der Timer ist nur eine Bündelung und soll beim Beenden von
+                # Home Assistant (oder nach einem fehlgeschlagenen Entladen) nicht als hängend gelten.
+                self._cancel_timer = async_call_later(
+                    self._hass, FLUSH_DELAY, HassJob(self._fire, "zeitarchiv registry flush", cancel_on_shutdown=True)
+                )
         except Exception:  # noqa: BLE001
             _LOGGER.debug("Registry-Ereignis nicht ausgewertet", exc_info=True)
 

@@ -1,6 +1,9 @@
 {
   "domain": "zeitarchiv",
   "name": "Zeitarchiv",
+  "after_dependencies": [
+    "energy"
+  ],
   "codeowners": [
     "@bertel2020"
   ],
