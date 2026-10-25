@@ -131,3 +131,98 @@ def test_catalog_digest_is_stable_and_detects_changes() -> None:
     assert catalog_digest(rows) == catalog_digest(_catalog())
     rows[0]["selected"] = not rows[0]["selected"]
     assert catalog_digest(rows) != catalog_digest(_catalog())
+
+
+# ---------------------------------------------------------------- Phase 1
+
+from custom_components.zeitarchiv.catalog import build_catalog_body, encode_catalog  # noqa: E402
+from custom_components.zeitarchiv.registry_filter import ArchiveFilterMatcher  # noqa: E402
+
+
+@dataclass
+class LabeledEntry(Entry):
+    labels: set = field(default_factory=set)
+
+
+def _phase1_rows(ledger):
+    entity_registry = Registry({
+        "sensor.a": LabeledEntry(labels={"lbl_za"}),
+        "sensor.b": LabeledEntry(),
+        "sensor.c": LabeledEntry(device_id="dev1"),
+        "sensor.d": LabeledEntry(),
+        "sensor.privat": LabeledEntry(),
+    })
+    device_registry = Registry({"dev1": SimpleNamespace(name="Zähler", name_by_user="Hauptzähler", area_id=None, labels=set())})
+    area_registry = Registry({})
+    label_registry = SimpleNamespace(async_get_label=lambda lid: SimpleNamespace(name="Zeitarchiv") if lid == "lbl_za" else None)
+    options = {
+        "entities": ["sensor.b", "sensor.status"],
+        "labels": ["lbl_za"],
+        "devices": ["dev1"],
+        "exclude_entities": ["sensor.privat"],
+    }
+    matcher = ArchiveFilterMatcher(options, entity_registry, device_registry, area_registry)
+    states = [
+        SimpleNamespace(entity_id=eid, state=value, attributes={})
+        for eid, value in (
+            ("sensor.a", "1"), ("sensor.b", "2"), ("sensor.c", "3"), ("sensor.d", "4"),
+            ("sensor.privat", "5"), ("sensor.status", "Heizen"),
+        )
+    ]
+    rows = build_catalog(states, entity_registry, device_registry, area_registry, matcher, ledger=ledger, label_registry=label_registry)
+    return {row["entity_id"]: row for row in rows}
+
+
+LEDGER = {
+    "label_id": "lbl_za",
+    "entries": {
+        "sensor.a": {"origin": "assistant", "mode": "label", "topic": "energie", "added_ts": 10.0, "change_id": "j1"},
+        "sensor.d": {"origin": "assistant", "mode": "ids", "topic": "wetter", "added_ts": 11.0, "change_id": "j2"},
+    },
+    "log": [{"id": "j2"}, {"id": "j1"}],
+}
+
+
+def test_catalog_phase1_origin_via_and_drift() -> None:
+    rows = _phase1_rows(LEDGER)
+    a = rows["sensor.a"]
+    assert a["origin"] == "assistant" and a["drifted"] is False and a["topic"] == "energie" and a["added_ts"] == 10.0
+    assert a["via"] == [
+        {"type": "label", "value": "Zeitarchiv", "level": "entity"},
+        {"type": "assistant", "topic": "energie", "mode": "label"},
+    ]
+    b = rows["sensor.b"]
+    assert b["origin"] == "manual" and b["via"] == [{"type": "entity"}] and b["topic"] is None
+    assert rows["sensor.c"]["via"] == [{"type": "device", "value": "Hauptzähler"}]
+    # Assistenten-ID ist in HA aus "entities" verschwunden: von Hand geändert.
+    d = rows["sensor.d"]
+    assert d["origin"] is None and d["drifted"] is True and d["via"] == [] and d["topic"] == "wetter"
+    privat = rows["sensor.privat"]
+    assert privat["selected"] is False and privat["excluded"] is False
+    assert privat["excluded_by"] == [{"type": "entity"}]
+    status = rows["sensor.status"]
+    assert status["text"] is True and rows["sensor.a"]["text"] is False
+
+
+def test_catalog_phase1_without_ledger_everything_selected_is_manual() -> None:
+    rows = _phase1_rows(None)
+    assert rows["sensor.a"]["origin"] == "manual"
+    assert all(row["drifted"] is False for row in rows.values())
+    assert all(row["origin"] is None for row in rows.values() if not row["selected"])
+
+
+def test_catalog_body_and_size_guard() -> None:
+    rows = list(_phase1_rows(LEDGER).values())
+    body = build_catalog_body(rows, LEDGER, "Zeitarchiv")
+    assert body["label"] == {"id": "lbl_za", "name": "Zeitarchiv"}
+    assert body["ledger_count"] == 2 and [item["id"] for item in body["log"]] == ["j2", "j1"]
+    assert build_catalog_body(rows, None)["label"] is None
+    import json
+
+    assert json.loads(encode_catalog(body)) == body
+    filler = [{"entity_id": f"sensor.z{i:04d}", "selected": False, "origin": None, "drifted": False, "excluded_by": [], "name": "x" * 100} for i in range(400)]
+    big = {**body, "entities": rows + filler}
+    small = json.loads(encode_catalog(big, limit=len(encode_catalog(body)) + 5000))
+    ids = {row["entity_id"] for row in small["entities"]}
+    assert {row["entity_id"] for row in rows if row["selected"] or row["origin"] or row["drifted"] or row["excluded_by"]} <= ids
+    assert len(small["entities"]) < len(big["entities"])

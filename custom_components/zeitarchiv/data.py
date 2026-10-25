@@ -11,6 +11,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import State
 
 from .api import ZeitarchivClient
 from .coordinator import ZeitarchivNoticesCoordinator
@@ -34,6 +35,10 @@ class ZeitarchivRuntimeData:
     # Von repairs.async_sync_issues() nachgeführt, um nicht mehr zutreffende
     # Repair-Issues wieder zu entfernen.
     active_repair_issues: set[str] = field(default_factory=set)
+    # Filtert und reiht einen Zustand ein (derselbe Weg wie state_changed) —
+    # der Auswahl-Assistent sendet damit nach dem Label-Setzen den aktuellen
+    # Zustand nach (selection_sync.py).
+    enqueue_state: Callable[[State], bool] | None = None
 
 
 type ZeitarchivConfigEntry = ConfigEntry[ZeitarchivRuntimeData]

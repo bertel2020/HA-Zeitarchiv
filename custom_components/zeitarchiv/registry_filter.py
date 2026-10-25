@@ -20,7 +20,7 @@ from .const import (
     CONF_EXCLUDE_ENTITY_PATTERNS,
     CONF_LABELS,
 )
-from .filtering import should_archive
+from .filtering import matches_entity_pattern, should_archive
 
 LEGACY_CONF_DOMAINS = "domains"
 
@@ -90,6 +90,75 @@ class ArchiveFilterMatcher:
             return False
         area = self._area_registry.async_get_area(effective_area)
         return area is not None and bool(self.selected_labels.intersection(area.labels))
+
+    def _registry_ways(self, entity_id: str) -> list[dict[str, str]]:
+        """Alle Registry-Wege (Label/Gerät/Bereich), ohne Abbruch beim ersten Treffer.
+
+        Dieselben Prüfungen wie _included_by_registry; ``value`` sind hier die
+        IDs (Label-, Geräte-, Bereichs-ID), Namen ergänzt erst der Katalog."""
+        entry = self._entity_registry.async_get(entity_id)
+        if entry is None:
+            return []
+        ways: list[dict[str, str]] = [
+            {"type": "label", "value": label, "level": "entity"}
+            for label in sorted(self.selected_labels.intersection(entry.labels))
+        ]
+        device = (
+            self._device_registry.async_get(entry.device_id)
+            if entry.device_id
+            else None
+        )
+        if entry.device_id and entry.device_id in self.selected_devices:
+            ways.append({"type": "device", "value": entry.device_id})
+        if device is not None:
+            ways.extend(
+                {"type": "label", "value": label, "level": "device"}
+                for label in sorted(self.selected_labels.intersection(device.labels))
+            )
+        effective_area = entry.area_id or (device.area_id if device else None)
+        if effective_area is None:
+            return ways
+        if effective_area in self.selected_areas:
+            ways.append({"type": "area", "value": effective_area})
+        area = self._area_registry.async_get_area(effective_area)
+        if area is not None:
+            ways.extend(
+                {"type": "label", "value": label, "level": "area"}
+                for label in sorted(self.selected_labels.intersection(area.labels))
+            )
+        return ways
+
+    def explain(self, entity_id: str) -> dict[str, Any]:
+        """Warum eine Entität (nicht) erfasst wird (ROADMAP 1.33).
+
+        ``via``: alle Einschluss-Wege unabhängig von Ausschlüssen,
+        ``excluded_by``: alle greifenden Ausschlüsse. ``selected`` entspricht
+        genau ``matches()``; ``excluded`` heißt wie im Katalog: ein Weg greift,
+        aber ein Ausschluss gewinnt."""
+        via: list[dict[str, str]] = []
+        if entity_id in self.included_entities:
+            via.append({"type": "entity"})
+        via.extend(
+            {"type": "pattern", "value": pattern}
+            for pattern in self.included_patterns
+            if matches_entity_pattern(entity_id, [pattern])
+        )
+        via.extend(self._registry_ways(entity_id))
+        excluded_by: list[dict[str, str]] = []
+        if entity_id in self.excluded_entities:
+            excluded_by.append({"type": "entity"})
+        excluded_by.extend(
+            {"type": "pattern", "value": pattern}
+            for pattern in self.excluded_patterns
+            if matches_entity_pattern(entity_id, [pattern])
+        )
+        selected = bool(via) and not excluded_by
+        return {
+            "selected": selected,
+            "excluded": bool(via) and bool(excluded_by),
+            "via": via,
+            "excluded_by": excluded_by,
+        }
 
     def matches(self, entity_id: str, *, apply_exclusions: bool = True) -> bool:
         """Gibt zurück, ob eine Entity vom aktuellen Filter erfasst wird."""

@@ -94,6 +94,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
         entry.data[CONF_API_TOKEN],
         integration_version=str(integration.version) if integration.version else None,
         language=hass.config.language,
+        entry_id=entry.entry_id,
     )
     # Verbindungstest vor allem anderen, damit ein Abbruch weder Thread noch
     # Listener zurücklässt. Nur ein abgelehnter Token bricht ab: mit ihm kann
@@ -313,6 +314,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
         filters=filters,
         notices_coordinator=notices_coordinator,
         text_states=text_states_view,
+        enqueue_state=_enqueue_state,
     )
 
     def _sync_repairs() -> None:
@@ -348,7 +350,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
     await notices_coordinator.async_refresh()
     _sync_repairs()
     _setup_ai(hass, entry, client, notices_coordinator)
-    catalog_sender = CatalogSender(hass, entry, client, filters)
+    selection = await _async_setup_selection(hass, entry, client, notices_coordinator, _enqueue_state)
+    catalog_sender = CatalogSender(hass, entry, client, filters, selection)
+    if selection is not None:
+        selection.on_changed = lambda: entry.async_create_background_task(
+            hass, catalog_sender.async_send_now(), "zeitarchiv_catalog_now"
+        )
 
     def _send_catalog() -> None:
         entry.async_create_background_task(
@@ -363,6 +370,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
     # genau diese Daten in seinem eigenen async_setup_entry.
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
+
+
+async def _async_setup_selection(
+    hass: HomeAssistant, entry: ZeitarchivConfigEntry, client: ZeitarchivClient,
+    coordinator: ZeitarchivNoticesCoordinator, enqueue_state,
+):
+    """Auswahl-Assistent (ROADMAP 1.33): Ledger laden, ``manual_ha`` erkennen,
+    Aufträge der App über den Meldungs-Abruf abholen. Ein Fehler hier lässt
+    nur den Assistenten weg, nie den Schreibpfad."""
+    try:
+        from .selection_sync import SelectionManager  # noqa: PLC0415
+
+        selection = SelectionManager(hass, entry, client, enqueue_state)
+        await selection.async_setup()
+    except Exception:  # noqa: BLE001
+        _LOGGER.warning("Auswahl-Assistent von Zeitarchiv nicht verfügbar", exc_info=True)
+        return None
+    entry.async_on_unload(coordinator.async_add_listener(lambda: selection.handle_notices(coordinator.data)))
+    selection.handle_notices(coordinator.data)
+    return selection
 
 
 def _setup_ai(
@@ -394,6 +421,12 @@ async def async_remove_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) 
     """Löscht den Wasserstand einer entfernten Verbindung aus .storage —
     sonst bliebe je gelöschtem Entry eine verwaiste Datei zurück."""
     await _watermark_store(hass, entry).async_remove()
+    try:
+        from .selection_sync import async_remove_store  # noqa: PLC0415
+
+        await async_remove_store(hass, entry)
+    except Exception:  # noqa: BLE001 — eine verwaiste Datei ist harmlos
+        _LOGGER.debug("Auswahl-Ledger nicht entfernt", exc_info=True)
 
 
 def _watermark_store(hass: HomeAssistant, entry: ConfigEntry) -> Store[dict[str, float]]:

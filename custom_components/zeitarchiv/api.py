@@ -7,6 +7,7 @@ Aufrufe laufen über hass.async_add_executor_job.
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any
 
@@ -79,6 +80,11 @@ def _json_or_none(response: requests.Response) -> Any:
         return None
 
 
+def _int_or_none(value: Any) -> int | None:
+    # bool ist in Python ein int — als Zähler aber sinnlos.
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
 def capabilities_from(payload: Any) -> frozenset[str]:
     """Die Fähigkeiten aus einer Antwort von /api/health oder /api/notices.
     Fehlt das Feld (ältere App) oder ist es kaputt, gilt: keine Fähigkeiten —
@@ -101,6 +107,7 @@ class ZeitarchivClient:
         api_token: str,
         integration_version: str | None = None,
         language: str | None = None,
+        entry_id: str | None = None,
     ) -> None:
         self._base_url = f"http://{host}:{port}"
         self._headers = {
@@ -119,6 +126,10 @@ class ZeitarchivClient:
         # "Automatisch" steht. Ohne Header käme immer Deutsch.
         if language:
             self._headers["Accept-Language"] = language
+        # Welche Verbindung spricht (ROADMAP 1.33): Die App gibt Auswahl-Aufträge
+        # nur an den Eintrag, der zuletzt den Katalog geschickt hat.
+        if entry_id:
+            self._headers["X-Zeitarchiv-Entry-Id"] = entry_id
 
     def test_connection(self) -> frozenset[str]:
         """Prüft Erreichbarkeit und Token. Wirft bei Fehlschlag.
@@ -185,7 +196,7 @@ class ZeitarchivClient:
         # Die Fähigkeiten gehören in die Koordinatordaten: _sync_capabilities()
         # (__init__.py) führt sie daraus jede Minute nach. Fehlten sie hier,
         # fiele "state" nach dem ersten Abruf wieder auf False zurück.
-        return {
+        result = {
             "notices": notices,
             "latest_backup": latest_backup,
             "demo_mode": demo_mode,
@@ -195,6 +206,12 @@ class ZeitarchivClient:
             # ohne KI-Zugriff.
             "ai_config_rev": payload.get("ai_config_rev") if isinstance(payload.get("ai_config_rev"), int) else None,
         }
+        # Zählt Auswahl-Aufträge der App hoch (ROADMAP 1.33); selection_sync.py
+        # holt die Aufträge nur bei einer Änderung. Nur vorhanden, wenn die App
+        # das Feld liefert — für Leser gilt data.get("selection_rev") → None.
+        if "selection_rev" in payload:
+            result["selection_rev"] = _int_or_none(payload.get("selection_rev"))
+        return result
 
     def get_ai_config(self, api_id: str) -> dict[str, Any]:
         """Konfiguration des KI-Zugriffs (GET /api/ai/config): ob er eingeschaltet
@@ -248,14 +265,31 @@ class ZeitarchivClient:
             raise ZeitarchivApiError(f"App antwortete mit Status {response.status_code} ohne JSON")
         return response.status_code, body
 
-    def post_catalog(self, entities: list[dict[str, Any]]) -> None:
+    def post_catalog(
+        self,
+        entities: list[dict[str, Any]],
+        *,
+        label: dict[str, str] | None = None,
+        log: list[dict[str, Any]] | None = None,
+        ledger_count: int | None = None,
+        body: bytes | None = None,
+    ) -> None:
         """Schickt den Entitäten-Katalog (Metadaten, keine Werte) an /api/catalog
         (ROADMAP 1.33). Wirft bei Fehlschlag; eine App ohne den Endpunkt
-        antwortet 404 und meldet die Fähigkeit "catalog" gar nicht erst."""
+        antwortet 404 und meldet die Fähigkeit "catalog" gar nicht erst.
+
+        Seit Phase 1 gehen zusätzlich das verwaltete Label, der Verlauf und die
+        Zahl der Ledger-Einträge mit. Eine ältere App ignoriert die Felder.
+        ``body`` erlaubt einen bereits kompakt kodierten Body (catalog.encode_catalog)."""
+        if body is None:
+            payload: dict[str, Any] = {"entities": entities}
+            if label is not None or log is not None or ledger_count is not None:
+                payload.update({"label": label, "log": log or [], "ledger_count": int(ledger_count or 0)})
+            body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         try:
             response = requests.post(
                 f"{self._base_url}/api/catalog",
-                json={"entities": entities},
+                data=body,
                 headers=self._headers,
                 timeout=_CATALOG_TIMEOUT,
             )
@@ -267,6 +301,54 @@ class ZeitarchivClient:
             raise ZeitarchivApiError(
                 f"App antwortete beim Katalog mit Status {response.status_code}: {response.text[:200]}"
             )
+
+    def get_selection_jobs(self) -> list[dict[str, Any]]:
+        """Offene Auswahl-Aufträge der App (GET /api/selection/jobs, ROADMAP 1.33).
+
+        Liefert die rohe Liste; geprüft wird jeder Auftrag erst in
+        selection_apply.normalize_job. Wirft bei Fehlschlag."""
+        try:
+            response = requests.get(
+                f"{self._base_url}/api/selection/jobs", headers=self._headers, timeout=_TIMEOUT
+            )
+        except requests.RequestException as err:
+            raise ZeitarchivApiError(f"Auswahl-Aufträge nicht abrufbar: {err}") from err
+        if response.status_code == 401:
+            raise ZeitarchivAuthError("API-Token wurde von der App abgelehnt")
+        body = _json_or_none(response)
+        if response.status_code != 200 or not isinstance(body, dict):
+            raise ZeitarchivApiError(f"App antwortete bei den Auswahl-Aufträgen mit Status {response.status_code}")
+        jobs = body.get("jobs")
+        if not isinstance(jobs, list):
+            raise ZeitarchivApiError("App lieferte eine unerwartete Antwortstruktur")
+        return jobs
+
+    def ack_selection_job(
+        self,
+        job_id: str,
+        status: str,
+        results: dict[str, dict[str, Any]],
+        message: str | None = None,
+    ) -> bool:
+        """Quittiert einen Auftrag (POST /api/selection/ack). True, wenn die App
+        ihn angenommen hat; False bei unbekannter oder abgelaufener Auftrags-ID
+        (die App antwortet dann ``{"ok": false}``). Wirft bei Netz-/Statusfehlern."""
+        payload = {"job_id": job_id, "status": status, "results": results, "message": message}
+        try:
+            response = requests.post(
+                f"{self._base_url}/api/selection/ack",
+                json=payload,
+                headers=self._headers,
+                timeout=_TIMEOUT,
+            )
+        except requests.RequestException as err:
+            raise ZeitarchivApiError(f"Auftrag nicht quittiert: {err}") from err
+        if response.status_code == 401:
+            raise ZeitarchivAuthError("API-Token wurde von der App abgelehnt")
+        body = _json_or_none(response)
+        if response.status_code != 200 or not isinstance(body, dict):
+            raise ZeitarchivApiError(f"App antwortete beim Quittieren mit Status {response.status_code}")
+        return body.get("ok") is True
 
     def write_batch(self, events: list[dict[str, Any]]) -> None:
         """Schickt einen Batch Events an /api/write. Wirft bei Fehlschlag."""

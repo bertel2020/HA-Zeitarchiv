@@ -94,3 +94,55 @@ def test_legacy_domains_become_concrete_entities_and_disappear() -> None:
         "sensor.a",
         "sensor.b",
     ]
+
+
+def test_explain_lists_every_way_without_stopping_at_the_first() -> None:
+    entity = Entry(entity_id="sensor.temperature", device_id="device-1", labels={"archive", "zeitarchiv"})
+    device = Entry(area_id="kitchen", labels={"archive"})
+    area = Entry(labels={"archive"})
+    filters = matcher(
+        {
+            "entities": ["sensor.temperature"],
+            "entity_patterns": ["temp*", "sensor.*"],
+            "labels": ["archive", "zeitarchiv"],
+            "devices": ["device-1"],
+            "areas": ["kitchen"],
+        },
+        entity=entity, device=device, area=area,
+    )
+    result = filters.explain(entity.entity_id)
+    assert result["selected"] is True and result["excluded"] is False
+    assert result["via"] == [
+        {"type": "entity"},
+        {"type": "pattern", "value": "temp*"},
+        {"type": "pattern", "value": "sensor.*"},
+        {"type": "label", "value": "archive", "level": "entity"},
+        {"type": "label", "value": "zeitarchiv", "level": "entity"},
+        {"type": "device", "value": "device-1"},
+        {"type": "label", "value": "archive", "level": "device"},
+        {"type": "area", "value": "kitchen"},
+        {"type": "label", "value": "archive", "level": "area"},
+    ]
+    assert result["excluded_by"] == []
+
+
+def test_explain_reports_exclusions_and_agrees_with_matches() -> None:
+    entity = Entry(entity_id="sensor.private", labels={"archive"})
+    filters = matcher(
+        {"labels": ["archive"], "exclude_entities": ["sensor.private"], "exclude_entity_patterns": ["priv*"]},
+        entity=entity,
+    )
+    result = filters.explain(entity.entity_id)
+    assert result["selected"] is False and result["excluded"] is True
+    assert result["excluded_by"] == [{"type": "entity"}, {"type": "pattern", "value": "priv*"}]
+    assert result["selected"] == filters.matches(entity.entity_id)
+
+
+def test_explain_for_unselected_and_unknown_entities() -> None:
+    entity = Entry(entity_id="sensor.other")
+    filters = matcher({"exclude_entities": ["sensor.other"]}, entity=entity)
+    result = filters.explain("sensor.other")
+    # Ausgeschlossen, aber über keinen Weg erfasst: excluded bleibt False wie im Katalog.
+    assert result == {"selected": False, "excluded": False, "via": [], "excluded_by": [{"type": "entity"}]}
+    assert filters.explain("sensor.unbekannt")["via"] == []
+    assert matcher({"entities": ["sensor.x"]}, entity=entity).explain("sensor.x")["selected"] is True
