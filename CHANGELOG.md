@@ -1,5 +1,53 @@
 # Changelog
 
+## 1.2.0 - 2026-10-25
+
+### Neu
+
+- **Auswahl-Assistent**: Zusammen mit der Zeitarchiv-App lassen sich Entitäten
+  jetzt dort auswählen statt in den Optionen der Integration.
+  - **Katalog**: Die Integration schickt der App eine Liste der archivierbaren
+    Entitäten mit Name, Art, Gerät und Bereich, ohne Messwerte. Das geschieht
+    höchstens alle zehn Minuten und nur, wenn die App es unterstützt.
+  - **Übernehmen**: Bestätigte Vorschläge setzt die Integration innerhalb etwa
+    einer Minute um, standardmäßig über das Label „Zeitarchiv“ in Home
+    Assistant (wirkt ohne Neustart), alternativ als Einzel-ID. Textentitäten und
+    Entitäten ohne Registry-Eintrag gehen immer als Einzel-ID. Neu ausgewählte
+    Entitäten senden ihren aktuellen Zustand sofort nach.
+  - **Ausschließen und Muster**: Die App kann Entitäten ausschließen und wieder
+    aufnehmen sowie Muster wie `sensor.shelly_plug_*` hinzufügen und entfernen.
+    Textentitäten erfasst ein Muster weiterhin nicht.
+  - **Herkunft**: Die Integration merkt sich, was der Assistent ausgewählt hat,
+    und erkennt Änderungen, die du in Home Assistant machst, auch an Labels,
+    Bereichen und Geräten. Die App zeigt sie im Verlauf.
+- Braucht eine neuere Version der Zeitarchiv-App. Mit der bisherigen läuft alles
+  wie zuvor.
+
+---
+
+### English
+
+#### New
+
+- **Selection assistant**: Together with the Zeitarchiv app, entities can now be
+  chosen there instead of in the integration's options.
+  - **Catalog**: The integration sends the app a list of archivable entities
+    with name, type, device and area, without measured values. This happens at
+    most every ten minutes and only if the app supports it.
+  - **Applying**: Confirmed suggestions are applied by the integration within
+    about a minute, by default through the label “Zeitarchiv” in Home Assistant
+    (takes effect without a restart), alternatively as an individual ID. Text
+    entities and entities without a registry entry are always added as an
+    individual ID. Newly selected entities send their current state right away.
+  - **Exclude and patterns**: The app can exclude entities and include them
+    again, and add and remove patterns such as `sensor.shelly_plug_*`. A pattern
+    still does not cover text entities.
+  - **Origin**: The integration remembers what the assistant selected and
+    detects changes you make in Home Assistant, including changes to labels,
+    areas and devices. The app shows them in its history.
+- Needs a newer version of the Zeitarchiv app. With the current one everything
+  works as before.
+
 ## 1.1.0 - 2026-10-22
 
 ### Neu
