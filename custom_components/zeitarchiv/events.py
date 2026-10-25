@@ -15,6 +15,7 @@ from .const import (
     IGNORED_STATES,
     PRESENCE_DOMAINS,
     SWITCH_DOMAINS,
+    TEXT_STATE_DOMAINS,
 )
 
 # Spiegel von ENTITY_ID_PATTERN der App (storage/paths.py). Home Assistant
@@ -55,6 +56,18 @@ def is_text_state(domain: str, state: str) -> bool:
     except (TypeError, ValueError):
         return True
     return False
+
+
+def text_allowed(
+    entity_id: str, individually_selected: bool, app_supports_state: bool
+) -> bool:
+    """Ob ein Text-Zustand als ``state`` an die App gehen darf (ROADMAP 1.29).
+
+    Einzeln ausgewählt immer, über Label/Gerät/Bereich/Muster nur für
+    TEXT_STATE_DOMAINS. Voraussetzung ist die App-Fähigkeit "state"."""
+    if not app_supports_state:
+        return False
+    return individually_selected or entity_id.split(".", 1)[0] in TEXT_STATE_DOMAINS
 
 
 def build_event(

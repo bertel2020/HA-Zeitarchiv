@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import _pkg  # noqa: F401  (registriert die Namespace-Pakete als Seiteneffekt)
-from custom_components.zeitarchiv.events import build_event, is_text_state
+from custom_components.zeitarchiv.events import build_event, is_text_state, text_allowed
 
 
 def test_numeric_sensor_parses_to_float() -> None:
@@ -198,3 +198,12 @@ def test_numbers_stay_numbers_even_when_text_is_allowed() -> None:
     event = build_event("sensor.temp", "sensor", "21.4", None, None, 1.0, allow_text=True)
     assert event["value"] == 21.4
     assert "state" not in event
+
+
+def test_text_allowed_for_climate_even_when_selected_via_label() -> None:
+    """Thermostate (climate) kommen als Text auch über Label/Bereich mit,
+    Text-Sensoren nur bei Einzelauswahl; ohne App-Fähigkeit nie."""
+    assert text_allowed("climate.hm_wz", False, True)
+    assert not text_allowed("sensor.version", False, True)
+    assert text_allowed("sensor.version", True, True)
+    assert not text_allowed("climate.hm_wz", True, False)

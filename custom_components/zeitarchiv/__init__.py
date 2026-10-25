@@ -53,7 +53,7 @@ from .const import (
 from .catalog_sync import CatalogSender
 from .coordinator import ZeitarchivNoticesCoordinator
 from .data import ZeitarchivConfigEntry, ZeitarchivRuntimeData
-from .events import build_event, is_text_state
+from .events import build_event, is_text_state, text_allowed
 from .filtering import is_state_already_sent, is_state_value_change
 from .queue_writer import ZeitarchivQueueWriter
 from .registry_filter import ArchiveFilterMatcher, migrate_legacy_domains
@@ -203,10 +203,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
         hass.add_job(_async_text_states_changed, tuple(sorted(text_state_entities)))
 
     def _text_allowed(entity_id: str) -> bool:
-        # Nur EINZELN ausgewählte Entitäten: ein Muster wie sensor.* oder
-        # eine Auswahl über Bereich/Gerät/Label holt Text-Sensoren nicht mit
-        # (ROADMAP 1.29 — sonst kämen Versionsnummern, Geräte-IDs & Co. mit).
-        return app_capabilities["state"] and entity_id in filters.included_entities
+        # Über Bereich/Gerät/Label oder ein Muster (sensor.*) kommt Text nur
+        # für TEXT_STATE_DOMAINS mit (ROADMAP 1.29 — sonst kämen
+        # Versionsnummern, Geräte-IDs & Co. mit); sonst nur einzeln gewählte.
+        return text_allowed(
+            entity_id,
+            entity_id in filters.included_entities,
+            app_capabilities["state"],
+        )
 
     def _track_text_state(entity_id: str, is_text: bool) -> None:
         if is_text == (entity_id in text_state_entities):

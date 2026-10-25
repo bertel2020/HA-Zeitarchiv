@@ -38,6 +38,12 @@ RETRY_DELAYS = (1, 2, 4, 8, 15, 30, 60)
 APP_EVENT_TEXT_MAX_LENGTH = 255
 APP_ENTITY_ID_MAX_LENGTH = 240
 
+# Domains, deren Text-Zustand auch bei Auswahl über Label/Gerät/Bereich/Muster
+# archiviert wird (sonst nur bei einzeln ausgewählten Entitäten). Ein Thermostat
+# ("heat"/"auto"/"off") ist ein Zustand, den man nicht einzeln anklicken will —
+# bei sensor.* wären es dagegen Versionsnummern, Geräte-IDs & Co.
+TEXT_STATE_DOMAINS = frozenset({"climate"})
+
 # Domains, deren Zustand als Schalter (on/off → 1/0) archiviert wird,
 # unabhängig von state_class (die haben ohnehin meist keine). Nur Domains,
 # deren Zustand wirklich ausschließlich on/off ist — climate, media_player,
