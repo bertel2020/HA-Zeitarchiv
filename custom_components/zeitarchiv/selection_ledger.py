@@ -11,6 +11,8 @@ Ledger-Form (Version 1)::
     {"entries": {entity_id: {"origin": "assistant", "mode": "label|ids",
                              "topic": str|None, "added_ts": float, "change_id": str}},
      "label_id": str|None,
+     "patterns": {muster: {"origin": "assistant", "topic": str|None,
+                           "added_ts": float, "change_id": str}},   # Phase 2
      "options_snapshot": {<Filterschlüssel>: [...]} | None,
      "log": [Log-Eintrag, ...],          # neueste zuerst, höchstens LOG_LIMIT
      "pending_acks": {job_id: Ack-Body}} # intern: noch nicht quittierte Aufträge
@@ -32,6 +34,7 @@ from .const import (
     CONF_EXCLUDE_ENTITY_PATTERNS,
     CONF_LABELS,
 )
+from .filtering import ENTITY_PATTERN_RE, MAX_ENTITY_PATTERN_LENGTH
 
 #: Die Optionsschlüssel, die die Auswahl bestimmen (alles andere, etwa
 #: Nachkommastellen, gehört nicht in den Abgleich).
@@ -54,7 +57,11 @@ PENDING_ACKS_LIMIT = 50
 
 SOURCES = frozenset({"assistant", "manual_ui", "undo", "manual_ha"})
 MODES = frozenset({"label", "ids"})
-RESULTS = frozenset({"ok", "already", "not_found", "excluded", "blocked", "unsupported", "error"})
+RESULTS = frozenset({
+    "ok", "already", "not_found", "excluded", "blocked", "unsupported", "invalid", "too_many", "error",
+})
+#: Höchstens so viele Muster stehen in einem Log-Eintrag (wie die App prüft).
+LOG_PATTERNS_LIMIT = 20
 STATUSES = frozenset({"applied", "partial", "failed"})
 
 _ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
@@ -66,7 +73,9 @@ _TOPIC_MAX = 40
 
 
 def empty_ledger() -> dict[str, Any]:
-    return {"entries": {}, "label_id": None, "options_snapshot": None, "log": [], "pending_acks": {}}
+    return {
+        "entries": {}, "label_id": None, "patterns": {}, "options_snapshot": None, "log": [], "pending_acks": {},
+    }
 
 
 def _float(value: Any, default: float = 0.0) -> float:
@@ -88,6 +97,15 @@ def is_entity_id(value: Any) -> bool:
 
 def is_change_id(value: Any) -> bool:
     return isinstance(value, str) and bool(_ID_RE.match(value))
+
+
+def is_pattern(value: Any) -> bool:
+    """Ein normalisiertes Muster, wie es in ``entity_patterns`` steht."""
+    return (
+        isinstance(value, str)
+        and 0 < len(value) <= MAX_ENTITY_PATTERN_LENGTH
+        and bool(ENTITY_PATTERN_RE.fullmatch(value))
+    )
 
 
 def normalize_ledger(raw: Any) -> dict[str, Any]:
@@ -113,6 +131,18 @@ def normalize_ledger(raw: Any) -> dict[str, Any]:
             }
     label_id = raw.get("label_id")
     ledger["label_id"] = label_id if isinstance(label_id, str) and label_id else None
+    # Phase 2; ein älterer Store hat den Schlüssel nicht (dann leer).
+    patterns = raw.get("patterns")
+    if isinstance(patterns, Mapping):
+        for pattern, item in patterns.items():
+            if not is_pattern(pattern) or not isinstance(item, Mapping):
+                continue
+            ledger["patterns"][pattern] = {
+                "origin": "assistant",
+                "topic": clean_topic(item.get("topic")),
+                "added_ts": _float(item.get("added_ts")),
+                "change_id": item.get("change_id") if is_change_id(item.get("change_id")) else "",
+            }
     snapshot = raw.get("options_snapshot")
     ledger["options_snapshot"] = options_snapshot(snapshot) if isinstance(snapshot, Mapping) else None
     log = raw.get("log")
@@ -249,12 +279,13 @@ def make_log_entry(
     damit ``undo_of`` beide meinen kann. Gespeichert werden höchstens
     LOG_IDS_LIMIT IDs samt ihren Ergebnissen, ``count`` zählt alle."""
     entity_ids = list(job.get("entity_ids") or [])
+    patterns = list(job.get("patterns") or [])
     kept = entity_ids[:LOG_IDS_LIMIT]
     mode = job.get("mode")
     if mode not in MODES:
         modes = {item.get("mode") for item in results.values() if item.get("mode") in MODES}
         mode = modes.pop() if len(modes) == 1 else None
-    return {
+    entry = {
         "id": job["id"],
         "ts": now,
         "source": job.get("source") if job.get("source") in SOURCES else "manual_ui",
@@ -269,6 +300,17 @@ def make_log_entry(
         "undone_by": None,
         "ha_detail": None,
     }
+    if job.get("action") in ("add_patterns", "remove_patterns"):
+        # Musteraktionen: keine Entitäten, ``count`` zählt die Muster, die
+        # Ergebnisse stehen unter dem Musterstring (wie im Ack).
+        kept_patterns = [pattern[:MAX_ENTITY_PATTERN_LENGTH] for pattern in patterns[:LOG_PATTERNS_LIMIT]]
+        entry.update({
+            "entity_ids": [],
+            "count": len(patterns),
+            "patterns": kept_patterns,
+            "results": {pattern: dict(results[pattern]) for pattern in kept_patterns if pattern in results},
+        })
+    return entry
 
 
 def make_manual_ha_entry(detail: Mapping[str, Any], now: float, change_id: str | None = None) -> dict[str, Any]:
@@ -288,6 +330,51 @@ def make_manual_ha_entry(detail: Mapping[str, Any], now: float, change_id: str |
         "undone_by": None,
         "ha_detail": dict(detail),
     }
+
+
+def make_label_drift_entry(entity_ids: Iterable[str], now: float) -> dict[str, Any]:
+    """``manual_ha``-Eintrag: In HA wurde das Zeitarchiv-Label von Entitäten
+    genommen (Registry, nicht Optionen — der Options-Abgleich sieht das nicht).
+    Gleiche Form wie ein Options-Eintrag, damit die App ihn ohne Sonderfall zeigt."""
+    ids = sorted(set(entity_ids))
+    detail = {
+        "kind": "options",
+        "added_entities": 0,
+        "removed_entities": len(ids),
+        "patterns": "0",
+        "areas": "0",
+        "devices": "0",
+        "labels": "0",
+        "excluded": "0",
+        "summary": f"label removed in entity registry -{len(ids)}",
+    }
+    entry = make_manual_ha_entry(detail, now)
+    entry["entity_ids"] = ids[:LOG_IDS_LIMIT]
+    entry["count"] = len(ids)
+    return entry
+
+
+def assistant_label_removed(
+    entity_id: str,
+    old_labels: Iterable[str] | None,
+    new_labels: Iterable[str] | None,
+    ledger: Mapping[str, Any],
+    option_labels: Iterable[str],
+) -> bool:
+    """Ob ein Registry-Ereignis bedeutet: das Zeitarchiv-Label wurde in HA von
+    einer Assistenten-Entität genommen.
+
+    Eigene Entfernungen (``remove``-Auftrag) zählen nicht: dort ist der
+    Ledger-Eintrag schon gelöscht, bevor das Ereignis ankommt. Steht das Label
+    nicht (mehr) in den Optionen, wirkte der Weg ohnehin nicht — das hat dann
+    schon der Options-Abgleich erfasst (kein Doppeleintrag)."""
+    label_id = ledger.get("label_id")
+    entry = (ledger.get("entries") or {}).get(entity_id)
+    if not label_id or not entry or entry.get("mode") != "label":
+        return False
+    if label_id not in set(option_labels or ()):
+        return False
+    return label_id in set(old_labels or ()) and label_id not in set(new_labels or ())
 
 
 def append_log(ledger: dict[str, Any], entry: dict[str, Any]) -> None:

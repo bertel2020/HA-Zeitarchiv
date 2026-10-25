@@ -17,7 +17,9 @@ import json
 from collections.abc import Iterable, Mapping
 from typing import Any
 
+from .const import CONF_ENTITY_PATTERNS
 from .events import is_text_state
+from .filtering import matches_entity_pattern
 from .selection_ledger import LOG_LIMIT, compute_origin
 
 #: Domains, aus denen die Integration Zustände archivieren kann. Alles andere
@@ -34,6 +36,9 @@ MAX_ENTITIES = 20_000
 
 #: Body-Grenze mit Abstand zum 8-MB-Limit von nginx vor der App.
 MAX_BODY_BYTES = 7_500_000
+
+#: Höchstens so viele Include-Muster gehen im Katalog mit (wie die App prüft).
+MAX_CATALOG_PATTERNS = 100
 
 #: Rollen aus den Energie-Einstellungen (Schlüssel der Statistik-ID → Rolle).
 _ENERGY_ROLE_PRIORITY = (
@@ -135,6 +140,7 @@ def build_catalog(
     roles = energy_roles or {}
     entries = (ledger or {}).get("entries") or {}
     label_id = (ledger or {}).get("label_id")
+    assistant_patterns = (ledger or {}).get("patterns") or {}
     seen: set[str] = set()
     rows: list[dict[str, Any]] = []
 
@@ -159,7 +165,9 @@ def build_catalog(
         if kind == "label":
             return {"type": "label", "value": label_name(value), "level": item.get("level")}
         if kind == "pattern":
-            return {"type": "pattern", "value": value}
+            # Phase 2: vom Assistenten angelegtes Muster (im Ledger) markieren.
+            return {"type": "pattern", "value": value, "assistant": True} if value in assistant_patterns else {
+                "type": "pattern", "value": value}
         return {"type": "entity"}
 
     def add(entity_id: str, state: Any | None) -> None:
@@ -207,12 +215,43 @@ def build_catalog(
     return rows
 
 
+def catalog_patterns(
+    rows: Iterable[Mapping[str, Any]],
+    options: Mapping[str, Any] | None,
+    ledger: Mapping[str, Any] | None,
+) -> list[dict[str, Any]]:
+    """Die aktuellen Include-Muster für den Katalog (Phase 2).
+
+    ``origin`` assistant, wenn das Muster im Ledger steht, sonst manual;
+    ``count`` zählt die passenden Katalogzeilen ohne Textentitäten (Muster
+    holen nie Text), unabhängig von Ausschlüssen — die App rechnet die
+    Ausschlüsse in ihrer Vorschau selbst heraus."""
+    raw = (options or {}).get(CONF_ENTITY_PATTERNS) or []
+    patterns = [item for item in dict.fromkeys(raw) if isinstance(item, str)][:MAX_CATALOG_PATTERNS]
+    if not patterns:
+        return []
+    ledger_patterns = (ledger or {}).get("patterns") or {}
+    candidates = [row["entity_id"] for row in rows if not row.get("text")]
+    result = []
+    for pattern in patterns:
+        item = ledger_patterns.get(pattern)
+        result.append({
+            "pattern": pattern,
+            "origin": "assistant" if item else "manual",
+            "topic": item.get("topic") if item else None,
+            "added_ts": item.get("added_ts") if item else None,
+            "count": sum(1 for entity_id in candidates if matches_entity_pattern(entity_id, [pattern])),
+        })
+    return result
+
+
 def build_catalog_body(
     rows: list[dict[str, Any]],
     ledger: Mapping[str, Any] | None,
     label_name: str | None = None,
+    options: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Der erweiterte Body für POST /api/catalog (Phase 1)."""
+    """Der erweiterte Body für POST /api/catalog (Phase 1, ``patterns`` seit Phase 2)."""
     ledger = ledger or {}
     label_id = ledger.get("label_id")
     return {
@@ -220,6 +259,7 @@ def build_catalog_body(
         "label": {"id": label_id, "name": label_name or label_id} if label_id else None,
         "log": list(ledger.get("log") or [])[:LOG_LIMIT],
         "ledger_count": len(ledger.get("entries") or {}),
+        "patterns": catalog_patterns(rows, options, ledger),
     }
 
 

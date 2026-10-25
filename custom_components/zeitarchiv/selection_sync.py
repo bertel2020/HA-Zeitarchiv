@@ -1,4 +1,4 @@
-"""Auswahl-Assistent, Home-Assistant-Seite (ROADMAP 1.33, Phase 1).
+"""Auswahl-Assistent, Home-Assistant-Seite (ROADMAP 1.33, Phase 1 und 2).
 
 Dünne Schicht um die reinen Module selection_ledger.py/selection_apply.py:
 Ledger-``Store``, echte Registries als ``SelectionPorts``, Abholen der
@@ -31,8 +31,16 @@ from .catalog import CATALOG_DOMAINS
 from .const import DOMAIN
 from .events import is_text_state
 from .registry_filter import ArchiveFilterMatcher
-from .selection_apply import apply_jobs, pending_acks
-from .selection_ledger import LABEL_NAME, detect_manual_change, diff_options, empty_ledger, normalize_ledger
+from .selection_apply import apply_jobs, pattern_targets, pending_acks
+from .selection_ledger import (
+    LABEL_NAME,
+    append_log,
+    detect_manual_change,
+    diff_options,
+    empty_ledger,
+    make_label_drift_entry,
+    normalize_ledger,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -85,6 +93,18 @@ class HaSelectionPorts:
     def is_selected(self, entity_id: str, options: Mapping[str, Any]) -> bool:
         return ArchiveFilterMatcher(options, self._entities, self._devices, self._areas).matches(entity_id)
 
+    def pattern_targets(
+        self, patterns: list[str], before: Mapping[str, Any], after: Mapping[str, Any]
+    ) -> list[str]:
+        """Entitäten, die neue Muster jetzt erst erfassen (Zustand nachsenden)."""
+        if not patterns:
+            return []
+        old = ArchiveFilterMatcher(before, self._entities, self._devices, self._areas)
+        return pattern_targets(
+            (state.entity_id for state in self._hass.states.async_all()), patterns, after,
+            is_text=self.is_text, was_selected=old.matches,
+        )
+
     def effective(self, options: Mapping[str, Any]) -> set[str]:
         matcher = ArchiveFilterMatcher(options, self._entities, self._devices, self._areas)
         return {
@@ -103,6 +123,7 @@ class SelectionManager:
         client: ZeitarchivClient,
         enqueue_state: Callable[[State], bool],
     ) -> None:
+        # enqueue_state: Nachsende-Weg mit Wasserstand-Schutz (__init__.py, _resend_state).
         self._hass = hass
         self._entry = entry
         self._client = client
@@ -163,8 +184,9 @@ class SelectionManager:
             if not raw_jobs:
                 self._last_rev = rev
                 return
+            ports = HaSelectionPorts(self._hass)
             outcome = apply_jobs(
-                raw_jobs, self._entry.options, self.ledger, HaSelectionPorts(self._hass), time.time(),
+                raw_jobs, self._entry.options, self.ledger, ports, time.time(),
                 on_error=lambda entity_id, err: _LOGGER.warning(
                     "Auswahl-Auftrag: %s konnte nicht geändert werden: %s", entity_id, err
                 ),
@@ -173,7 +195,12 @@ class SelectionManager:
             if not outcome.acks:
                 return
             await self._store.async_save(self.ledger)
-            self._resend_states(outcome.label_targets)
+            targets = [*outcome.label_targets, *outcome.include_targets]
+            try:
+                targets.extend(ports.pattern_targets(outcome.added_patterns, self._entry.options, outcome.options))
+            except Exception:  # noqa: BLE001 — nur das Nachsenden fällt weg
+                _LOGGER.debug("Treffer neuer Muster nicht ermittelt", exc_info=True)
+            self._resend_states(list(dict.fromkeys(targets)))
             await self._async_flush_acks()
             _LOGGER.debug(
                 "Auswahl-Aufträge angewendet · Ziel=%s · Aufträge=%d · Optionen geändert=%s",
@@ -212,10 +239,23 @@ class SelectionManager:
                 self.ledger["pending_acks"].pop(job_id, None)
             await self._store.async_save(self.ledger)
 
+    async def async_record_label_drift(self, entity_ids: set[str]) -> None:
+        """Das Zeitarchiv-Label wurde in HA von Assistenten-Entitäten genommen
+        (registry_watch.py): ein ``manual_ha``-Eintrag. Die Ledger-Einträge
+        bleiben; die Entitäten erscheinen im Katalog als ``drifted``. Wirft nie."""
+        try:
+            if not self._loaded or not entity_ids:
+                return
+            append_log(self.ledger, make_label_drift_entry(entity_ids, time.time()))
+            await self._store.async_save(self.ledger)
+        except Exception:  # noqa: BLE001
+            _LOGGER.warning("Label-Änderung nicht im Auswahl-Verlauf vermerkt", exc_info=True)
+
     def _resend_states(self, entity_ids: list[str]) -> None:
-        """Zustand frisch gelabelter Entitäten sofort einreihen, sonst erschienen
-        ruhige Sensoren erst bei ihrer nächsten Änderung. Greift der Filter noch
-        nicht (Label erst nach dem Reload in den Optionen), übernimmt das der
+        """Zustand frisch gelabelter, wieder aufgenommener oder per neuem Muster
+        erfasster Entitäten sofort einreihen, sonst erschienen ruhige Sensoren
+        erst bei ihrer nächsten Änderung. Greift der Filter noch nicht (Label
+        oder Muster erst nach dem Reload in den Optionen), übernimmt das der
         Initial-Snapshot des Neuladens."""
         for entity_id in entity_ids:
             try:

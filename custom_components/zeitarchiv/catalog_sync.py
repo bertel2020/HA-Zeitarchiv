@@ -5,6 +5,9 @@ coordinator.py). Gesendet wird nur, wenn die App die Fähigkeit "catalog"
 meldet, höchstens alle zehn Minuten neu aufgebaut und nur bei einer Änderung
 tatsächlich übertragen. Nach einer vom Assistenten angewendeten Änderung geht
 er sofort raus (``async_send_now``: ohne Drosselung und Digest-Prüfung).
+Registry-Änderungen (Labels, Bereich, Gerät; registry_watch.py) stoßen über
+``async_handle_registry_change`` einen Neubau an, mit denselben Regeln:
+höchstens alle zehn Minuten, gesendet nur bei geändertem Digest.
 Ein Fehlschlag ist hier folgenlos: der Katalog ist ein Zusatz, der
 Schreibpfad bleibt davon unberührt.
 """
@@ -76,6 +79,17 @@ class CatalogSender:
             return
         await self._async_send(force=False)
 
+    async def async_handle_registry_change(self) -> None:
+        """Nach einer (gebündelten) Registry-Änderung: neu bauen, wenn die
+        Drosselung es erlaubt. Sonst nichts — der nächste Meldungs-Abruf nach
+        Ablauf der zehn Minuten baut ohnehin neu und sendet bei Änderung."""
+        if self._busy or not self._capable:
+            return
+        now = time.monotonic()
+        if self._last_attempt and now - self._last_attempt < REBUILD_INTERVAL:
+            return
+        await self._async_send(force=False)
+
     async def async_send_now(self) -> None:
         """Sofort senden (nach einer Änderung durch den Assistenten)."""
         if not self._capable:
@@ -116,7 +130,7 @@ class CatalogSender:
             if ledger and ledger.get("label_id") and labels is not None:
                 label = labels.async_get_label(ledger["label_id"])
                 label_name = getattr(label, "name", None)
-            body = build_catalog_body(rows, ledger, label_name)
+            body = build_catalog_body(rows, ledger, label_name, self._entry.options)
             digest = catalog_digest([body])
             if not force and digest == self._last_digest:
                 return

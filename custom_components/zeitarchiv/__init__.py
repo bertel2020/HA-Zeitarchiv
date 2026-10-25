@@ -299,6 +299,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
     snapshot_done = True
     if text_state_entities:
         _publish_text_states()
+
+    # Nachsenden für den Auswahl-Assistenten und Registry-Ereignisse (ROADMAP
+    # 1.33): derselbe Weg wie state_changed, aber mit Wasserstand-Schutz wie
+    # der Initial-Snapshot und ohne denselben Zustand zweimal einzureihen
+    # (Assistent und Label-Ereignis treffen oft dieselbe Entität).
+    resent_ts: dict[str, float] = {}
+
+    def _resend_state(state: State) -> bool:
+        ts = state.last_updated.timestamp() if state.last_updated else None
+        if _already_sent(state) or (ts is not None and resent_ts.get(state.entity_id) == ts):
+            return False
+        if not _enqueue_state(state):
+            return False
+        if ts is not None:
+            resent_ts[state.entity_id] = ts
+        return True
     _LOGGER.info(
         "Zeitarchiv-Initialzustand beim Laden vorgemerkt · Ziel=%s · Events=%d · "
         "bereits gesendet (übersprungen)=%d",
@@ -350,12 +366,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
     await notices_coordinator.async_refresh()
     _sync_repairs()
     _setup_ai(hass, entry, client, notices_coordinator)
-    selection = await _async_setup_selection(hass, entry, client, notices_coordinator, _enqueue_state)
+    selection = await _async_setup_selection(hass, entry, client, notices_coordinator, _resend_state)
     catalog_sender = CatalogSender(hass, entry, client, filters, selection)
     if selection is not None:
         selection.on_changed = lambda: entry.async_create_background_task(
             hass, catalog_sender.async_send_now(), "zeitarchiv_catalog_now"
         )
+    _setup_registry_watch(hass, entry, filters, _resend_state, catalog_sender, selection)
 
     def _send_catalog() -> None:
         entry.async_create_background_task(
@@ -390,6 +407,21 @@ async def _async_setup_selection(
     entry.async_on_unload(coordinator.async_add_listener(lambda: selection.handle_notices(coordinator.data)))
     selection.handle_notices(coordinator.data)
     return selection
+
+
+def _setup_registry_watch(hass, entry, filters, resend_state, catalog_sender, selection) -> None:
+    """Label-/Bereichs-/Geräte-Ereignisse (ROADMAP 1.33, Phase 2): neu erfasste
+    Entitäten nachsenden, Katalog gedrosselt neu bauen. Die Listener meldet der
+    Unload ab. Ein Fehler hier lässt nur diesen Zusatz weg."""
+    try:
+        from .registry_watch import RegistryWatcher  # noqa: PLC0415
+
+        watcher = RegistryWatcher(hass, entry, filters, resend_state, catalog_sender, selection)
+        watcher.async_start()
+    except Exception:  # noqa: BLE001
+        _LOGGER.warning("Registry-Ereignisse für Zeitarchiv nicht verfügbar", exc_info=True)
+        return
+    entry.async_on_unload(watcher.async_stop)
 
 
 def _setup_ai(
