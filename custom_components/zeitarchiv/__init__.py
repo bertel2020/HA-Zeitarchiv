@@ -50,6 +50,7 @@ from .const import (
     DOMAIN,
     SIGNAL_TEXT_STATES,
 )
+from .catalog_sync import CatalogSender
 from .coordinator import ZeitarchivNoticesCoordinator
 from .data import ZeitarchivConfigEntry, ZeitarchivRuntimeData
 from .events import build_event, is_text_state
@@ -347,6 +348,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
     await notices_coordinator.async_refresh()
     _sync_repairs()
     _setup_ai(hass, entry, client, notices_coordinator)
+    catalog_sender = CatalogSender(hass, entry, client, filters)
+
+    def _send_catalog() -> None:
+        entry.async_create_background_task(
+            hass, catalog_sender.async_handle_notices(notices_coordinator.data), "zeitarchiv_catalog"
+        )
+
+    entry.async_on_unload(notices_coordinator.async_add_listener(_send_catalog))
+    _send_catalog()
 
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     # Erst NACH dem obigen runtime_data weiterreichen — sensor.py liest

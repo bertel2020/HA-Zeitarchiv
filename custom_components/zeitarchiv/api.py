@@ -18,6 +18,8 @@ _TIMEOUT = 10  # Sekunden
 # Auswertungen über lange Zeiträume dürfen länger dauern; die App bricht selbst
 # vor HAs 60-s-Limit pro MCP-Anfrage ab.
 _AI_TIMEOUT = 45
+# Der Katalog hat einige tausend Zeilen und wird nur selten gesendet.
+_CATALOG_TIMEOUT = 30
 
 
 class ZeitarchivApiError(Exception):
@@ -245,6 +247,26 @@ class ZeitarchivClient:
         if not isinstance(body, dict):
             raise ZeitarchivApiError(f"App antwortete mit Status {response.status_code} ohne JSON")
         return response.status_code, body
+
+    def post_catalog(self, entities: list[dict[str, Any]]) -> None:
+        """Schickt den Entitäten-Katalog (Metadaten, keine Werte) an /api/catalog
+        (ROADMAP 1.33). Wirft bei Fehlschlag; eine App ohne den Endpunkt
+        antwortet 404 und meldet die Fähigkeit "catalog" gar nicht erst."""
+        try:
+            response = requests.post(
+                f"{self._base_url}/api/catalog",
+                json={"entities": entities},
+                headers=self._headers,
+                timeout=_CATALOG_TIMEOUT,
+            )
+        except requests.RequestException as err:
+            raise ZeitarchivApiError(f"Katalog nicht gesendet: {err}") from err
+        if response.status_code == 401:
+            raise ZeitarchivAuthError("API-Token wurde von der App abgelehnt")
+        if response.status_code != 200:
+            raise ZeitarchivApiError(
+                f"App antwortete beim Katalog mit Status {response.status_code}: {response.text[:200]}"
+            )
 
     def write_batch(self, events: list[dict[str, Any]]) -> None:
         """Schickt einen Batch Events an /api/write. Wirft bei Fehlschlag."""
