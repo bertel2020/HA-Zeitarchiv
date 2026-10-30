@@ -18,6 +18,10 @@ CONF_EXCLUDE_ENTITIES = "exclude_entities"
 CONF_ENTITY_PATTERNS = "entity_patterns"
 CONF_EXCLUDE_ENTITY_PATTERNS = "exclude_entity_patterns"
 CONF_DECIMAL_PLACES = "decimal_places"
+# Charts und Tabellen, die die Zeitarchiv-Karte auch Nicht-Administratoren zeigt
+# (Liste von IDs der App, in den Optionen unter "Karte freigeben").
+CONF_CARD_SHARED_CHARTS = "card_shared_charts"
+CONF_CARD_SHARED_TABLES = "card_shared_tables"
 # 3 Nachkommastellen war bisher der fest verdrahtete Wert (siehe events.py) —
 # als Default beibehalten, damit bestehende Installationen ihr Verhalten
 # nicht stillschweigend ändern.

@@ -98,17 +98,45 @@ async def test_anything_but_a_whole_number_and_a_day_is_refused(
     card_client.get_card_chart.assert_not_called()
 
 
-async def test_other_users_may_not_ask(
+async def test_other_users_may_not_ask_for_what_is_not_shared(
     hass: HomeAssistant, hass_ws_client: WebSocketGenerator, hass_read_only_access_token: str,
     card_client: MagicMock, loaded_entry: MockConfigEntry,
 ) -> None:
     client = await hass_ws_client(hass, hass_read_only_access_token)
-    for message in ({"type": "zeitarchiv/card/items"}, {"type": "zeitarchiv/card/chart", "chart_id": 7}):
-        response = await _call(client, message)
-        assert response["success"] is False
-        assert response["error"]["code"] == "unauthorized"
-    card_client.get_card_items.assert_not_called()
+    response = await _call(client, {"type": "zeitarchiv/card/chart", "chart_id": 7})
+    assert response["success"] is False
+    assert response["error"]["code"] == "unauthorized"
     card_client.get_card_chart.assert_not_called()
+    # Die Auswahl ist für sie leer, ohne dass etwas durchsickert.
+    response = await _call(client, {"type": "zeitarchiv/card/items"})
+    assert response["success"] is True
+    assert response["result"]["items"] == [] and response["result"]["tables"] == []
+
+
+async def test_other_users_see_what_an_administrator_shared(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, hass_read_only_access_token: str,
+    card_client: MagicMock, loaded_entry: MockConfigEntry,
+) -> None:
+    card_client.get_card_items.return_value = {
+        "spec_version": 1,
+        "items": [{"id": 7, "name": "Verbrauch"}, {"id": 8, "name": "Geheim"}],
+        "tables": [{"id": 3, "name": "Monat"}, {"id": 4, "name": "Privat"}],
+    }
+    hass.config_entries.async_update_entry(
+        loaded_entry, options={**loaded_entry.options, "card_shared_charts": [7], "card_shared_tables": [3]}
+    )
+    await hass.async_block_till_done()
+    client = await hass_ws_client(hass, hass_read_only_access_token)
+    items = (await _call(client, {"type": "zeitarchiv/card/items"}))["result"]
+    assert [item["id"] for item in items["items"]] == [7]
+    assert [item["id"] for item in items["tables"]] == [3]
+    assert (await _call(client, {"type": "zeitarchiv/card/chart", "chart_id": 7}))["success"] is True
+    # Ein anderes Chart, und ein Chart ist keine Tabelle gleicher Nummer.
+    assert (await _call(client, {"type": "zeitarchiv/card/chart", "chart_id": 8}))["error"]["code"] == "unauthorized"
+    assert (await _call(client, {"type": "zeitarchiv/card/chart", "chart_id": 3}))["error"]["code"] == "unauthorized"
+    # Für Administratoren bleibt die Auswahl vollständig.
+    admin = await hass_ws_client(hass)
+    assert len((await _call(admin, {"type": "zeitarchiv/card/items"}))["result"]["items"]) == 2
 
 
 async def test_a_second_ask_within_the_cache_time_does_not_reach_the_app(
@@ -375,7 +403,7 @@ async def test_a_table_is_passed_on_by_whole_number_and_day_only(
         assert series_client.get_card_table.call_count == 1
 
 
-async def test_a_table_needs_an_admin_and_an_app_that_knows_it(
+async def test_a_table_needs_a_share_for_other_users_and_an_app_that_knows_it(
     hass: HomeAssistant, hass_ws_client: WebSocketGenerator, hass_read_only_access_token: str,
     series_client: MagicMock, loaded_entry: MockConfigEntry,
 ) -> None:

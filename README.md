@@ -457,8 +457,11 @@ period: month        # day, week, month, year, 24h, 7d, 30d
 style: stacked       # auto (je Entität), stacked (gestapelt), percent (Anteile in Prozent)
 ```
 
-- **Nur für Administratoren.** Home Assistant kennt keine Rechte je Chart, deshalb
-  zeigt die Karte anderen Benutzern nichts.
+- **Standardmäßig nur für Administratoren.** Home Assistant kennt keine Rechte je Chart, deshalb
+  zeigt die Karte anderen Benutzern nichts. Soll sie auch auf einem Wandtablet oder unter einem
+  Familienkonto laufen, wähle in den Einstellungen der Integration (**Konfigurieren → Karte
+  freigeben**) die Charts und Tabellen aus, die jeder angemeldete Benutzer sehen darf. Nur diese
+  sind dann abrufbar; Entitäten direkt und die Sparkline bleiben Administratoren vorbehalten.
 - **Nur die Integration spricht mit dem Zeitarchiv.** Die Karte spricht nie mit der App,
   sondern über Home Assistant; der Token bleibt in der Integration. Dafür braucht die
   App die Fähigkeit „cards“ (App-Update, wenn die Karte darauf hinweist).
@@ -490,7 +493,7 @@ features:
     show_change: true
 ```
 
-Wie die Karte nur für Administratoren sichtbar.
+Wie die Karte mit Entitäten direkt nur für Administratoren sichtbar.
 
 ## Bekannte Grenzen
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from homeassistant.config_entries import SOURCE_USER, ConfigEntryState
@@ -13,6 +13,8 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.zeitarchiv.api import ZeitarchivApiError, ZeitarchivAuthError
 from custom_components.zeitarchiv.const import (
+    CONF_CARD_SHARED_CHARTS,
+    CONF_CARD_SHARED_TABLES,
     CONF_API_TOKEN,
     CONF_DECIMAL_PLACES,
     CONF_ENTITIES,
@@ -510,3 +512,72 @@ async def test_options_preview_without_pending_filters_falls_back(
     result = await flow.async_step_filter_preview()
 
     assert result["step_id"] == "filters"
+
+
+CARD_ITEMS = {
+    "spec_version": 1,
+    "items": [{"id": 7, "name": "Verbrauch"}, {"id": 9, "name": "Solar"}],
+    "tables": [{"id": 3, "name": "Monat"}],
+}
+
+
+async def test_options_card_sharing_saves_known_ids_only(
+    hass: HomeAssistant, loaded_entry: MockConfigEntry
+) -> None:
+    hass.config_entries.async_update_entry(
+        loaded_entry, options={**loaded_entry.options, CONF_CARD_SHARED_CHARTS: [7, 99]}
+    )
+    await hass.async_block_till_done()
+    with patch("custom_components.zeitarchiv.api.ZeitarchivClient.get_card_items", return_value=CARD_ITEMS):
+        result = await _open_options_step(hass, loaded_entry, "card_sharing")
+        assert result["step_id"] == "card_sharing"
+        schema = result["data_schema"].schema
+        shared = next(key for key in schema if key == CONF_CARD_SHARED_CHARTS)
+        # Eine gelöschte ID (99) taucht nicht mehr als Vorgabe auf.
+        assert shared.default() == ["7"]
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {CONF_CARD_SHARED_CHARTS: ["9", "7"], CONF_CARD_SHARED_TABLES: ["3"]}
+        )
+    await hass.async_block_till_done()
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert loaded_entry.options[CONF_CARD_SHARED_CHARTS] == [7, 9]
+    assert loaded_entry.options[CONF_CARD_SHARED_TABLES] == [3]
+
+
+async def test_options_card_sharing_aborts_without_the_app(
+    hass: HomeAssistant, loaded_entry: MockConfigEntry
+) -> None:
+    with patch(
+        "custom_components.zeitarchiv.api.ZeitarchivClient.get_card_items", side_effect=ZeitarchivApiError("down")
+    ):
+        result = await _open_options_step(hass, loaded_entry, "card_sharing")
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "card_unavailable"
+
+
+async def test_the_card_sharing_survives_saving_the_filters_and_an_import(
+    hass: HomeAssistant, loaded_entry: MockConfigEntry
+) -> None:
+    hass.config_entries.async_update_entry(
+        loaded_entry,
+        options={CONF_ENTITIES: ["sensor.temperatur"], CONF_CARD_SHARED_CHARTS: [7], CONF_CARD_SHARED_TABLES: [3]},
+    )
+    await hass.async_block_till_done()
+    hass.states.async_set("sensor.temperatur", "21.5")
+
+    result = await _open_options_step(hass, loaded_entry, "filters")
+    result = await hass.config_entries.options.async_configure(result["flow_id"], _filter_input())
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {})
+    await hass.async_block_till_done()
+    assert loaded_entry.options[CONF_CARD_SHARED_CHARTS] == [7]
+    assert loaded_entry.options[CONF_CARD_SHARED_TABLES] == [3]
+
+    result = await _open_options_step(hass, loaded_entry, "export")
+    exported = result["data_schema"]({})["yaml_config"]
+    assert "card_shared" not in exported
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {"yaml_config": exported})
+    result = await hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "import"})
+    await hass.config_entries.options.async_configure(result["flow_id"], {"yaml_config": exported})
+    await hass.async_block_till_done()
+    assert loaded_entry.options[CONF_CARD_SHARED_CHARTS] == [7]
+    assert loaded_entry.options[CONF_CARD_SHARED_TABLES] == [3]

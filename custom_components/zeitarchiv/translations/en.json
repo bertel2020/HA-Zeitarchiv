@@ -76,12 +76,14 @@
         "menu_options": {
           "filters": "Edit archive filters",
           "overview": "Currently included entities",
+          "card_sharing": "Share card",
           "export": "Export filters as YAML",
           "import": "Import filters from YAML"
         },
         "menu_option_descriptions": {
           "filters": "Prefer labels; additional selection methods and exclusions are optional.",
           "overview": "Review included, stateless, and excluded entities.",
+          "card_sharing": "Show the Zeitarchiv card to users without administrator rights too, for example on wall tablets.",
           "export": "Copy the current filters without host or API token.",
           "import": "Read a Zeitarchiv export and replace the current filters."
         }
@@ -140,6 +142,14 @@
         "title": "Zeitarchiv – Currently included entities",
         "description": "This overview evaluates the saved filters against the currently known entities. Selected labels: **{label_count}**.\n\n**Value processing:** Numeric measurements are rounded to up to **{decimal_places} decimal places** before transmission. Switch states are stored as **1/0**.\n\n**Selected by the filter: {current_count}** ({domain_summary})\n\n{current_entities}\n\n**Registered without a current state: {without_state_count}**\n\n{without_state_entities}\n\n**Removed by exclusions: {excluded_count}**\n\n{excluded_entities}\n\n{limit_note}\n\nSelect **Submit** to return to settings; no filters are changed."
       },
+      "card_sharing": {
+        "title": "Zeitarchiv – Share card",
+        "description": "Charts and tables chosen here are shown in the Zeitarchiv card to every signed-in user, even without administrator rights. Everything else stays with administrators, as do the card with freely chosen entities and the sparkline.",
+        "data": {
+          "card_shared_charts": "Saved charts",
+          "card_shared_tables": "Saved tables"
+        }
+      },
       "export": {
         "title": "Zeitarchiv – Export filters",
         "description": "Copy the YAML content and save it as a file, or paste it into “Import filters from YAML” on another system. Host and API token are not included. Note that labels, areas, and devices use internal IDs. Select “Submit” to return to the menu.",
@@ -163,6 +173,9 @@
       "invalid_entity": "The export contains an invalid entity ID.",
       "invalid_pattern": "The pattern is invalid. Entity ID characters plus * and ? are allowed.",
       "too_many_patterns": "Each pattern field supports at most 100 entries."
+    },
+    "abort": {
+      "card_unavailable": "The Zeitarchiv app cannot be reached or is too old for the card. Please check or update the app."
     }
   },
   "entity": {

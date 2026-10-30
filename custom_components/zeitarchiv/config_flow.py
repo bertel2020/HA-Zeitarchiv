@@ -24,6 +24,8 @@ from .api import ZeitarchivApiError, ZeitarchivAuthError, ZeitarchivClient
 from .const import (
     CONF_API_TOKEN,
     CONF_AREAS,
+    CONF_CARD_SHARED_CHARTS,
+    CONF_CARD_SHARED_TABLES,
     CONF_DECIMAL_PLACES,
     CONF_DEVICES,
     CONF_ENTITIES,
@@ -430,7 +432,7 @@ class ZeitarchivOptionsFlow(config_entries.OptionsFlow):
         """Zeigt ein übersichtliches Menü statt sofort aller Filterfelder."""
         return self.async_show_menu(
             step_id="init",
-            menu_options=["filters", "overview", "export", "import"],
+            menu_options=["filters", "overview", "card_sharing", "export", "import"],
         )
 
     async def async_step_overview(
@@ -445,6 +447,65 @@ class ZeitarchivOptionsFlow(config_entries.OptionsFlow):
             description_placeholders=_build_filter_report(
                 self.hass, dict(self.config_entry.options)
             ),
+        )
+
+    def _card_options(self) -> dict[str, Any]:
+        """Die Freigabe der Karte: gehört nicht zu den Archivfiltern und bleibt deshalb
+        beim Speichern der Filter und beim YAML-Import erhalten."""
+        return {
+            key: self.config_entry.options[key]
+            for key in (CONF_CARD_SHARED_CHARTS, CONF_CARD_SHARED_TABLES)
+            if key in self.config_entry.options
+        }
+
+    async def async_step_card_sharing(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Wählt Charts und Tabellen, die die Karte auch Nicht-Administratoren zeigt."""
+        runtime = getattr(self.config_entry, "runtime_data", None)
+        if runtime is None:
+            return self.async_abort(reason="card_unavailable")
+        try:
+            listed = await self.hass.async_add_executor_job(runtime.client.get_card_items)
+        except ZeitarchivApiError:
+            return self.async_abort(reason="card_unavailable")
+        charts = {item["id"]: item["name"] for item in listed.get("items", [])}
+        tables = {item["id"]: item["name"] for item in listed.get("tables", [])}
+        options = self.config_entry.options
+        if user_input is not None:
+            # Nur IDs, die die App kennt: gelöschte Charts fallen beim Speichern weg.
+            chosen_charts = sorted(int(value) for value in user_input.get(CONF_CARD_SHARED_CHARTS, []) if int(value) in charts)
+            chosen_tables = sorted(int(value) for value in user_input.get(CONF_CARD_SHARED_TABLES, []) if int(value) in tables)
+            return self.async_create_entry(
+                title="",
+                data={
+                    **options,
+                    CONF_CARD_SHARED_CHARTS: chosen_charts,
+                    CONF_CARD_SHARED_TABLES: chosen_tables,
+                },
+            )
+
+        def _field(option: str, names: dict[int, str]) -> tuple[Any, Any]:
+            current = [str(value) for value in options.get(option, []) if value in names]
+            return (
+                vol.Optional(option, default=current),
+                selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[
+                            selector.SelectOptionDict(value=str(item_id), label=name)
+                            for item_id, name in names.items()
+                        ],
+                        multiple=True,
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                ),
+            )
+
+        key_charts, field_charts = _field(CONF_CARD_SHARED_CHARTS, charts)
+        key_tables, field_tables = _field(CONF_CARD_SHARED_TABLES, tables)
+        return self.async_show_form(
+            step_id="card_sharing",
+            data_schema=vol.Schema({key_charts: field_charts, key_tables: field_tables}),
         )
 
     async def async_step_filters(
@@ -575,7 +636,7 @@ class ZeitarchivOptionsFlow(config_entries.OptionsFlow):
             return await self.async_step_filters()
         if user_input is not None:
             del self._pending_filters
-            return self.async_create_entry(title="", data=pending)
+            return self.async_create_entry(title="", data={**pending, **self._card_options()})
         return self.async_show_form(
             step_id="filter_preview",
             data_schema=vol.Schema({}),
@@ -628,7 +689,9 @@ class ZeitarchivOptionsFlow(config_entries.OptionsFlow):
                     imported_options[CONF_DECIMAL_PLACES] = self.config_entry.options[
                         CONF_DECIMAL_PLACES
                     ]
-                return self.async_create_entry(title="", data=imported_options)
+                return self.async_create_entry(
+                    title="", data={**imported_options, **self._card_options()}
+                )
 
         return self.async_show_form(
             step_id="import",

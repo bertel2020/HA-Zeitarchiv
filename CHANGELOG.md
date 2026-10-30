@@ -4,13 +4,18 @@
 
 ### Neu
 
-- **Zeitarchiv-Karte für Lovelace** (`custom:zeitarchiv-card`, nur für
-  Administratoren, braucht eine aktuelle Zeitarchiv-App): Zeigt ein gespeichertes
+- **Zeitarchiv-Karte für Lovelace** (`custom:zeitarchiv-card`, braucht
+  eine aktuelle Zeitarchiv-App): Zeigt ein gespeichertes
   Chart oder eine gespeicherte Tabelle des Zeitarchivs direkt im Dashboard, im
   Hell- und Dunkelmodus und mit den Beschriftungen der Home-Assistant-Sprache.
   Die Karte lässt sich im Karteneditor einrichten; im Kartenwähler zeigt sie
   schon eine Vorschau mit deinem ersten Chart. Zuerst die App aktualisieren,
   dann die Integration.
+  - **Für alle Benutzer freigeben**: Standardmäßig sehen nur Administratoren die
+    Karte. In den Einstellungen der Integration unter **Karte freigeben**
+    wählst du Charts und Tabellen, die jeder angemeldete Benutzer sieht, zum
+    Beispiel auf einem Wandtablet. Entitäten direkt und die Sparkline bleiben
+    Administratoren vorbehalten.
   - **Entitäten direkt**: Statt eines gespeicherten Charts lassen sich bis zu
     zehn archivierte Entitäten mit Zeitraum und Darstellung wählen.
   - **Darstellungen**: Linien, Balken, gestapelt und in Prozent, Vergleich mit
@@ -27,12 +32,16 @@
 
 #### New
 
-- **Zeitarchiv card for Lovelace** (`custom:zeitarchiv-card`, administrators
-  only, needs a current Zeitarchiv app): Shows a saved chart or a saved table
+- **Zeitarchiv card for Lovelace** (`custom:zeitarchiv-card`, needs a
+  current Zeitarchiv app): Shows a saved chart or a saved table
   of Zeitarchiv directly on your dashboard, in light and dark mode and with
   labels in the Home Assistant language. The card can be set up in the card
   editor; the card picker already shows a preview with your first chart.
   Update the app first, then the integration.
+  - **Share with all users**: By default only administrators see the card. In
+    the integration settings under **Share card** you choose charts and tables
+    that every signed-in user sees, for example on a wall tablet. Entities
+    directly and the sparkline stay with administrators.
   - **Entities directly**: Instead of a saved chart you can pick up to ten
     archived entities with a period and a display style.
   - **Displays**: Lines, bars, stacked and in percent, comparison with the

@@ -76,12 +76,14 @@
         "menu_options": {
           "filters": "Archivfilter bearbeiten",
           "overview": "Aktuell erfasste Entitäten",
+          "card_sharing": "Karte freigeben",
           "export": "Filter als YAML exportieren",
           "import": "Filter aus YAML importieren"
         },
         "menu_option_descriptions": {
           "filters": "Bevorzugt Labels auswählen; weitere Auswahlwege und Ausschlüsse sind optional.",
           "overview": "Erfasste, zustandslose und ausgeschlossene Entitäten prüfen.",
+          "card_sharing": "Zeigt die Zeitarchiv-Karte auch Benutzern ohne Administratorrechte, zum Beispiel auf Wandtablets.",
           "export": "Aktuelle Filter ohne Host und API-Token kopieren.",
           "import": "Einen Zeitarchiv-Export einlesen und die aktuellen Filter ersetzen."
         }
@@ -140,6 +142,14 @@
         "title": "Zeitarchiv – Aktuell erfasste Entitäten",
         "description": "Diese Übersicht wertet die gespeicherten Filter gegen die aktuell bekannten Entitäten aus. Ausgewählte Labels: **{label_count}**.\n\n**Werteverarbeitung:** Numerische Messwerte werden vor der Übertragung auf bis zu **{decimal_places} Nachkommastellen** gerundet. Schaltzustände werden als **1/0** gespeichert.\n\n**Vom Filter ausgewählt: {current_count}** ({domain_summary})\n\n{current_entities}\n\n**Registriert, derzeit ohne Zustand: {without_state_count}**\n\n{without_state_entities}\n\n**Durch Ausschlüsse entfernt: {excluded_count}**\n\n{excluded_entities}\n\n{limit_note}\n\nMit **Absenden** gelangst du zurück zu den Einstellungen; es werden keine Filter verändert."
       },
+      "card_sharing": {
+        "title": "Zeitarchiv – Karte freigeben",
+        "description": "Hier gewählte Charts und Tabellen sieht jeder angemeldete Benutzer in der Zeitarchiv-Karte, auch ohne Administratorrechte. Alles andere bleibt Administratoren vorbehalten, ebenso die Karte mit frei gewählten Entitäten und die Sparkline.",
+        "data": {
+          "card_shared_charts": "Gespeicherte Charts",
+          "card_shared_tables": "Gespeicherte Tabellen"
+        }
+      },
       "export": {
         "title": "Zeitarchiv – Filter exportieren",
         "description": "Kopiere den YAML-Inhalt und speichere ihn als Datei oder füge ihn auf einem anderen System unter „Filter aus YAML importieren“ ein. Host und API-Token sind nicht enthalten. Beachte, dass Labels, Bereiche und Geräte interne IDs verwenden. Mit „Absenden“ gelangst du zurück zum Menü.",
@@ -163,6 +173,9 @@
       "invalid_entity": "Der Export enthält eine ungültige Entity-ID.",
       "invalid_pattern": "Das Muster ist ungültig. Erlaubt sind Entity-ID-Zeichen sowie * und ?.",
       "too_many_patterns": "Je Musterfeld sind höchstens 100 Einträge erlaubt."
+    },
+    "abort": {
+      "card_unavailable": "Die Zeitarchiv-App ist nicht erreichbar oder zu alt für die Karte. Bitte die App prüfen oder aktualisieren."
     }
   },
   "entity": {

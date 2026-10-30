@@ -5,9 +5,11 @@ Home Assistant: zwei WebSocket-Befehle, die diese Datei bereitstellt und die den
 Token der Verbindung serverseitig behalten. Dahinter stehen /api/card/items und
 /api/card/chart der App.
 
-Nur Administratoren: Jeder angemeldete Benutzer könnte sonst jedes gespeicherte
-Chart über seine ID abfragen, und Home Assistant kennt keine Rechte je Chart.
-Die Befehle nehmen deshalb ausschließlich eine ganzzahlige Chart-ID (und einen
+Standardmäßig nur Administratoren: Jeder angemeldete Benutzer könnte sonst jedes
+gespeicherte Chart über seine ID abfragen, und Home Assistant kennt keine Rechte je
+Chart. Was ein Administrator in den Optionen unter "Karte freigeben" benennt, sehen
+auch andere Benutzer (Wandtablets, Familienkonten); Entitäten direkt und die
+Sparkline bleiben Administratoren vorbehalten. Die Befehle nehmen deshalb ausschließlich eine ganzzahlige Chart-ID (und einen
 Stichtag) an und bauen den Pfad selbst; nie reicht die Integration einen frei
 wählbaren Pfad oder Parameter an die App durch, sonst wäre sie ein Proxy an der
 Whitelist des Token-Ports vorbei.
@@ -42,7 +44,7 @@ from .api import (
     CARD_STYLES,
     capabilities_from,
 )
-from .const import DOMAIN
+from .const import CONF_CARD_SHARED_CHARTS, CONF_CARD_SHARED_TABLES, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -135,8 +137,37 @@ def _remember(hass: HomeAssistant, key: tuple, value: dict[str, Any]) -> None:
     cache[key] = (now, value)
 
 
+def shared_ids(entry, option: str) -> set[int]:
+    """Die für alle Benutzer freigegebenen IDs (Optionen der Verbindung)."""
+    return {value for value in entry.options.get(option, []) if isinstance(value, int)}
+
+
+def _may_see(hass: HomeAssistant, connection, msg: dict[str, Any], option: str, item_id: int) -> bool:
+    """Administratoren dürfen jedes Chart und jede Tabelle, andere nur freigegebene.
+    Antwortet selbst mit "unauthorized", wenn nicht. Die Prüfung steht vor dem
+    Zwischenspeicher, der Antworten für alle Betrachter gemeinsam hält."""
+    if connection.user.is_admin:
+        return True
+    entry = _entry(hass, msg.get("entry_id"))
+    if entry is not None and item_id in shared_ids(entry, option):
+        return True
+    connection.send_error(msg["id"], "unauthorized", "Nicht für die Karte freigegeben")
+    return False
+
+
+def _only_shared(entry, result: dict[str, Any]) -> dict[str, Any]:
+    """Die Auswahl der Karte für Nicht-Administratoren: nur Freigegebenes."""
+    charts, tables = shared_ids(entry, CONF_CARD_SHARED_CHARTS), shared_ids(entry, CONF_CARD_SHARED_TABLES)
+    return {
+        **result,
+        "items": [item for item in result.get("items", []) if item.get("id") in charts],
+        "tables": [item for item in result.get("tables", []) if item.get("id") in tables],
+    }
+
+
 async def _fetch(
     hass: HomeAssistant, connection, msg: dict[str, Any], key: tuple, call, capability: str = "cards",
+    transform=None,
 ) -> None:
     """Gemeinsamer Ablauf beider Befehle: Verbindung wählen, Fähigkeit prüfen,
     zwischengespeicherte Antwort oder Abruf in der App, Fehler als Code."""
@@ -174,20 +205,22 @@ async def _fetch(
             connection.send_error(msg["id"], ERROR_UNREACHABLE, "Zeitarchiv nicht erreichbar")
             return
         _remember(hass, key, result)
-    connection.send_result(msg["id"], result)
+    connection.send_result(msg["id"], transform(entry, result) if transform else result)
 
 
-@websocket_api.require_admin
 @websocket_api.websocket_command(
     {"type": "zeitarchiv/card/items", probatio.Optional("entry_id"): str}
 )
 @websocket_api.async_response
 async def ws_card_items(hass: HomeAssistant, connection, msg: dict[str, Any]) -> None:
-    """Gespeicherte Charts für den Editor der Karte."""
-    await _fetch(hass, connection, msg, ("items",), lambda client: client.get_card_items())
+    """Gespeicherte Charts und Tabellen für den Editor der Karte; Nicht-Administratoren
+    sehen nur die freigegebenen (und im Editor ohnehin nichts zu tun)."""
+    await _fetch(
+        hass, connection, msg, ("items",), lambda client: client.get_card_items(),
+        transform=None if connection.user.is_admin else _only_shared,
+    )
 
 
-@websocket_api.require_admin
 @websocket_api.websocket_command(
     {
         "type": "zeitarchiv/card/chart",
@@ -201,6 +234,8 @@ async def ws_card_items(hass: HomeAssistant, connection, msg: dict[str, Any]) ->
 async def ws_card_chart(hass: HomeAssistant, connection, msg: dict[str, Any]) -> None:
     """Einstellungen und Daten eines gespeicherten Charts."""
     chart_id, at, px = msg["chart_id"], msg.get("at"), _px(msg)
+    if not _may_see(hass, connection, msg, CONF_CARD_SHARED_CHARTS, chart_id):
+        return
     await _fetch(hass, connection, msg, ("chart", chart_id, at, px), lambda client: client.get_card_chart(chart_id, at, px))
 
 
@@ -259,7 +294,6 @@ async def ws_card_spark(hass: HomeAssistant, connection, msg: dict[str, Any]) ->
     )
 
 
-@websocket_api.require_admin
 @websocket_api.websocket_command(
     {
         "type": "zeitarchiv/card/table",
@@ -272,6 +306,8 @@ async def ws_card_spark(hass: HomeAssistant, connection, msg: dict[str, Any]) ->
 async def ws_card_table(hass: HomeAssistant, connection, msg: dict[str, Any]) -> None:
     """Aufbau und fertige Abfrage einer gespeicherten Vergleichstabelle."""
     table_id, at = msg["table_id"], msg.get("at")
+    if not _may_see(hass, connection, msg, CONF_CARD_SHARED_TABLES, table_id):
+        return
     await _fetch(
         hass, connection, msg, ("table", table_id, at), lambda client: client.get_card_table(table_id, at),
         capability="card_table",
