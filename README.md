@@ -473,6 +473,27 @@ Mit `link: /eigener/pfad` lässt sich eine andere Adresse eintragen.
   ein Hinweis. Der im Chart gespeicherte Zeitraum gilt.
 - Bei einem Ausfall der App bleibt das letzte Bild stehen und die Karte nennt sein Alter.
 
+### Verlauf unter einer Kachelkarte
+
+Zusätzlich gibt es eine kleine Verlaufslinie als **Funktion** der Standard-Kachelkarte: In der Kachelkarte
+**Funktion hinzufügen → Zeitarchiv-Verlauf** wählen. Sie zeigt die Entität der Kachel für die letzten 24 Stunden,
+7 oder 30 Tage als Linie, Fläche oder Balken, auf Wunsch mit markiertem Minimum und Maximum und der Änderung.
+Die Entität muss im Zeitarchiv archiviert sein; sonst steht dort „Nicht archiviert“.
+
+```yaml
+type: tile
+entity: sensor.aussentemperatur
+features:
+  - type: custom:zeitarchiv-sparkline
+    range: 24h          # 24h, 7d, 30d
+    style: line         # line, area, bars
+    color: accent       # accent oder trend (grün steigend, rot fallend)
+    min_max: true
+    show_change: true
+```
+
+Wie die Karte nur für Administratoren sichtbar.
+
 ## Bekannte Grenzen
 
 - Nichtnumerische Textsensoren werden nicht archiviert; ausgewählte werden

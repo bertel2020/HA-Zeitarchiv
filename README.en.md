@@ -450,6 +450,27 @@ The link to Zeitarchiv appears automatically (the app reports its address in Hom
   period saved with the chart applies.
 - If the app is unreachable, the last image stays and the card shows its age.
 
+### History under a tile card
+
+There is also a small history line as a **feature** of the standard tile card: in the tile card choose
+**Add feature → Zeitarchiv history**. It shows the tile's entity for the last 24 hours, 7 or 30 days as line, area or
+bars, optionally with marked minimum and maximum and the change. The entity must be archived by Zeitarchiv; otherwise
+it says "Not archived".
+
+```yaml
+type: tile
+entity: sensor.outside_temperature
+features:
+  - type: custom:zeitarchiv-sparkline
+    range: 24h          # 24h, 7d, 30d
+    style: line         # line, area, bars
+    color: accent       # accent or trend (green rising, red falling)
+    min_max: true
+    show_change: true
+```
+
+Like the card, visible to administrators only.
+
 ## Known limitations
 
 - Non-numeric text sensors are not archived; selected ones are reported as a

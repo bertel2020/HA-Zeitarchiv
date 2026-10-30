@@ -37,6 +37,7 @@ from .api import (
     ZeitarchivCardError,
     CARD_MAX_ENTITIES,
     CARD_PERIODS,
+    CARD_SPARK_RANGES,
     CARD_STYLES,
     capabilities_from,
 )
@@ -47,6 +48,7 @@ _LOGGER = logging.getLogger(__name__)
 URL_BASE = "/zeitarchiv_card"
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 CARD_FILE = "zeitarchiv-card.js"
+SPARKLINE_FILE = "zeitarchiv-sparkline.js"
 
 #: Wie lange eine Antwort der App für weitere Karten und Betrachter gilt. Mehrere
 #: Karten oder Browser, die dasselbe Chart zeigen, fragen die App nur einmal.
@@ -88,12 +90,14 @@ async def async_setup_card(hass: HomeAssistant) -> None:
         # Die Fassung hängt an jeder Datei, auch an denen, die die Karte nachlädt
         # (siehe zeitarchiv-card.js): ein Update ersetzt sie ohne Browser-Cache.
         add_extra_js_url(hass, f"{URL_BASE}/{CARD_FILE}?v={integration.version}")
+        add_extra_js_url(hass, f"{URL_BASE}/{SPARKLINE_FILE}?v={integration.version}")
     else:
         _LOGGER.debug("Home-Assistant-Frontend nicht geladen, Zeitarchiv-Karte wird nicht angemeldet")
     websocket_api.async_register_command(hass, ws_card_items)
     websocket_api.async_register_command(hass, ws_card_chart)
     websocket_api.async_register_command(hass, ws_card_entities)
     websocket_api.async_register_command(hass, ws_card_series)
+    websocket_api.async_register_command(hass, ws_card_spark)
 
 
 def _entry(hass: HomeAssistant, entry_id: str | None):
@@ -218,4 +222,23 @@ async def ws_card_series(hass: HomeAssistant, connection, msg: dict[str, Any]) -
     await _fetch(
         hass, connection, msg, ("series", tuple(ids), period, style, at),
         lambda client: client.get_card_series(ids, period, style, at), capability="card_series",
+    )
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        "type": "zeitarchiv/card/spark",
+        probatio.Required("entity_id"): probatio.All(str, probatio.Match(_ENTITY)),
+        probatio.Optional("range", default="24h"): probatio.In(CARD_SPARK_RANGES),
+        probatio.Optional("entry_id"): str,
+    }
+)
+@websocket_api.async_response
+async def ws_card_spark(hass: HomeAssistant, connection, msg: dict[str, Any]) -> None:
+    """Kurze Reihe einer Entität für die Sparkline unter einer Kachelkarte."""
+    entity_id, range_key = msg["entity_id"], msg["range"]
+    await _fetch(
+        hass, connection, msg, ("spark", entity_id, range_key),
+        lambda client: client.get_card_spark(entity_id, range_key), capability="card_spark",
     )

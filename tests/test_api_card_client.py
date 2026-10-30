@@ -111,3 +111,24 @@ def test_the_entity_list_goes_to_a_fixed_path_and_a_rejection_is_told_apart() ->
     with patch(GET, return_value=_Resp({}, 400)), pytest.raises(ZeitarchivCardError) as raised:
         client.get_card_series(["sensor.a"])
     assert raised.value.status == 400
+
+
+def test_a_spark_goes_to_a_fixed_path_with_one_id_and_a_known_range() -> None:
+    client = ZeitarchivClient("h", 1, "t")
+    with patch(GET, return_value=_Resp({"points": []})) as get:
+        client.get_card_spark("sensor.a", "7d")
+        assert get.call_args.args[0] == "http://h:1/api/card/spark"
+        assert get.call_args.kwargs["params"] == {"entity_id": "sensor.a", "range": "7d"}
+        client.get_card_spark("sensor.a")
+        assert get.call_args.kwargs["params"]["range"] == "24h"
+
+
+@pytest.mark.parametrize("arguments", [
+    {"entity_id": "sensor.a/../b"}, {"entity_id": "sensor.a,sensor.b"}, {"entity_id": "Sensor.A"}, {"entity_id": 5},
+    {"entity_id": "sensor.a", "range_key": "1y"},
+])
+def test_a_spark_never_sends_anything_but_an_id_and_a_known_range(arguments: dict) -> None:
+    client = ZeitarchivClient("h", 1, "t")
+    with patch(GET) as get, pytest.raises(ValueError):
+        client.get_card_spark(**arguments)
+    get.assert_not_called()

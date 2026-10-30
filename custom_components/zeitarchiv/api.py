@@ -30,6 +30,7 @@ _CARD_TIMEOUT = 20
 CARD_PERIODS = ("day", "week", "month", "year", "24h", "7d", "30d")
 CARD_STYLES = ("auto", "stacked", "percent")
 CARD_MAX_ENTITIES = 10
+CARD_SPARK_RANGES = ("24h", "7d", "30d")
 _ENTITY_ID = re.compile(r"^[a-z0-9_]+\.[a-z0-9_]+$")
 
 
@@ -289,6 +290,16 @@ class ZeitarchivClient:
         if at:
             params["at"] = at
         return self._get_card("/api/card/series", params)
+
+    def get_card_spark(self, entity_id: str, range_key: str = "24h") -> dict[str, Any]:
+        """Kurze Reihe einer Entität für die Sparkline unter einer Kachelkarte (GET /api/card/spark,
+        Fähigkeit "card_spark"). Nimmt nur eine Entitäts-ID im Home-Assistant-Format und einen der
+        festen Zeiträume an, sonst ValueError."""
+        if not isinstance(entity_id, str) or not _ENTITY_ID.fullmatch(entity_id):
+            raise ValueError("entity_id")
+        if range_key not in CARD_SPARK_RANGES:
+            raise ValueError("range")
+        return self._get_card("/api/card/spark", {"entity_id": entity_id, "range": range_key})
 
     def get_ai_config(self, api_id: str) -> dict[str, Any]:
         """Konfiguration des KI-Zugriffs (GET /api/ai/config): ob er eingeschaltet

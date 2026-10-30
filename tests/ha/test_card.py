@@ -183,8 +183,9 @@ async def test_the_card_files_are_served_and_announced(
 ) -> None:
     urls = hass.data[DATA_EXTRA_MODULE_URL]
     assert any(url.startswith("/zeitarchiv_card/zeitarchiv-card.js?v=") for url in urls)
+    assert any(url.startswith("/zeitarchiv_card/zeitarchiv-sparkline.js?v=") for url in urls)
     client = await hass_client()
-    for name in ("zeitarchiv-card.js", "chart-tile-render.js", "number-format.js", "tooltip-hold.js", "server-time.js", "echarts.min.js", "catalog.json"):
+    for name in ("zeitarchiv-card.js", "zeitarchiv-sparkline.js", "chart-tile-render.js", "number-format.js", "tooltip-hold.js", "server-time.js", "echarts.min.js", "catalog.json"):
         response = await client.get(f"/zeitarchiv_card/{name}")
         assert response.status == 200, name
     # Nur die ausgelieferten Dateien, nichts darüber hinaus.
@@ -290,3 +291,46 @@ async def test_refusals_of_the_app_for_a_series_come_back_as_codes(
     client = await hass_ws_client(hass)
     response = await _call(client, {"type": "zeitarchiv/card/series", "entity_ids": ["sensor.a"]})
     assert response["error"]["code"] == code
+
+
+SPARK = {"spec_version": 1, "entity_id": "sensor.a", "range": "24h", "supported": True, "points": [[1, 2.0], [2, 3.0]]}
+
+
+async def test_a_spark_is_passed_on_for_one_entity_and_a_known_range(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, series_client: MagicMock, loaded_entry: MockConfigEntry
+) -> None:
+    series_client.get_notices.return_value = {**NOTICES, "capabilities": ["card_spark"]}
+    loaded_entry.runtime_data.notices_coordinator.async_set_updated_data({**NOTICES, "capabilities": ["card_spark"]})
+    series_client.get_card_spark = MagicMock(return_value=SPARK)
+    client = await hass_ws_client(hass)
+    with patch("custom_components.zeitarchiv.api.ZeitarchivClient.get_card_spark", series_client.get_card_spark):
+        assert (await _call(client, {"type": "zeitarchiv/card/spark", "entity_id": "sensor.a", "range": "7d"}))["result"] == SPARK
+        series_client.get_card_spark.assert_called_once_with("sensor.a", "7d")
+        await _call(client, {"type": "zeitarchiv/card/spark", "entity_id": "sensor.b"})
+        series_client.get_card_spark.assert_called_with("sensor.b", "24h")
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [{}, {"entity_id": "sensor.a/../b"}, {"entity_id": ["sensor.a"]}, {"entity_id": "sensor.a,sensor.b"}, {"entity_id": "sensor.a", "range": "1y"}],
+)
+async def test_a_spark_takes_one_id_and_a_known_range_only(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, series_client: MagicMock, loaded_entry: MockConfigEntry,
+    arguments: dict[str, Any],
+) -> None:
+    client = await hass_ws_client(hass)
+    with patch("custom_components.zeitarchiv.api.ZeitarchivClient.get_card_spark") as ask:
+        response = await _call(client, {"type": "zeitarchiv/card/spark", **arguments})
+    assert response["error"]["code"] == "invalid_format"
+    ask.assert_not_called()
+
+
+async def test_a_spark_needs_an_admin_and_an_app_that_knows_it(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, hass_read_only_access_token: str,
+    series_client: MagicMock, loaded_entry: MockConfigEntry,
+) -> None:
+    loaded_entry.runtime_data.notices_coordinator.async_set_updated_data({**NOTICES, "capabilities": ["cards", "card_series"]})
+    admin = await hass_ws_client(hass)
+    assert (await _call(admin, {"type": "zeitarchiv/card/spark", "entity_id": "sensor.a"}))["error"]["code"] == "app_outdated"
+    other = await hass_ws_client(hass, hass_read_only_access_token)
+    assert (await _call(other, {"type": "zeitarchiv/card/spark", "entity_id": "sensor.a"}))["error"]["code"] == "unauthorized"
