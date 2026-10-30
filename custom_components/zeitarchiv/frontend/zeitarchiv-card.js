@@ -601,6 +601,9 @@ class ZeitarchivCard extends HTMLElement {
     let hidden = [];
     let names = {};
     try { hidden = JSON.parse(spec?.hiddenEntityIds || '[]'); names = JSON.parse(spec?.entityNames || '{}'); } catch (err) { /* ohne */ }
+    // Gültiges JSON mit anderem Typ ("null", Zahl) darf das Chart nicht in den Fehlerzustand werfen.
+    if (!Array.isArray(hidden)) hidden = [];
+    if (!names || typeof names !== 'object' || Array.isArray(names)) names = {};
     const parts = series.filter((s) => !hidden.includes(s.entity_id)).map((s) => {
       const name = names[s.entity_id] || s.friendly_name || s.entity_id;
       const values = (s.points || []).map((point) => point.value).filter(Number.isFinite);
