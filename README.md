@@ -443,8 +443,11 @@ chart_id: 12
 title: Stromverbrauch
 refresh: 60
 height: 260
-link: /hassio/ingress/<Adresse-des-Add-ons>   # optional, zeigt „Im Zeitarchiv öffnen“
+link: false                                   # optional: Link „Im Zeitarchiv öffnen“ ausblenden
 ```
+
+Der Link zum Zeitarchiv erscheint automatisch (die App meldet ihre Adresse in Home Assistant).
+Mit `link: /eigener/pfad` lässt sich eine andere Adresse eintragen.
 
 - **Nur für Administratoren.** Home Assistant kennt keine Rechte je Chart, deshalb
   zeigt die Karte anderen Benutzern nichts.

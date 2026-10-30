@@ -39,7 +39,7 @@ const TEXTS = {
     title: 'Titel (leer: Name des Charts)',
     refresh: 'Aktualisierung (Sekunden)',
     height: 'Höhe (Pixel)',
-    link: 'Link zum Zeitarchiv (z. B. /hassio/ingress/…)',
+    link: 'Eigener Link zum Zeitarchiv (leer: automatisch)',
     notSupportedShort: 'noch nicht darstellbar',
     description: 'Zeigt ein gespeichertes Chart aus dem Zeitarchiv.',
   },
@@ -64,7 +64,7 @@ const TEXTS = {
     title: 'Title (empty: chart name)',
     refresh: 'Refresh (seconds)',
     height: 'Height (pixels)',
-    link: 'Link to Zeitarchiv (e.g. /hassio/ingress/…)',
+    link: 'Own link to Zeitarchiv (empty: automatic)',
     notSupportedShort: 'not supported yet',
     description: 'Shows a saved chart from Zeitarchiv.',
   },
@@ -282,13 +282,24 @@ class ZeitarchivCard extends HTMLElement {
     this._els.header.hidden = !title;
   }
 
-  _setFooter() {
-    const link = this._config.link;
+  // appLink: die Seite des Zeitarchivs in Home Assistant, von der App gemeldet. Ein eigener
+  // Eintrag `link` in der Karte hat Vorrang, `link: false` blendet den Link aus.
+  _setFooter(appLink) {
+    const configured = this._config.link;
+    const link = configured === false ? null : (configured || appLink);
     this._els.footer.replaceChildren();
     if (link) {
       const anchor = document.createElement('a');
       anchor.href = link;
       anchor.textContent = text(this._hass, 'openLink');
+      // Ein Pfad in Home Assistant wird dort geöffnet, ohne die Seite neu zu laden.
+      if (link.startsWith('/')) {
+        anchor.addEventListener('click', (event) => {
+          event.preventDefault();
+          history.pushState(null, '', link);
+          window.dispatchEvent(new CustomEvent('location-changed', {detail: {replace: false}}));
+        });
+      }
       this._els.footer.append(anchor);
     }
     this._els.footer.hidden = !link;
@@ -329,7 +340,7 @@ class ZeitarchivCard extends HTMLElement {
   async _draw(result) {
     if (!result || result.spec_version !== SPEC_VERSION) { const err = new Error('spec_version'); err.code = 'spec'; throw err; }
     this._setHeader(result.name);
-    this._setFooter();
+    this._setFooter(result.app_link);
     if (!result.supported || !result.data) {
       this._showNote('unsupported');
       return;

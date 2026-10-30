@@ -421,8 +421,11 @@ chart_id: 12
 title: Power consumption
 refresh: 60
 height: 260
-link: /hassio/ingress/<address-of-the-add-on>   # optional, shows "Open in Zeitarchiv"
+link: false                                   # optional: hide the "Open in Zeitarchiv" link
 ```
+
+The link to Zeitarchiv appears automatically (the app reports its address in Home Assistant).
+`link: /own/path` sets a different address.
 
 - **Administrators only.** Home Assistant has no per-chart permissions, so the card
   shows nothing to other users.
