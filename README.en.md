@@ -406,6 +406,35 @@ Areas and devices are resolved into concrete entity IDs when the options are
 saved. Entities that are newly added to a selected area or device later are
 only taken into account after the filters are saved again.
 
+## Dashboard card
+
+The integration ships a Lovelace card that shows a saved chart from Zeitarchiv. No
+resource needs to be added.
+
+1. In the dashboard choose **Add card → Zeitarchiv**.
+2. Pick the chart in the editor. Title, refresh (default 60 seconds) and height are
+   optional.
+
+```yaml
+type: custom:zeitarchiv-card
+chart_id: 12
+title: Power consumption
+refresh: 60
+height: 260
+link: /hassio/ingress/<address-of-the-add-on>   # optional, shows "Open in Zeitarchiv"
+```
+
+- **Administrators only.** Home Assistant has no per-chart permissions, so the card
+  shows nothing to other users.
+- **Only the integration talks to Zeitarchiv.** The card never contacts the app; it
+  goes through Home Assistant and the token stays in the integration. The app needs
+  the "cards" capability for this (update the app if the card says so).
+- **What the card draws:** numeric charts as line, bars, stacked and as shares in
+  percent, with tooltip, in the light and dark theme. States, timeline, donut, shares,
+  changes, heatmap and comparison are not shown yet; a notice appears instead. The
+  period saved with the chart applies.
+- If the app is unreachable, the last image stays and the card shows its age.
+
 ## Known limitations
 
 - Non-numeric text sensors are not archived; selected ones are reported as a
@@ -414,7 +443,8 @@ only taken into account after the filters are saved again.
 - Queue and transmission counters exist only for the lifetime of the integration.
 - The connection uses a shared static token, not OAuth.
 - The integration is a write path; archived values are not read back as new
-  Home Assistant entities.
+  Home Assistant entities. The card shows saved charts but does not turn them into
+  entities.
 
 ## Removal
 

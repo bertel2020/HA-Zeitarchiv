@@ -428,6 +428,35 @@ Bereiche und Geräte werden beim Speichern der Optionen in konkrete Entity-IDs
 aufgelöst. Entitäten, die später neu zu einem gewählten Bereich oder Gerät
 hinzukommen, werden erst nach erneutem Speichern der Filter berücksichtigt.
 
+## Karte im Dashboard
+
+Die Integration bringt eine Lovelace-Karte mit, die ein gespeichertes Chart aus
+dem Zeitarchiv zeigt. Eine Ressource muss nicht eingetragen werden.
+
+1. Im Dashboard **Karte hinzufügen → Zeitarchiv** wählen.
+2. Im Editor das Chart auswählen. Titel, Aktualisierung (Standard 60 Sekunden)
+   und Höhe sind optional.
+
+```yaml
+type: custom:zeitarchiv-card
+chart_id: 12
+title: Stromverbrauch
+refresh: 60
+height: 260
+link: /hassio/ingress/<Adresse-des-Add-ons>   # optional, zeigt „Im Zeitarchiv öffnen“
+```
+
+- **Nur für Administratoren.** Home Assistant kennt keine Rechte je Chart, deshalb
+  zeigt die Karte anderen Benutzern nichts.
+- **Nur die Integration spricht mit dem Zeitarchiv.** Die Karte spricht nie mit der App,
+  sondern über Home Assistant; der Token bleibt in der Integration. Dafür braucht die
+  App die Fähigkeit „cards“ (App-Update, wenn die Karte darauf hinweist).
+- **Was die Karte zeichnet:** Zahlen-Charts als Linie, Balken, gestapelt und als
+  Anteile in Prozent, mit Tooltip, im hellen und dunklen Thema. Zustände, Zeitstrahl,
+  Donut, Anteile, Wechsel, Heatmap und Vergleich zeigt sie noch nicht; dort steht
+  ein Hinweis. Der im Chart gespeicherte Zeitraum gilt.
+- Bei einem Ausfall der App bleibt das letzte Bild stehen und die Karte nennt sein Alter.
+
 ## Bekannte Grenzen
 
 - Nichtnumerische Textsensoren werden nicht archiviert; ausgewählte werden
@@ -436,7 +465,8 @@ hinzukommen, werden erst nach erneutem Speichern der Filter berücksichtigt.
 - Queue und Übertragungszähler bestehen nur für die Laufzeit der Integration.
 - Die Verbindung verwendet einen gemeinsamen statischen Token und kein OAuth.
 - Die Integration ist ein Schreibpfad; archivierte Werte werden nicht als neue
-  Home-Assistant-Entitäten zurückgelesen.
+  Home-Assistant-Entitäten zurückgelesen. Die Karte zeigt gespeicherte Charts,
+  macht daraus aber keine Entitäten.
 
 ## Entfernen
 

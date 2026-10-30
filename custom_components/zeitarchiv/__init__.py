@@ -35,11 +35,13 @@ from homeassistant.core import (
 )
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers import area_registry as ar
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.translation import async_get_cached_translations
+from homeassistant.helpers.typing import ConfigType
 from homeassistant.loader import async_get_integration
 
 from .api import ZeitarchivApiError, ZeitarchivAuthError, ZeitarchivClient, capabilities_from
@@ -50,6 +52,7 @@ from .const import (
     DOMAIN,
     SIGNAL_TEXT_STATES,
 )
+from .card import async_setup_card
 from .catalog_sync import CatalogSender
 from .coordinator import ZeitarchivNoticesCoordinator
 from .data import ZeitarchivConfigEntry, ZeitarchivRuntimeData
@@ -73,6 +76,19 @@ PLATFORMS: list = ["sensor", "binary_sensor"]
 # dabei den dortigen Index-Lock so dicht besetzt hält, dass parallele
 # Anfragen mit 503 scheitern (an einer echten Installation beobachtet).
 _WATERMARK_STORAGE_VERSION = 1
+
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Meldet die Lovelace-Karte an (einmal je Home Assistant, nicht je Eintrag).
+    Ein Fehler hier lässt nur die Karte weg, nie den Schreibpfad."""
+    try:
+        await async_setup_card(hass)
+    except Exception:  # noqa: BLE001
+        _LOGGER.warning("Zeitarchiv-Karte nicht verfügbar", exc_info=True)
+    return True
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

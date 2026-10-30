@@ -21,6 +21,8 @@ _TIMEOUT = 10  # Sekunden
 _AI_TIMEOUT = 45
 # Der Katalog hat einige tausend Zeilen und wird nur selten gesendet.
 _CATALOG_TIMEOUT = 30
+# Eine Karte wartet auf die Daten eines Charts, nicht auf eine Auswertung.
+_CARD_TIMEOUT = 20
 
 
 class ZeitarchivApiError(Exception):
@@ -41,6 +43,16 @@ class ZeitarchivAuthError(ZeitarchivApiError):
     def __init__(self, message: str, *, demo_mode: bool | None = None) -> None:
         super().__init__(message)
         self.demo_mode = demo_mode
+
+
+class ZeitarchivCardError(ZeitarchivApiError):
+    """Die App hat eine Abfrage der Karte nicht beantwortet (404: Chart gibt es
+    nicht mehr, 429: zu viele gleichzeitige Abfragen). status trägt den Code,
+    damit die Karte den Fall benennen kann."""
+
+    def __init__(self, message: str, status: int) -> None:
+        super().__init__(message)
+        self.status = status
 
 
 class ZeitarchivRejectedError(ZeitarchivApiError):
@@ -212,6 +224,38 @@ class ZeitarchivClient:
         if "selection_rev" in payload:
             result["selection_rev"] = _int_or_none(payload.get("selection_rev"))
         return result
+
+    def _get_card(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        try:
+            response = requests.get(
+                f"{self._base_url}{path}", params=params, headers=self._headers, timeout=_CARD_TIMEOUT
+            )
+        except requests.RequestException as err:
+            raise ZeitarchivApiError(f"Zeitarchiv nicht erreichbar: {err}") from err
+        if response.status_code == 401:
+            raise ZeitarchivAuthError("API-Token wurde von der App abgelehnt")
+        if response.status_code in (404, 429):
+            raise ZeitarchivCardError(f"App antwortete mit Status {response.status_code}", response.status_code)
+        body = _json_or_none(response)
+        if response.status_code != 200 or not isinstance(body, dict):
+            raise ZeitarchivApiError(f"App antwortete mit Status {response.status_code}")
+        return body
+
+    def get_card_items(self) -> dict[str, Any]:
+        """Gespeicherte Charts für die Auswahl der Lovelace-Karte (GET /api/card/items).
+        Eine App ohne die Fähigkeit "cards" kennt die Route nicht (404)."""
+        return self._get_card("/api/card/items")
+
+    def get_card_chart(self, chart_id: int, at: str | None = None) -> dict[str, Any]:
+        """Einstellungen und Daten eines gespeicherten Charts (GET /api/card/chart).
+
+        Die ID reist als Query-Parameter, nie als Teil des Pfads, und kommt hier
+        als int an: so bleibt der Pfad fest und die Integration ein schmaler Weg
+        statt eines Proxys für beliebige Abfragen."""
+        params: dict[str, Any] = {"id": int(chart_id)}
+        if at:
+            params["at"] = at
+        return self._get_card("/api/card/chart", params)
 
     def get_ai_config(self, api_id: str) -> dict[str, Any]:
         """Konfiguration des KI-Zugriffs (GET /api/ai/config): ob er eingeschaltet
