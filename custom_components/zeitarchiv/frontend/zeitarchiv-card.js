@@ -357,6 +357,10 @@ class ZeitarchivCard extends HTMLElement {
     if (first && this._config) this._load();
   }
 
+  // Abschnittsansicht: volle Breite (mindestens die halbe), die Höhe ergibt sich aus der Karte selbst
+  // (Chart mit der eingestellten Höhe, Tabelle mit ihren Zeilen) statt aus einer festen Zeilenzahl.
+  getGridOptions() { return {columns: 12, min_columns: 6, rows: 'auto'}; }
+
   getCardSize() { return Math.ceil((Number(this._config?.height) || 260) / 50) + 1; }
 
   connectedCallback() {
