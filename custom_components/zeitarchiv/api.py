@@ -57,7 +57,8 @@ class ZeitarchivAuthError(ZeitarchivApiError):
 
 class ZeitarchivCardError(ZeitarchivApiError):
     """Die App hat eine Abfrage der Karte nicht beantwortet (400: sie lehnt die Angaben ab,
-    404: Chart oder Entität gibt es nicht mehr, 429: zu viele gleichzeitige Abfragen).
+    404: Chart oder Entität gibt es nicht mehr, 413: zu viele Datenpunkte für diesen Zeitraum,
+    429: zu viele gleichzeitige Abfragen).
     status trägt den Code, damit die Karte den Fall benennen kann."""
 
     def __init__(self, message: str, status: int) -> None:
@@ -244,7 +245,7 @@ class ZeitarchivClient:
             raise ZeitarchivApiError(f"Zeitarchiv nicht erreichbar: {err}") from err
         if response.status_code == 401:
             raise ZeitarchivAuthError("API-Token wurde von der App abgelehnt")
-        if response.status_code in (400, 404, 429):
+        if response.status_code in (400, 404, 413, 429):
             raise ZeitarchivCardError(f"App antwortete mit Status {response.status_code}", response.status_code)
         body = _json_or_none(response)
         if response.status_code != 200 or not isinstance(body, dict):

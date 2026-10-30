@@ -30,6 +30,7 @@ const TEXTS = {
     app_outdated: 'Die Zeitarchiv-App ist zu alt für die Karte. Bitte die App aktualisieren.',
     not_found: 'Dieses Chart, diese Tabelle oder eine der Entitäten gibt es im Zeitarchiv nicht (mehr).',
     invalid: 'Die App hat die Angaben der Karte abgelehnt.',
+    too_large: 'Für diesen Zeitraum gibt es zu viele Datenpunkte. Bitte einen kürzeren Zeitraum wählen.',
     busy: 'Zeitarchiv ist gerade beschäftigt, nächster Versuch folgt.',
     auth_failed: 'Zeitarchiv hat die Zugangsdaten abgelehnt.',
     unreachable: 'Zeitarchiv ist nicht erreichbar.',
@@ -75,6 +76,7 @@ const TEXTS = {
     app_outdated: 'The Zeitarchiv app is too old for the card. Please update the app.',
     not_found: 'This chart, table or one of the entities no longer exists in Zeitarchiv.',
     invalid: 'The app rejected the settings of the card.',
+    too_large: 'There are too many data points for this period. Please choose a shorter period.',
     busy: 'Zeitarchiv is busy, trying again shortly.',
     auth_failed: 'Zeitarchiv rejected the credentials.',
     unreachable: 'Zeitarchiv is not reachable.',
@@ -191,7 +193,7 @@ const buildRuntime = (sources, {timezone, language, dark}) => {
     return result;
   };
   evaluate(sources.numberFormat, ['window', 'document'], [win, doc]);
-  evaluate(sources.tooltipHold, ['window', 'document'], [win, doc]);
+  evaluate(sources.tooltipHold, ['window', 'document', 't', 'NumberFormat'], [win, doc, t, win.NumberFormat]);
   evaluate(sources.serverTime, ['window', 'document'], [win, doc]);
   evaluate(sources.htmlEscape, ['window'], [win]);
   evaluate(sources.stateEntities, ['window', 'document', 'getComputedStyle', 't', 'NumberFormat', 'escapeHtml'],
@@ -257,6 +259,9 @@ class ZeitarchivCard extends HTMLElement {
     this._timer = null;
     this._visible = true;
     this._loading = false;
+    this._generation = 0;
+    this._reload = false;
+    this._shown = false;
     this._lastGood = 0;
     this._failures = 0;
     this.shadowRoot.innerHTML = `<style>${STYLE}</style>
@@ -292,6 +297,7 @@ class ZeitarchivCard extends HTMLElement {
     this._els.chart.style.height = `${Math.max(120, Number(this._config.height) || 260)}px`;
     this._lastGood = 0;
     this._failures = 0;
+    this._generation += 1;
     if (this._hass) this._load();
     else this._showNote(this._hasSource() ? 'loading' : 'chooseChart');
   }
@@ -363,6 +369,7 @@ class ZeitarchivCard extends HTMLElement {
     note.hidden = false;
     this._els.chart.hidden = true;
     this._els.table.hidden = true;
+    this._shown = false;
   }
 
   _setHeader(name) {
@@ -395,21 +402,34 @@ class ZeitarchivCard extends HTMLElement {
   }
 
   async _load() {
-    if (this._loading || !this._config || !this._hass) return;
+    if (!this._config || !this._hass) return;
+    // Läuft schon eine Anfrage (alte Konfiguration), wird danach sofort neu geladen, statt ihr Ergebnis
+    // bis zur nächsten Aktualisierung stehen zu lassen.
+    if (this._loading) { this._reload = true; return; }
     if (!this._hasSource()) { this._showNote('chooseChart'); return; }
     this._loading = true;
+    const generation = this._generation;
     try {
       const result = await this._hass.callWS(this._request());
-      await this._draw(result);
-      this._lastGood = Date.now();
-      this._failures = 0;
-      this._els.badge.hidden = true;
+      if (generation === this._generation) {
+        await this._draw(result);
+        this._lastGood = Date.now();
+        this._failures = 0;
+        this._els.badge.hidden = true;
+      }
     } catch (err) {
-      this._failures += 1;
-      this._fail(err);
+      if (generation === this._generation) {
+        this._failures += 1;
+        this._fail(err);
+      }
     } finally {
       this._loading = false;
-      this._schedule();
+      if (this._reload || generation !== this._generation) {
+        this._reload = false;
+        this._load();
+      } else {
+        this._schedule();
+      }
     }
   }
 
@@ -418,7 +438,7 @@ class ZeitarchivCard extends HTMLElement {
     if (key !== 'unknown' && key !== 'script' && err.code !== 'unauthorized') console.debug('Zeitarchiv-Karte:', err.code, err.message);
     else console.warn('Zeitarchiv-Karte:', err);
     // Ein Ausfall nach einem guten Stand lässt das Bild stehen und sagt nur, wie alt es ist.
-    if (this._chart && this._lastGood && ['unreachable', 'busy', 'auth_failed'].includes(key)) {
+    if (this._shown && this._lastGood && ['unreachable', 'busy', 'auth_failed', 'too_large'].includes(key)) {
       this._els.badge.textContent = text(this._hass, 'stale', {min: Math.max(1, Math.round((Date.now() - this._lastGood) / 60000))});
       this._els.badge.hidden = false;
       return;
@@ -467,6 +487,7 @@ class ZeitarchivCard extends HTMLElement {
       spec, data: result.data, series, viewType: R.viewTypeFor(spec, series), multiYear, hiddenSet: undefined, style,
     });
     this._chart.resize();
+    this._shown = true;
   }
 
   // Gespeicherte Tabelle: dieselben Dateien wie die Tabellen-Kachel der App rechnen die Zellen aus der fertigen
@@ -493,6 +514,7 @@ class ZeitarchivCard extends HTMLElement {
     this._els.table.style.maxHeight = this._explicitHeight ? `${Math.max(120, Number(this._config.height) || 260)}px` : '';
     this._els.table.innerHTML = TableTileRender.buildHtml({...table, style: result.table.style || {}});
     TableTileRender.afterInsert(this._els.table);
+    this._shown = true;
   }
 
   // Die Farben, die die Zeichenregeln aus dem CSS der App lesen, aus dem Thema von Home Assistant.
@@ -502,7 +524,9 @@ class ZeitarchivCard extends HTMLElement {
     return {
       '--border': get('--divider-color', '#e0e0e0'),
       '--ink-faint': get('--secondary-text-color', '#727272'),
+      '--ink': get('--primary-text-color', '#212121'),
       '--ink-muted': get('--primary-text-color', '#212121'),
+      '--surface-alt': get('--secondary-background-color', '#f5f5f5'),
       '--surface': get('--card-background-color', '#ffffff'),
       '--font-mono': get('--ha-font-family-body', 'Roboto, sans-serif'),
     };

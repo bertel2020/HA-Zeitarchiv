@@ -139,6 +139,8 @@ async def test_the_cache_expires(
     [
         (ZeitarchivCardError("weg", 404), "not_found"),
         (ZeitarchivCardError("voll", 429), "busy"),
+        (ZeitarchivCardError("zu groß", 413), "too_large"),
+        (ZeitarchivCardError("abgelehnt", 400), "invalid"),
         (ZeitarchivAuthError("abgelehnt"), "auth_failed"),
         (ZeitarchivApiError("weg"), "unreachable"),
     ],

@@ -111,6 +111,8 @@ class ZeitarchivSparkline extends HTMLElement {
     this._timer = null;
     this._visible = true;
     this._loading = false;
+    this._generation = 0;
+    this._reload = false;
     this._failures = 0;
     this._lastGood = 0;
     this._data = null;
@@ -145,6 +147,7 @@ class ZeitarchivSparkline extends HTMLElement {
     if (!RANGES.includes(this._config.range)) this._config.range = '24h';
     this._failures = 0;
     this._data = null;
+    this._generation += 1;
     this._load();
   }
 
@@ -157,7 +160,7 @@ class ZeitarchivSparkline extends HTMLElement {
   set context(context) {
     const changed = this._context?.entity_id !== context?.entity_id;
     this._context = context;
-    if (changed) { this._data = null; this._load(); }
+    if (changed) { this._data = null; this._generation += 1; this._load(); }
   }
 
   connectedCallback() {
@@ -192,23 +195,35 @@ class ZeitarchivSparkline extends HTMLElement {
 
   async _load() {
     const entityId = this._context?.entity_id;
-    if (this._loading || !this._config || !this._hass || !entityId) return;
+    if (!this._config || !this._hass || !entityId) return;
+    // Läuft schon eine Anfrage (alte Entität oder Einstellung), wird danach sofort neu geladen.
+    if (this._loading) { this._reload = true; return; }
     this._loading = true;
+    const generation = this._generation;
     try {
       const result = await this._hass.callWS({type: 'zeitarchiv/card/spark', entity_id: entityId, range: this._config.range});
-      this._data = result;
-      this._lastGood = Date.now();
-      this._failures = 0;
-      this._render(false);
+      if (generation === this._generation) {
+        this._data = result;
+        this._lastGood = Date.now();
+        this._failures = 0;
+        this._render(false);
+      }
     } catch (err) {
-      this._failures += 1;
-      const code = err && err.code;
-      if (code === 'not_found') this._note('notArchived');
-      else if (this._data && ['unreachable', 'busy', 'auth_failed'].includes(code)) this._render(true);
-      else this._note(code === 'unauthorized' || code === 'app_outdated' ? code : (code === 'unreachable' ? 'unreachable' : 'unknown'), true);
+      if (generation === this._generation) {
+        this._failures += 1;
+        const code = err && err.code;
+        if (code === 'not_found') this._note('notArchived');
+        else if (this._data && ['unreachable', 'busy', 'auth_failed'].includes(code)) this._render(true);
+        else this._note(code === 'unauthorized' || code === 'app_outdated' ? code : (code === 'unreachable' ? 'unreachable' : 'unknown'), true);
+      }
     } finally {
       this._loading = false;
-      this._schedule();
+      if (this._reload || generation !== this._generation) {
+        this._reload = false;
+        this._load();
+      } else {
+        this._schedule();
+      }
     }
   }
 

@@ -66,6 +66,7 @@ ERROR_BUSY = "busy"
 ERROR_AUTH = "auth_failed"
 ERROR_UNREACHABLE = "unreachable"
 ERROR_INVALID = "invalid"
+ERROR_TOO_LARGE = "too_large"
 
 _DAY = r"^\d{4}-\d{2}-\d{2}$"
 _PX_STEP = 100
@@ -161,6 +162,8 @@ async def _fetch(
         except ZeitarchivCardError as err:
             if err.status == 429:
                 connection.send_error(msg["id"], ERROR_BUSY, "Zeitarchiv ist gerade beschäftigt")
+            elif err.status == 413:
+                connection.send_error(msg["id"], ERROR_TOO_LARGE, "Zu viele Datenpunkte für diesen Zeitraum")
             elif err.status == 400:
                 connection.send_error(msg["id"], ERROR_INVALID, "Die Angaben der Karte hat die App abgelehnt")
             else:

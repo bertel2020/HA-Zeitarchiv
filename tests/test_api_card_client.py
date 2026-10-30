@@ -60,7 +60,7 @@ def test_failures_are_told_apart() -> None:
     client = ZeitarchivClient("h", 1, "t")
     with patch(GET, return_value=_Resp({}, 401)), pytest.raises(ZeitarchivAuthError):
         client.get_card_items()
-    for status in (404, 429):
+    for status in (400, 404, 413, 429):
         with patch(GET, return_value=_Resp({}, status)), pytest.raises(ZeitarchivCardError) as raised:
             client.get_card_chart(1)
         assert raised.value.status == status
