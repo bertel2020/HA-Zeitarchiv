@@ -1,7 +1,9 @@
-"""Lovelace-Karte: WebSocket-Befehle (nur Administratoren) und Auslieferung der Dateien."""
+"""Lovelace-Karte: WebSocket-Befehle (Administratoren, Freigabe für andere) und Auslieferung der Dateien."""
 
 from __future__ import annotations
 
+import threading
+import time
 from collections.abc import Generator
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -14,6 +16,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.typing import ClientSessionGenerator, WebSocketGenerator
 
 from custom_components.zeitarchiv import card
+from custom_components.zeitarchiv.card import FAILURE_SECONDS, MAX_APP_QUERIES, MAX_QUEUED_OTHERS
 from custom_components.zeitarchiv.api import ZeitarchivApiError, ZeitarchivAuthError, ZeitarchivCardError
 from custom_components.zeitarchiv.const import DOMAIN
 
@@ -190,9 +193,12 @@ async def test_failures_of_the_app_come_back_as_codes(
     response = await _call(client, {"type": "zeitarchiv/card/chart", "chart_id": 7})
     assert response["success"] is False
     assert response["error"]["code"] == code
-    # Ein Fehler landet nicht im Zwischenspeicher.
+    # Ein Fehler landet nicht im Zwischenspeicher der Antworten. Abweisungen der App (400, 404, 413) merkt sich
+    # die Integration einige Sekunden, damit dieselbe Frage die App nicht immer wieder belastet; danach, und
+    # bei allen anderen Fehlern sofort, wird neu gefragt.
     card_client.get_card_chart.side_effect = None
-    again = await _call(client, {"type": "zeitarchiv/card/chart", "chart_id": 7})
+    with patch("custom_components.zeitarchiv.card.time.monotonic", return_value=time.monotonic() + FAILURE_SECONDS + 1):
+        again = await _call(client, {"type": "zeitarchiv/card/chart", "chart_id": 7})
     assert again["success"] is True, again
 
 
@@ -489,3 +495,129 @@ async def test_different_asks_run_a_few_at_a_time_and_none_is_turned_away(
     assert all(answer["success"] for answer in answers), [a for a in answers if not a["success"]]
     assert card_client.get_card_chart.call_count == 10
     assert 1 < running["most"] <= MAX_APP_QUERIES
+
+
+async def test_a_user_cannot_fill_the_queue_in_front_of_the_administrators(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, hass_read_only_access_token: str,
+    series_client: MagicMock, loaded_entry: MockConfigEntry,
+) -> None:
+    """Normale Benutzer dürfen höchstens MAX_QUEUED_OTHERS Abfragen offen haben, der Rest bekommt sofort
+    "beschäftigt"; ein Administrator wird trotzdem angenommen."""
+    loaded_entry.runtime_data.notices_coordinator.async_set_updated_data(
+        {**NOTICES, "capabilities": ["cards", "card_series", "card_spark"]}
+    )
+    release = threading.Event()
+    running = threading.Semaphore(0)
+
+    def slow(*_args, **_kwargs):
+        running.release()
+        release.wait(5)
+        return SPARK
+
+    other = await hass_ws_client(hass, hass_read_only_access_token)
+    flood = 30
+    with patch("custom_components.zeitarchiv.api.ZeitarchivClient.get_card_spark", side_effect=slow) as ask:
+        for number in range(flood):
+            other.last_id = getattr(other, "last_id", 0) + 1
+            await other.send_json({"id": other.last_id, "type": "zeitarchiv/card/spark", "entity_id": f"sensor.s{number}"})
+        # Die abgewiesenen Antworten kommen sofort; die angenommenen warten auf die App.
+        refused = [await other.receive_json() for _ in range(flood - MAX_QUEUED_OTHERS)]
+        assert {answer["error"]["code"] for answer in refused} == {"busy"}
+        admin = await hass_ws_client(hass)
+        admin.last_id = 0
+        await admin.send_json({"id": 1, "type": "zeitarchiv/card/chart", "chart_id": 7})
+        release.set()
+        answers = [await other.receive_json() for _ in range(MAX_QUEUED_OTHERS)]
+        assert all(answer["success"] for answer in answers)
+        assert (await admin.receive_json())["success"] is True
+        assert ask.call_count == MAX_QUEUED_OTHERS
+    assert MAX_APP_QUERIES < MAX_QUEUED_OTHERS
+
+
+async def test_a_refusal_of_the_app_is_remembered_for_a_few_seconds(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, card_client: MagicMock, loaded_entry: MockConfigEntry
+) -> None:
+    """Dieselbe unbekannte Entität oder Tabelle soll die App nicht bei jeder Anfrage beschäftigen."""
+    card_client.get_card_chart.side_effect = ZeitarchivCardError("weg", 404)
+    client = await hass_ws_client(hass)
+    for _ in range(3):
+        assert (await _call(client, {"type": "zeitarchiv/card/chart", "chart_id": 9}))["error"]["code"] == "not_found"
+    assert card_client.get_card_chart.call_count == 1
+    # Nach der Frist wird neu gefragt; ein Fehler der App (5xx) oder ein 429 wird nie gemerkt.
+    with patch("custom_components.zeitarchiv.card.time.monotonic", return_value=time.monotonic() + FAILURE_SECONDS + 1):
+        await _call(client, {"type": "zeitarchiv/card/chart", "chart_id": 9})
+    assert card_client.get_card_chart.call_count == 2
+    card_client.get_card_chart.side_effect = ZeitarchivCardError("kaputt", 503)
+    for _ in range(2):
+        await _call(client, {"type": "zeitarchiv/card/chart", "chart_id": 10})
+    assert card_client.get_card_chart.call_count == 4
+
+
+async def test_a_malformed_id_or_day_is_refused_at_the_door(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, hass_read_only_access_token: str,
+    series_client: MagicMock, loaded_entry: MockConfigEntry,
+) -> None:
+    """Ein angehängter Zeilenumbruch oder fremde Ziffern gingen durch das Muster und endeten als unbekannter Fehler."""
+    loaded_entry.runtime_data.notices_coordinator.async_set_updated_data(
+        {**NOTICES, "capabilities": ["cards", "card_series", "card_spark", "card_table"]}
+    )
+    other = await hass_ws_client(hass, hass_read_only_access_token)
+    admin = await hass_ws_client(hass)
+    assert (await _call(other, {"type": "zeitarchiv/card/spark", "entity_id": "sensor.a\n"}))["error"]["code"] == "invalid_format"
+    assert (await _call(admin, {"type": "zeitarchiv/card/series", "entity_ids": ["sensor.a\n"]}))["error"]["code"] == "invalid_format"
+    for day in ("2026-10-01\n", "\u0662\u0660\u0662\u0666-10-01"):
+        assert (await _call(admin, {"type": "zeitarchiv/card/chart", "chart_id": 7, "at": day}))["error"]["code"] == "invalid_format"
+
+
+async def test_the_selection_survives_an_answer_of_the_app_without_lists(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, hass_read_only_access_token: str,
+    card_client: MagicMock, loaded_entry: MockConfigEntry,
+) -> None:
+    card_client.get_card_items.return_value = {"spec_version": 1, "items": None, "tables": None}
+    for client in (await hass_ws_client(hass), await hass_ws_client(hass, hass_read_only_access_token)):
+        response = await _call(client, {"type": "zeitarchiv/card/items"})
+        assert response["success"] is True
+        assert response["result"]["items"] == [] and response["result"]["tables"] == []
+
+
+async def test_a_table_for_another_day_is_a_question_of_its_own(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, series_client: MagicMock, loaded_entry: MockConfigEntry
+) -> None:
+    loaded_entry.runtime_data.notices_coordinator.async_set_updated_data(
+        {**NOTICES, "capabilities": ["cards", "card_series", "card_spark", "card_table"]}
+    )
+    admin = await hass_ws_client(hass)
+    with patch("custom_components.zeitarchiv.api.ZeitarchivClient.get_card_table", return_value={"spec_version": 1}) as ask:
+        await _call(admin, {"type": "zeitarchiv/card/table", "table_id": 4})
+        await _call(admin, {"type": "zeitarchiv/card/table", "table_id": 4, "at": "2026-10-01"})
+        await _call(admin, {"type": "zeitarchiv/card/table", "table_id": 4, "at": "2026-10-01"})
+        assert ask.call_count == 2
+
+
+async def test_waiting_asks_survive_the_connection_being_unloaded(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, card_client: MagicMock, loaded_entry: MockConfigEntry
+) -> None:
+    """Wer wartet, hat den Zugang zur App schon in der Hand; das Entladen darf ihn nicht in einen unbekannten
+    Fehler werfen."""
+    release = threading.Event()
+    running = threading.Semaphore(0)
+
+    def slow(*_args, **_kwargs):
+        running.release()
+        release.wait(5)
+        return CHART
+
+    card_client.get_card_chart.side_effect = slow
+    admin = await hass_ws_client(hass)
+    count = MAX_APP_QUERIES + 2
+    for chart_id in range(1, count + 1):
+        admin.last_id = getattr(admin, "last_id", 0) + 1
+        await admin.send_json({"id": admin.last_id, "type": "zeitarchiv/card/chart", "chart_id": chart_id})
+    for _ in range(MAX_APP_QUERIES):
+        await hass.async_add_executor_job(running.acquire, True, 5)
+    unload = hass.async_create_task(hass.config_entries.async_unload(loaded_entry.entry_id))
+    await hass.async_block_till_done()
+    release.set()
+    answers = [await admin.receive_json() for _ in range(count)]
+    await unload
+    assert all(answer["success"] or answer["error"]["code"] != "unknown_error" for answer in answers), answers

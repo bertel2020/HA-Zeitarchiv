@@ -63,11 +63,19 @@ CACHE_MAX_ENTRIES = 64
 
 _CACHE_KEY = f"{DOMAIN}_card_cache"
 _INFLIGHT_KEY = f"{DOMAIN}_card_inflight"
+_FAILED_KEY = f"{DOMAIN}_card_failed"
 _SLOTS_KEY = f"{DOMAIN}_card_slots"
 
 #: Wie viele Abfragen der Karte gleichzeitig zur App laufen. Die App erlaubt vier und
 #: antwortet sonst mit 429; ein Platz bleibt frei für die Auswahl im Editor.
 MAX_APP_QUERIES = 3
+#: Wie viele Abfragen (laufende und wartende) normale Benutzer je Verbindung gleichzeitig offen haben
+#: dürfen. Darüber kommt sofort "beschäftigt", sonst könnte ein einzelner Benutzer die Warteschlange
+#: füllen und die Karten der Administratoren hinter sich warten lassen. Administratoren sind ausgenommen.
+MAX_QUEUED_OTHERS = MAX_APP_QUERIES + 8
+#: Eine Abweisung der App (Angaben ungültig, nicht gefunden, zu groß) wird so lange gemerkt, statt die App
+#: mit derselben Frage immer wieder zu belasten.
+FAILURE_SECONDS = 5.0
 
 # Die Codes sind der Vertrag mit der Karte (sie übersetzt sie selbst).
 ERROR_NOT_LOADED = "not_loaded"
@@ -80,9 +88,9 @@ ERROR_INVALID = "invalid"
 ERROR_TOO_LARGE = "too_large"
 ERROR_APP_ERROR = "app_error"
 
-_DAY = r"^\d{4}-\d{2}-\d{2}$"
+_DAY = r"^[0-9]{4}-[0-9]{2}-[0-9]{2}\Z"
 _PX_STEP = 100
-_ENTITY = r"^[a-z0-9_]+\.[a-z0-9_]+$"
+_ENTITY = r"^[a-z0-9_]+\.[a-z0-9_]+\Z"
 
 
 def _px(msg: dict[str, Any]) -> int:
@@ -104,6 +112,7 @@ async def async_setup_card(hass: HomeAssistant) -> None:
         return
     hass.data[_CACHE_KEY] = {}
     hass.data[_INFLIGHT_KEY] = {}
+    hass.data[_FAILED_KEY] = {}
     hass.data[_SLOTS_KEY] = {}
     integration = await async_get_integration(hass, DOMAIN)
     await hass.http.async_register_static_paths([StaticPathConfig(URL_BASE, str(FRONTEND_DIR), True)])
@@ -149,22 +158,51 @@ def _remember(hass: HomeAssistant, key: tuple, value: dict[str, Any]) -> None:
     cache[key] = (now, value)
 
 
-async def _query_app(hass: HomeAssistant, entry, key: tuple, call) -> dict[str, Any]:
+def _recent_failure(hass: HomeAssistant, key: tuple) -> ZeitarchivCardError | None:
+    hit = hass.data[_FAILED_KEY].get(key)
+    if hit is None or time.monotonic() - hit[0] > FAILURE_SECONDS:
+        return None
+    return hit[1]
+
+
+def _remember_failure(hass: HomeAssistant, key: tuple, err: ZeitarchivCardError) -> None:
+    failed = hass.data[_FAILED_KEY]
+    now = time.monotonic()
+    for old in [k for k, (stamp, _) in failed.items() if now - stamp > FAILURE_SECONDS]:
+        del failed[old]
+    if len(failed) < CACHE_MAX_ENTRIES:
+        failed[key] = (now, err)
+
+
+async def _query_app(hass: HomeAssistant, entry, key: tuple, call, *, admin: bool) -> dict[str, Any]:
     """Eine Abfrage an die App. Gleiche Abfragen, die gleichzeitig eintreffen (ein Dashboard mit
     mehreren Karten desselben Charts, mehrere Betrachter), teilen sich einen Abruf; verschiedene
     laufen höchstens MAX_APP_QUERIES gleichzeitig, der Rest wartet. So bekommt niemand ein
-    "beschäftigt" der App, nur weil ein Dashboard viele Karten auf einmal öffnet."""
+    "beschäftigt" der App, nur weil ein Dashboard viele Karten auf einmal öffnet. Normale Benutzer
+    dürfen dabei höchstens MAX_QUEUED_OTHERS Abfragen offen haben (siehe dort)."""
     inflight: dict[tuple, asyncio.Task] = hass.data[_INFLIGHT_KEY]
     task = inflight.get(key)
     if task is None:
+        failure = _recent_failure(hass, key)
+        if failure is not None:
+            raise failure
+        if not admin and sum(1 for other in inflight if other[0] == entry.entry_id) >= MAX_QUEUED_OTHERS:
+            raise ZeitarchivCardError("Zu viele offene Abfragen", 429)
         slots = hass.data[_SLOTS_KEY].setdefault(entry.entry_id, asyncio.Semaphore(MAX_APP_QUERIES))
+        # Vor dem Warten lesen: wird die Verbindung währenddessen entladen, fehlt runtime_data.
+        client = entry.runtime_data.client
 
         async def run() -> dict[str, Any]:
             try:
                 async with slots:
-                    result = await hass.async_add_executor_job(call, entry.runtime_data.client)
+                    result = await hass.async_add_executor_job(call, client)
                 _remember(hass, key, result)
                 return result
+            except ZeitarchivCardError as err:
+                # Nur Antworten, die sich nicht von selbst ändern; 429 und 5xx sollen neu versucht werden.
+                if err.status in (400, 404, 413) and not err.route_missing:
+                    _remember_failure(hass, key, err)
+                raise
             finally:
                 inflight.pop(key, None)
 
@@ -201,8 +239,8 @@ def _mark_shared(entry, result: dict[str, Any]) -> dict[str, Any]:
     charts, tables = shared_ids(entry, CONF_CARD_SHARED_CHARTS), shared_ids(entry, CONF_CARD_SHARED_TABLES)
     return {
         **result,
-        "items": [{**item, "shared": item.get("id") in charts} for item in result.get("items", [])],
-        "tables": [{**item, "shared": item.get("id") in tables} for item in result.get("tables", [])],
+        "items": [{**item, "shared": item.get("id") in charts} for item in result.get("items") or []],
+        "tables": [{**item, "shared": item.get("id") in tables} for item in result.get("tables") or []],
     }
 
 
@@ -211,8 +249,8 @@ def _only_shared(entry, result: dict[str, Any]) -> dict[str, Any]:
     charts, tables = shared_ids(entry, CONF_CARD_SHARED_CHARTS), shared_ids(entry, CONF_CARD_SHARED_TABLES)
     return {
         **result,
-        "items": [item for item in result.get("items", []) if item.get("id") in charts],
-        "tables": [item for item in result.get("tables", []) if item.get("id") in tables],
+        "items": [item for item in result.get("items") or [] if item.get("id") in charts],
+        "tables": [item for item in result.get("tables") or [] if item.get("id") in tables],
     }
 
 
@@ -237,7 +275,7 @@ async def _fetch(
     result = _cached(hass, key)
     if result is None:
         try:
-            result = await _query_app(hass, entry, key, call)
+            result = await _query_app(hass, entry, key, call, admin=connection.user.is_admin)
         except ZeitarchivAuthError:
             connection.send_error(msg["id"], ERROR_AUTH, "Zugangsdaten von der App abgelehnt")
             return
@@ -254,6 +292,11 @@ async def _fetch(
                 connection.send_error(msg["id"], ERROR_INVALID, "Die Angaben der Karte hat die App abgelehnt")
             else:
                 connection.send_error(msg["id"], ERROR_NOT_FOUND, "Chart oder Entität nicht gefunden")
+            return
+        except ValueError as err:
+            # Der Client nimmt nur IDs und feste Wörter; was durch das Schema rutscht, ist ungültig, nicht ein Fehler.
+            _LOGGER.debug("Karte: Angabe nicht angenommen: %s", err)
+            connection.send_error(msg["id"], ERROR_INVALID, "Die Angaben der Karte hat die App abgelehnt")
             return
         except ZeitarchivApiError as err:
             _LOGGER.debug("Karte: Abruf in der App fehlgeschlagen: %s", err)
