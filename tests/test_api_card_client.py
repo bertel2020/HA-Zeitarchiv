@@ -68,3 +68,46 @@ def test_failures_are_told_apart() -> None:
         with patch(GET, return_value=bad), pytest.raises(ZeitarchivApiError):
             client.get_card_chart(1)
     assert not issubclass(ZeitarchivCardError, ZeitarchivAuthError)
+
+
+def test_a_series_is_asked_for_with_fixed_words_and_a_fixed_path() -> None:
+    client = ZeitarchivClient("h", 1, "t")
+    with patch(GET, return_value=_Resp({"spec_version": 1})) as get:
+        client.get_card_series(["sensor.a", "sensor.b"], "7d", "percent", "2026-10-01")
+        assert get.call_args.args[0] == "http://h:1/api/card/series"
+        assert get.call_args.kwargs["params"] == {
+            "entity_ids": "sensor.a,sensor.b", "period": "7d", "style": "percent", "at": "2026-10-01",
+        }
+        client.get_card_series(["sensor.a"])
+        assert get.call_args.kwargs["params"] == {"entity_ids": "sensor.a", "period": "month", "style": "auto"}
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        {"entity_ids": []},
+        {"entity_ids": [f"sensor.x{n}" for n in range(11)]},
+        {"entity_ids": ["sensor.a/../b"]},
+        {"entity_ids": ["Sensor.A"]},
+        {"entity_ids": ["sensor.a,sensor.b"]},
+        {"entity_ids": ["sensor.a&x=1"]},
+        {"entity_ids": [5]},
+        {"entity_ids": ["sensor.a"], "period": "jahrzehnt"},
+        {"entity_ids": ["sensor.a"], "style": "bunt"},
+    ],
+)
+def test_a_series_never_sends_anything_but_ids_and_known_words(arguments: dict) -> None:
+    client = ZeitarchivClient("h", 1, "t")
+    with patch(GET) as get, pytest.raises(ValueError):
+        client.get_card_series(**arguments)
+    get.assert_not_called()
+
+
+def test_the_entity_list_goes_to_a_fixed_path_and_a_rejection_is_told_apart() -> None:
+    client = ZeitarchivClient("h", 1, "t")
+    with patch(GET, return_value=_Resp({"entities": []})) as get:
+        assert client.get_card_entities() == {"entities": []}
+    assert get.call_args.args[0] == "http://h:1/api/card/entities"
+    with patch(GET, return_value=_Resp({}, 400)), pytest.raises(ZeitarchivCardError) as raised:
+        client.get_card_series(["sensor.a"])
+    assert raised.value.status == 400

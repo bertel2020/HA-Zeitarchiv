@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any
 
 import requests
@@ -23,6 +24,13 @@ _AI_TIMEOUT = 45
 _CATALOG_TIMEOUT = 30
 # Eine Karte wartet auf die Daten eines Charts, nicht auf eine Auswertung.
 _CARD_TIMEOUT = 20
+
+# Was /api/card/series annimmt (card_routes.PERIODS/STYLES in der App). Die Integration reicht nur
+# diese Wörter und Entitäts-IDs weiter, nie freien Text.
+CARD_PERIODS = ("day", "week", "month", "year", "24h", "7d", "30d")
+CARD_STYLES = ("auto", "stacked", "percent")
+CARD_MAX_ENTITIES = 10
+_ENTITY_ID = re.compile(r"^[a-z0-9_]+\.[a-z0-9_]+$")
 
 
 class ZeitarchivApiError(Exception):
@@ -46,9 +54,9 @@ class ZeitarchivAuthError(ZeitarchivApiError):
 
 
 class ZeitarchivCardError(ZeitarchivApiError):
-    """Die App hat eine Abfrage der Karte nicht beantwortet (404: Chart gibt es
-    nicht mehr, 429: zu viele gleichzeitige Abfragen). status trägt den Code,
-    damit die Karte den Fall benennen kann."""
+    """Die App hat eine Abfrage der Karte nicht beantwortet (400: sie lehnt die Angaben ab,
+    404: Chart oder Entität gibt es nicht mehr, 429: zu viele gleichzeitige Abfragen).
+    status trägt den Code, damit die Karte den Fall benennen kann."""
 
     def __init__(self, message: str, status: int) -> None:
         super().__init__(message)
@@ -234,7 +242,7 @@ class ZeitarchivClient:
             raise ZeitarchivApiError(f"Zeitarchiv nicht erreichbar: {err}") from err
         if response.status_code == 401:
             raise ZeitarchivAuthError("API-Token wurde von der App abgelehnt")
-        if response.status_code in (404, 429):
+        if response.status_code in (400, 404, 429):
             raise ZeitarchivCardError(f"App antwortete mit Status {response.status_code}", response.status_code)
         body = _json_or_none(response)
         if response.status_code != 200 or not isinstance(body, dict):
@@ -256,6 +264,31 @@ class ZeitarchivClient:
         if at:
             params["at"] = at
         return self._get_card("/api/card/chart", params)
+
+    def get_card_entities(self) -> dict[str, Any]:
+        """Archivierte Entitäten, die die Karte ohne gespeichertes Chart zeigen kann
+        (GET /api/card/entities, Fähigkeit "card_series")."""
+        return self._get_card("/api/card/entities")
+
+    def get_card_series(
+        self, entity_ids: list[str], period: str = "month", style: str = "auto", at: str | None = None,
+    ) -> dict[str, Any]:
+        """Einstellungen und Daten für frei gewählte Entitäten (GET /api/card/series).
+
+        Nimmt nur Entitäts-IDs im Home-Assistant-Format und die festen Wörter für Zeitraum und
+        Darstellung an; alles andere wirft ValueError, bevor etwas die Integration verlässt."""
+        if not entity_ids or len(entity_ids) > CARD_MAX_ENTITIES:
+            raise ValueError("entity_ids")
+        if any(not isinstance(item, str) or not _ENTITY_ID.fullmatch(item) for item in entity_ids):
+            raise ValueError("entity_ids")
+        if period not in CARD_PERIODS:
+            raise ValueError("period")
+        if style not in CARD_STYLES:
+            raise ValueError("style")
+        params: dict[str, Any] = {"entity_ids": ",".join(entity_ids), "period": period, "style": style}
+        if at:
+            params["at"] = at
+        return self._get_card("/api/card/series", params)
 
     def get_ai_config(self, api_id: str) -> dict[str, Any]:
         """Konfiguration des KI-Zugriffs (GET /api/ai/config): ob er eingeschaltet

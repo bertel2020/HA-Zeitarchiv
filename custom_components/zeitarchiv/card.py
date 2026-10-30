@@ -35,6 +35,9 @@ from .api import (
     ZeitarchivApiError,
     ZeitarchivAuthError,
     ZeitarchivCardError,
+    CARD_MAX_ENTITIES,
+    CARD_PERIODS,
+    CARD_STYLES,
     capabilities_from,
 )
 from .const import DOMAIN
@@ -59,8 +62,10 @@ ERROR_NOT_FOUND = "not_found"
 ERROR_BUSY = "busy"
 ERROR_AUTH = "auth_failed"
 ERROR_UNREACHABLE = "unreachable"
+ERROR_INVALID = "invalid"
 
 _DAY = r"^\d{4}-\d{2}-\d{2}$"
+_ENTITY = r"^[a-z0-9_]+\.[a-z0-9_]+$"
 
 
 async def async_setup_card(hass: HomeAssistant) -> None:
@@ -87,6 +92,8 @@ async def async_setup_card(hass: HomeAssistant) -> None:
         _LOGGER.debug("Home-Assistant-Frontend nicht geladen, Zeitarchiv-Karte wird nicht angemeldet")
     websocket_api.async_register_command(hass, ws_card_items)
     websocket_api.async_register_command(hass, ws_card_chart)
+    websocket_api.async_register_command(hass, ws_card_entities)
+    websocket_api.async_register_command(hass, ws_card_series)
 
 
 def _entry(hass: HomeAssistant, entry_id: str | None):
@@ -113,7 +120,9 @@ def _remember(hass: HomeAssistant, key: tuple, value: dict[str, Any]) -> None:
     cache[key] = (now, value)
 
 
-async def _fetch(hass: HomeAssistant, connection, msg: dict[str, Any], key: tuple, call) -> None:
+async def _fetch(
+    hass: HomeAssistant, connection, msg: dict[str, Any], key: tuple, call, capability: str = "cards",
+) -> None:
     """Gemeinsamer Ablauf beider Befehle: Verbindung wählen, Fähigkeit prüfen,
     zwischengespeicherte Antwort oder Abruf in der App, Fehler als Code."""
     entry = _entry(hass, msg.get("entry_id"))
@@ -124,7 +133,7 @@ async def _fetch(hass: HomeAssistant, connection, msg: dict[str, Any], key: tupl
     notices = runtime.notices_coordinator.data
     # Ohne Antwort der App (gerade gestartet) bleibt die Fähigkeit unbekannt;
     # dann entscheidet die Antwort selbst.
-    if notices and "cards" not in capabilities_from(notices):
+    if notices and capability not in capabilities_from(notices):
         connection.send_error(msg["id"], ERROR_APP_OUTDATED, "Die Zeitarchiv-App ist zu alt für die Karte")
         return
     key = (entry.entry_id, *key)
@@ -138,8 +147,10 @@ async def _fetch(hass: HomeAssistant, connection, msg: dict[str, Any], key: tupl
         except ZeitarchivCardError as err:
             if err.status == 429:
                 connection.send_error(msg["id"], ERROR_BUSY, "Zeitarchiv ist gerade beschäftigt")
+            elif err.status == 400:
+                connection.send_error(msg["id"], ERROR_INVALID, "Die Angaben der Karte hat die App abgelehnt")
             else:
-                connection.send_error(msg["id"], ERROR_NOT_FOUND, "Chart nicht gefunden")
+                connection.send_error(msg["id"], ERROR_NOT_FOUND, "Chart oder Entität nicht gefunden")
             return
         except ZeitarchivApiError as err:
             _LOGGER.debug("Karte: Abruf in der App fehlgeschlagen: %s", err)
@@ -173,3 +184,38 @@ async def ws_card_chart(hass: HomeAssistant, connection, msg: dict[str, Any]) ->
     """Einstellungen und Daten eines gespeicherten Charts."""
     chart_id, at = msg["chart_id"], msg.get("at")
     await _fetch(hass, connection, msg, ("chart", chart_id, at), lambda client: client.get_card_chart(chart_id, at))
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {"type": "zeitarchiv/card/entities", probatio.Optional("entry_id"): str}
+)
+@websocket_api.async_response
+async def ws_card_entities(hass: HomeAssistant, connection, msg: dict[str, Any]) -> None:
+    """Archivierte Entitäten für die Auswahl der Karte ohne gespeichertes Chart."""
+    await _fetch(
+        hass, connection, msg, ("entities",), lambda client: client.get_card_entities(), capability="card_series",
+    )
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        "type": "zeitarchiv/card/series",
+        probatio.Required("entity_ids"): probatio.All(
+            [probatio.All(str, probatio.Match(_ENTITY))], probatio.Length(min=1, max=CARD_MAX_ENTITIES)
+        ),
+        probatio.Optional("period", default="month"): probatio.In(CARD_PERIODS),
+        probatio.Optional("style", default="auto"): probatio.In(CARD_STYLES),
+        probatio.Optional("at"): probatio.All(str, probatio.Match(_DAY)),
+        probatio.Optional("entry_id"): str,
+    }
+)
+@websocket_api.async_response
+async def ws_card_series(hass: HomeAssistant, connection, msg: dict[str, Any]) -> None:
+    """Einstellungen und Daten für frei gewählte Entitäten."""
+    ids, period, style, at = list(msg["entity_ids"]), msg["period"], msg["style"], msg.get("at")
+    await _fetch(
+        hass, connection, msg, ("series", tuple(ids), period, style, at),
+        lambda client: client.get_card_series(ids, period, style, at), capability="card_series",
+    )

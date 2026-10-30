@@ -446,6 +446,19 @@ height: 260
 link: false                                   # optional: Link „Im Zeitarchiv öffnen“ ausblenden
 ```
 
+**Entitäten direkt:** Statt eines gespeicherten Charts lassen sich im Editor Entitäten, Zeitraum und Darstellung
+einstellen (Quelle „Entitäten direkt“). Zur Auswahl stehen nur Entitäten, die das Zeitarchiv archiviert; Zustände und
+Schalter zeigt die Karte noch nicht.
+
+```yaml
+type: custom:zeitarchiv-card
+entities:
+  - sensor.netzbezug
+  - sensor.einspeisung
+period: month        # day, week, month, year, 24h, 7d, 30d
+style: stacked       # auto (je Entität), stacked (gestapelt), percent (Anteile in Prozent)
+```
+
 Der Link zum Zeitarchiv erscheint automatisch (die App meldet ihre Adresse in Home Assistant).
 Mit `link: /eigener/pfad` lässt sich eine andere Adresse eintragen.
 

@@ -198,3 +198,95 @@ async def test_the_card_is_registered_once_for_several_entries(
     before = len(hass.data[DATA_EXTRA_MODULE_URL])
     await card.async_setup_card(hass)
     assert len(hass.data[DATA_EXTRA_MODULE_URL]) == before
+
+
+# --- Karte ohne gespeichertes Chart -----------------------------------------------------------
+
+SERIES = {"spec_version": 1, "id": None, "name": None, "supported": True, "spec": {"entityIds": "[]"}, "data": {"series": []}}
+ENTITIES = {"spec_version": 1, "entities": [{"entity_id": "sensor.a", "aggregation_type": "standard"}]}
+
+
+@pytest.fixture
+def series_client(card_client: MagicMock) -> Generator[MagicMock]:
+    card_client.get_notices.return_value = {**NOTICES, "capabilities": ["cards", "card_series"]}
+    card_client.get_card_series.return_value = SERIES
+    card_client.get_card_entities.return_value = ENTITIES
+    with (
+        patch("custom_components.zeitarchiv.api.ZeitarchivClient.get_card_series", card_client.get_card_series),
+        patch("custom_components.zeitarchiv.api.ZeitarchivClient.get_card_entities", card_client.get_card_entities),
+    ):
+        yield card_client
+
+
+async def test_entities_and_a_series_are_passed_on_with_their_fixed_words(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, series_client: MagicMock, loaded_entry: MockConfigEntry
+) -> None:
+    client = await hass_ws_client(hass)
+    assert (await _call(client, {"type": "zeitarchiv/card/entities"}))["result"] == ENTITIES
+    response = await _call(client, {"type": "zeitarchiv/card/series", "entity_ids": ["sensor.a", "sensor.b"], "period": "7d", "style": "percent"})
+    assert response["success"] is True and response["result"] == SERIES
+    series_client.get_card_series.assert_called_once_with(["sensor.a", "sensor.b"], "7d", "percent", None)
+    # Ohne Angaben gelten Monat und je Entität.
+    await _call(client, {"type": "zeitarchiv/card/series", "entity_ids": ["sensor.a"]})
+    series_client.get_card_series.assert_called_with(["sensor.a"], "month", "auto", None)
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        {"entity_ids": []},
+        {"entity_ids": [f"sensor.x{n}" for n in range(11)]},
+        {"entity_ids": ["sensor.a/../b"]},
+        {"entity_ids": ["sensor.a,sensor.b"]},
+        {"entity_ids": ["SENSOR.A"]},
+        {"entity_ids": "sensor.a"},
+        {"entity_ids": [5]},
+        {"entity_ids": ["sensor.a"], "period": "jahrzehnt"},
+        {"entity_ids": ["sensor.a"], "style": "bunt"},
+        {"entity_ids": ["sensor.a"], "at": "gestern"},
+        {},
+    ],
+)
+async def test_a_series_takes_only_entity_ids_and_known_words(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, series_client: MagicMock, loaded_entry: MockConfigEntry,
+    arguments: dict[str, Any],
+) -> None:
+    client = await hass_ws_client(hass)
+    response = await _call(client, {"type": "zeitarchiv/card/series", **arguments})
+    assert response["success"] is False
+    assert response["error"]["code"] == "invalid_format"
+    series_client.get_card_series.assert_not_called()
+
+
+async def test_other_users_may_not_ask_for_series_or_entities(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, hass_read_only_access_token: str,
+    series_client: MagicMock, loaded_entry: MockConfigEntry,
+) -> None:
+    client = await hass_ws_client(hass, hass_read_only_access_token)
+    for message in ({"type": "zeitarchiv/card/entities"}, {"type": "zeitarchiv/card/series", "entity_ids": ["sensor.a"]}):
+        assert (await _call(client, message))["error"]["code"] == "unauthorized"
+    series_client.get_card_series.assert_not_called()
+    series_client.get_card_entities.assert_not_called()
+
+
+async def test_an_app_with_only_the_first_routes_is_named(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, series_client: MagicMock, loaded_entry: MockConfigEntry
+) -> None:
+    """Gespeicherte Charts gehen (Fähigkeit "cards"), Entitäten direkt braucht "card_series"."""
+    loaded_entry.runtime_data.notices_coordinator.async_set_updated_data({**NOTICES, "capabilities": ["cards"]})
+    client = await hass_ws_client(hass)
+    assert (await _call(client, {"type": "zeitarchiv/card/items"}))["success"] is True
+    assert (await _call(client, {"type": "zeitarchiv/card/entities"}))["error"]["code"] == "app_outdated"
+    response = await _call(client, {"type": "zeitarchiv/card/series", "entity_ids": ["sensor.a"]})
+    assert response["error"]["code"] == "app_outdated"
+
+
+@pytest.mark.parametrize(("status", "code"), [(400, "invalid"), (404, "not_found"), (429, "busy")])
+async def test_refusals_of_the_app_for_a_series_come_back_as_codes(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, series_client: MagicMock, loaded_entry: MockConfigEntry,
+    status: int, code: str,
+) -> None:
+    series_client.get_card_series.side_effect = ZeitarchivCardError("nein", status)
+    client = await hass_ws_client(hass)
+    response = await _call(client, {"type": "zeitarchiv/card/series", "entity_ids": ["sensor.a"]})
+    assert response["error"]["code"] == code

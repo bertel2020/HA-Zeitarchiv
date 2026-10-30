@@ -21,13 +21,14 @@ const TEXTS = {
   de: {
     loading: 'Lade …',
     noData: 'Keine Daten',
-    chooseChart: 'Bitte ein Chart aus dem Zeitarchiv wählen.',
+    chooseChart: 'Bitte ein Chart oder Entitäten aus dem Zeitarchiv wählen.',
     unsupported: 'Diese Darstellung zeigt die Karte noch nicht.',
     openLink: 'Im Zeitarchiv öffnen',
     stale: 'Stand vor {min} Min, Zeitarchiv nicht erreichbar',
     not_loaded: 'Keine Zeitarchiv-Verbindung eingerichtet.',
     app_outdated: 'Die Zeitarchiv-App ist zu alt für die Karte. Bitte die App aktualisieren.',
-    not_found: 'Dieses Chart gibt es im Zeitarchiv nicht mehr.',
+    not_found: 'Dieses Chart oder eine der Entitäten gibt es im Zeitarchiv nicht (mehr).',
+    invalid: 'Die App hat die Angaben der Karte abgelehnt.',
     busy: 'Zeitarchiv ist gerade beschäftigt, nächster Versuch folgt.',
     auth_failed: 'Zeitarchiv hat die Zugangsdaten abgelehnt.',
     unreachable: 'Zeitarchiv ist nicht erreichbar.',
@@ -35,24 +36,41 @@ const TEXTS = {
     unknown: 'Die Karte konnte nicht geladen werden.',
     spec: 'Die Karte passt nicht zur Version der Zeitarchiv-App.',
     script: 'Die Karte konnte ihre Dateien nicht laden.',
+    source: 'Quelle',
+    sourceChart: 'Gespeichertes Chart',
+    sourceEntities: 'Entitäten direkt',
     chart_id: 'Chart aus dem Zeitarchiv',
+    entities: 'Entitäten (nur archivierte)',
+    period: 'Zeitraum',
+    style: 'Darstellung',
+    period_day: 'Heute',
+    period_week: 'Diese Woche',
+    period_month: 'Dieser Monat',
+    period_year: 'Dieses Jahr',
+    period_24h: 'Letzte 24 Stunden',
+    period_7d: 'Letzte 7 Tage',
+    period_30d: 'Letzte 30 Tage',
+    style_auto: 'Je Entität (Linie oder Balken)',
+    style_stacked: 'Gestapelte Balken',
+    style_percent: 'Anteile in Prozent',
     title: 'Titel (leer: Name des Charts)',
     refresh: 'Aktualisierung (Sekunden)',
     height: 'Höhe (Pixel)',
     link: 'Eigener Link zum Zeitarchiv (leer: automatisch)',
     notSupportedShort: 'noch nicht darstellbar',
-    description: 'Zeigt ein gespeichertes Chart aus dem Zeitarchiv.',
+    description: 'Zeigt ein gespeichertes Chart oder Entitäten aus dem Zeitarchiv.',
   },
   en: {
     loading: 'Loading …',
     noData: 'No data',
-    chooseChart: 'Please choose a chart from Zeitarchiv.',
+    chooseChart: 'Please choose a chart or entities from Zeitarchiv.',
     unsupported: 'The card cannot show this kind of chart yet.',
     openLink: 'Open in Zeitarchiv',
     stale: 'As of {min} min ago, Zeitarchiv not reachable',
     not_loaded: 'No Zeitarchiv connection is set up.',
     app_outdated: 'The Zeitarchiv app is too old for the card. Please update the app.',
-    not_found: 'This chart no longer exists in Zeitarchiv.',
+    not_found: 'This chart or one of the entities no longer exists in Zeitarchiv.',
+    invalid: 'The app rejected the settings of the card.',
     busy: 'Zeitarchiv is busy, trying again shortly.',
     auth_failed: 'Zeitarchiv rejected the credentials.',
     unreachable: 'Zeitarchiv is not reachable.',
@@ -60,13 +78,29 @@ const TEXTS = {
     unknown: 'The card could not be loaded.',
     spec: 'The card does not match the version of the Zeitarchiv app.',
     script: 'The card could not load its files.',
+    source: 'Source',
+    sourceChart: 'Saved chart',
+    sourceEntities: 'Entities directly',
     chart_id: 'Chart from Zeitarchiv',
+    entities: 'Entities (archived only)',
+    period: 'Period',
+    style: 'Display',
+    period_day: 'Today',
+    period_week: 'This week',
+    period_month: 'This month',
+    period_year: 'This year',
+    period_24h: 'Last 24 hours',
+    period_7d: 'Last 7 days',
+    period_30d: 'Last 30 days',
+    style_auto: 'Per entity (line or bars)',
+    style_stacked: 'Stacked bars',
+    style_percent: 'Shares in percent',
     title: 'Title (empty: chart name)',
     refresh: 'Refresh (seconds)',
     height: 'Height (pixels)',
     link: 'Own link to Zeitarchiv (empty: automatic)',
     notSupportedShort: 'not supported yet',
-    description: 'Shows a saved chart from Zeitarchiv.',
+    description: 'Shows a saved chart or entities from Zeitarchiv.',
   },
 };
 
@@ -217,11 +251,12 @@ class ZeitarchivCard extends HTMLElement {
   setConfig(config) {
     this._config = {refresh: 60, height: 260, ...config};
     if (this._config.chart_id != null) this._config.chart_id = Number(this._config.chart_id);
+    this._config.entities = Array.isArray(config.entities) ? config.entities.filter((id) => typeof id === 'string' && id) : [];
     this._els.chart.style.height = `${Math.max(120, Number(this._config.height) || 260)}px`;
     this._lastGood = 0;
     this._failures = 0;
     if (this._hass) this._load();
-    else this._showNote(this._config.chart_id ? 'loading' : 'chooseChart');
+    else this._showNote(this._hasSource() ? 'loading' : 'chooseChart');
   }
 
   set hass(hass) {
@@ -253,6 +288,19 @@ class ZeitarchivCard extends HTMLElement {
     this._observer?.disconnect();
     this._resize?.disconnect();
     if (this._chart) { this._chart.dispose(); this._chart = null; }
+  }
+
+  _hasSource() {
+    return Boolean(this._config?.entities?.length || this._config?.chart_id);
+  }
+
+  // Die Anfrage an Home Assistant: Entitäten direkt oder ein gespeichertes Chart.
+  _request() {
+    const config = this._config;
+    if (config.entities.length) {
+      return {type: 'zeitarchiv/card/series', entity_ids: config.entities, period: config.period || 'month', style: config.style || 'auto'};
+    }
+    return {type: 'zeitarchiv/card/chart', chart_id: config.chart_id};
   }
 
   _stale() {
@@ -307,10 +355,10 @@ class ZeitarchivCard extends HTMLElement {
 
   async _load() {
     if (this._loading || !this._config || !this._hass) return;
-    if (!this._config.chart_id) { this._showNote('chooseChart'); return; }
+    if (!this._hasSource()) { this._showNote('chooseChart'); return; }
     this._loading = true;
     try {
-      const result = await this._hass.callWS({type: 'zeitarchiv/card/chart', chart_id: this._config.chart_id});
+      const result = await this._hass.callWS(this._request());
       await this._draw(result);
       this._lastGood = Date.now();
       this._failures = 0;
@@ -393,11 +441,15 @@ class ZeitarchivCardEditor extends HTMLElement {
     this._config = {};
     this._hass = null;
     this._items = null;
+    this._entities = null;
+    this._source = 'chart';
+    this._error = null;
     this._form = null;
   }
 
   setConfig(config) {
     this._config = config || {};
+    this._source = Array.isArray(this._config.entities) && this._config.entities.length ? 'entities' : (this._source === 'entities' && !this._config.chart_id ? 'entities' : 'chart');
     this._render();
   }
 
@@ -405,53 +457,101 @@ class ZeitarchivCardEditor extends HTMLElement {
     const first = !this._hass;
     this._hass = hass;
     if (this._form) this._form.hass = hass;
-    if (first) this._loadItems();
+    if (first) this._load();
   }
 
-  async _loadItems() {
+  _failure(err) {
+    return err && err.code && TEXTS.en[err.code] ? text(this._hass, err.code) : text(this._hass, 'unknown');
+  }
+
+  async _load() {
     try {
-      const result = await this._hass.callWS({type: 'zeitarchiv/card/items'});
-      this._items = result.items || [];
+      this._items = (await this._hass.callWS({type: 'zeitarchiv/card/items'})).items || [];
     } catch (err) {
       this._items = [];
-      this._error = err && err.code && TEXTS.en[err.code] ? text(this._hass, err.code) : text(this._hass, 'unknown');
+      this._error = this._failure(err);
+    }
+    this._render();
+  }
+
+  async _loadEntities() {
+    if (this._entities) return;
+    this._entities = [];
+    try {
+      this._entities = (await this._hass.callWS({type: 'zeitarchiv/card/entities'})).entities || [];
+    } catch (err) {
+      this._error = this._failure(err);
     }
     this._render();
   }
 
   _schema() {
-    const options = (this._items || []).map((item) => ({
+    const label = (key) => text(this._hass, key);
+    const chartOptions = (this._items || []).map((item) => ({
       value: String(item.id),
-      label: item.supported ? item.name : `${item.name} (${text(this._hass, 'notSupportedShort')})`,
+      label: item.supported ? item.name : `${item.name} (${label('notSupportedShort')})`,
     }));
-    return [
-      {name: 'chart_id', required: true, selector: {select: {mode: 'dropdown', options}}},
+    const select = (name, options) => ({name, selector: {select: {mode: 'dropdown', options}}});
+    const schema = [select('source', [{value: 'chart', label: label('sourceChart')}, {value: 'entities', label: label('sourceEntities')}])];
+    if (this._source === 'entities') {
+      schema.push(
+        {name: 'entities', required: true, selector: {entity: {multiple: true, include_entities: (this._entities || []).map((e) => e.entity_id)}}},
+        select('period', ['month', 'day', 'week', 'year', '24h', '7d', '30d'].map((value) => ({value, label: label(`period_${value}`)}))),
+        select('style', ['auto', 'stacked', 'percent'].map((value) => ({value, label: label(`style_${value}`)}))),
+      );
+    } else {
+      schema.push({...select('chart_id', chartOptions), required: true});
+    }
+    schema.push(
       {name: 'title', selector: {text: {}}},
       {name: 'refresh', selector: {number: {min: 15, max: 3600, step: 15, mode: 'box', unit_of_measurement: 's'}}},
       {name: 'height', selector: {number: {min: 120, max: 800, step: 10, mode: 'box', unit_of_measurement: 'px'}}},
       {name: 'link', selector: {text: {}}},
-    ];
+    );
+    return schema;
+  }
+
+  _data() {
+    const data = {...this._config, source: this._source};
+    if (data.chart_id != null) data.chart_id = String(data.chart_id);
+    if (this._source === 'entities') {
+      data.period = data.period || 'month';
+      data.style = data.style || 'auto';
+    }
+    if (data.link === false) delete data.link;
+    return data;
+  }
+
+  _changed(value) {
+    const next = {...value};
+    const source = next.source || this._source;
+    delete next.source;
+    if (source !== this._source) {
+      this._source = source;
+      if (source === 'entities') { delete next.chart_id; this._loadEntities(); } else { delete next.entities; delete next.period; delete next.style; }
+    }
+    if (next.chart_id !== undefined && next.chart_id !== '') next.chart_id = Number(next.chart_id);
+    else delete next.chart_id;
+    for (const key of ['title', 'link']) if (!next[key]) delete next[key];
+    if (this._source === 'chart') for (const key of ['entities', 'period', 'style']) delete next[key];
+    this._config = {...next, type: 'custom:zeitarchiv-card'};
+    this.dispatchEvent(new CustomEvent('config-changed', {detail: {config: this._config}, bubbles: true, composed: true}));
+    this._render();
   }
 
   _render() {
     if (!this._hass) return;
     if (!this._form) {
-      this._error = null;
       this._form = document.createElement('ha-form');
       this._form.computeLabel = (schema) => text(this._hass, schema.name);
-      this._form.addEventListener('value-changed', (event) => {
-        const value = {...event.detail.value};
-        if (value.chart_id !== undefined && value.chart_id !== '') value.chart_id = Number(value.chart_id);
-        for (const key of ['title', 'link']) if (!value[key]) delete value[key];
-        this._config = {...value, type: 'custom:zeitarchiv-card'};
-        this.dispatchEvent(new CustomEvent('config-changed', {detail: {config: this._config}, bubbles: true, composed: true}));
-      });
+      this._form.addEventListener('value-changed', (event) => this._changed(event.detail.value));
       this.replaceChildren(this._form);
     }
+    if (this._source === 'entities' && !this._entities) this._loadEntities();
     this._form.hass = this._hass;
     this._form.schema = this._schema();
-    this._form.data = {...this._config, chart_id: this._config.chart_id != null ? String(this._config.chart_id) : undefined};
-    if (this._error) this._form.error = {base: this._error};
+    this._form.data = this._data();
+    this._form.error = this._error ? {base: this._error} : undefined;
   }
 }
 

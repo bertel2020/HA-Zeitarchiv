@@ -424,6 +424,18 @@ height: 260
 link: false                                   # optional: hide the "Open in Zeitarchiv" link
 ```
 
+**Entities directly:** Instead of a saved chart, the editor lets you choose entities, period and display (source
+"Entities directly"). Only entities archived by Zeitarchiv are offered; the card does not show states and switches yet.
+
+```yaml
+type: custom:zeitarchiv-card
+entities:
+  - sensor.grid_import
+  - sensor.feed_in
+period: month        # day, week, month, year, 24h, 7d, 30d
+style: stacked       # auto (per entity), stacked, percent (shares in percent)
+```
+
 The link to Zeitarchiv appears automatically (the app reports its address in Home Assistant).
 `link: /own/path` sets a different address.
 
