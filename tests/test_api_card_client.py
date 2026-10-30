@@ -132,3 +132,16 @@ def test_a_spark_never_sends_anything_but_an_id_and_a_known_range(arguments: dic
     with patch(GET) as get, pytest.raises(ValueError):
         client.get_card_spark(**arguments)
     get.assert_not_called()
+
+
+def test_the_width_goes_along_only_when_known_and_is_bounded() -> None:
+    client = ZeitarchivClient("h", 1, "t")
+    with patch(GET, return_value=_Resp({})) as get:
+        client.get_card_chart(7, None, 600)
+        assert get.call_args.kwargs["params"] == {"id": 7, "px": 600}
+        client.get_card_chart(7, None, 99999)
+        assert get.call_args.kwargs["params"]["px"] == 4000
+        client.get_card_chart(7)
+        assert "px" not in get.call_args.kwargs["params"]
+        client.get_card_series(["sensor.a"], px=300)
+        assert get.call_args.kwargs["params"]["px"] == 300

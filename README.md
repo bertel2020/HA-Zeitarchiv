@@ -447,8 +447,7 @@ link: false                                   # optional: Link „Im Zeitarchiv 
 ```
 
 **Entitäten direkt:** Statt eines gespeicherten Charts lassen sich im Editor Entitäten, Zeitraum und Darstellung
-einstellen (Quelle „Entitäten direkt“). Zur Auswahl stehen nur Entitäten, die das Zeitarchiv archiviert; Zustände und
-Schalter zeigt die Karte noch nicht.
+einstellen (Quelle „Entitäten direkt“). Zur Auswahl stehen nur Entitäten, die das Zeitarchiv archiviert.
 
 ```yaml
 type: custom:zeitarchiv-card
@@ -467,10 +466,10 @@ Mit `link: /eigener/pfad` lässt sich eine andere Adresse eintragen.
 - **Nur die Integration spricht mit dem Zeitarchiv.** Die Karte spricht nie mit der App,
   sondern über Home Assistant; der Token bleibt in der Integration. Dafür braucht die
   App die Fähigkeit „cards“ (App-Update, wenn die Karte darauf hinweist).
-- **Was die Karte zeichnet:** Zahlen-Charts als Linie, Balken, gestapelt und als
-  Anteile in Prozent, mit Tooltip, im hellen und dunklen Thema. Zustände, Zeitstrahl,
-  Donut, Anteile, Wechsel, Heatmap und Vergleich zeigt sie noch nicht; dort steht
-  ein Hinweis. Der im Chart gespeicherte Zeitraum gilt.
+- **Was die Karte zeichnet:** alle Darstellungen eines gespeicherten Charts: Zahlen als Linie, Balken, gestapelt
+  und als Anteile in Prozent, mit Vorperiode, Vorjahr und Mehrjahresvergleich, dazu Zeitstrahl, Donut und bei
+  Zuständen Anteile, Wechsel und Heatmap. Tooltips, helles und dunkles Thema. Der im Chart gespeicherte Zeitraum
+  gilt. Tabellen folgen.
 - Bei einem Ausfall der App bleibt das letzte Bild stehen und die Karte nennt sein Alter.
 
 ### Verlauf unter einer Kachelkarte

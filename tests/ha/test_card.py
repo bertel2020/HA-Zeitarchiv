@@ -70,7 +70,7 @@ async def test_a_chart_is_asked_for_by_whole_number_and_day_only(
     response = await _call(client, {"type": "zeitarchiv/card/chart", "chart_id": 7, "at": "2026-10-01"})
     assert response["success"] is True
     assert response["result"] == CHART
-    card_client.get_card_chart.assert_called_once_with(7, "2026-10-01")
+    card_client.get_card_chart.assert_called_once_with(7, "2026-10-01", 0)
 
 
 @pytest.mark.parametrize(
@@ -185,7 +185,7 @@ async def test_the_card_files_are_served_and_announced(
     assert any(url.startswith("/zeitarchiv_card/zeitarchiv-card.js?v=") for url in urls)
     assert any(url.startswith("/zeitarchiv_card/zeitarchiv-sparkline.js?v=") for url in urls)
     client = await hass_client()
-    for name in ("zeitarchiv-card.js", "zeitarchiv-sparkline.js", "chart-tile-render.js", "number-format.js", "tooltip-hold.js", "server-time.js", "echarts.min.js", "catalog.json"):
+    for name in ("zeitarchiv-card.js", "zeitarchiv-sparkline.js", "chart-tile-render.js", "number-format.js", "tooltip-hold.js", "server-time.js", "html-escape.js", "state-entities.js", "echarts.min.js", "catalog.json"):
         response = await client.get(f"/zeitarchiv_card/{name}")
         assert response.status == 200, name
     # Nur die ausgelieferten Dateien, nichts darüber hinaus.
@@ -226,10 +226,10 @@ async def test_entities_and_a_series_are_passed_on_with_their_fixed_words(
     assert (await _call(client, {"type": "zeitarchiv/card/entities"}))["result"] == ENTITIES
     response = await _call(client, {"type": "zeitarchiv/card/series", "entity_ids": ["sensor.a", "sensor.b"], "period": "7d", "style": "percent"})
     assert response["success"] is True and response["result"] == SERIES
-    series_client.get_card_series.assert_called_once_with(["sensor.a", "sensor.b"], "7d", "percent", None)
+    series_client.get_card_series.assert_called_once_with(["sensor.a", "sensor.b"], "7d", "percent", None, 0)
     # Ohne Angaben gelten Monat und je Entität.
     await _call(client, {"type": "zeitarchiv/card/series", "entity_ids": ["sensor.a"]})
-    series_client.get_card_series.assert_called_with(["sensor.a"], "month", "auto", None)
+    series_client.get_card_series.assert_called_with(["sensor.a"], "month", "auto", None, 0)
 
 
 @pytest.mark.parametrize(
@@ -334,3 +334,20 @@ async def test_a_spark_needs_an_admin_and_an_app_that_knows_it(
     assert (await _call(admin, {"type": "zeitarchiv/card/spark", "entity_id": "sensor.a"}))["error"]["code"] == "app_outdated"
     other = await hass_ws_client(hass, hass_read_only_access_token)
     assert (await _call(other, {"type": "zeitarchiv/card/spark", "entity_id": "sensor.a"}))["error"]["code"] == "unauthorized"
+
+
+async def test_the_width_of_the_card_is_rounded_up_and_part_of_the_cache_key(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, card_client: MagicMock, loaded_entry: MockConfigEntry
+) -> None:
+    client = await hass_ws_client(hass)
+    await _call(client, {"type": "zeitarchiv/card/chart", "chart_id": 7, "px": 431})
+    card_client.get_card_chart.assert_called_with(7, None, 500)
+    await _call(client, {"type": "zeitarchiv/card/chart", "chart_id": 7, "px": 480})  # gleicher Schritt: aus dem Zwischenspeicher
+    assert card_client.get_card_chart.call_count == 1
+    await _call(client, {"type": "zeitarchiv/card/chart", "chart_id": 7, "px": 1000})
+    card_client.get_card_chart.assert_called_with(7, None, 1000)
+    await _call(client, {"type": "zeitarchiv/card/chart", "chart_id": 8, "px": 4000})
+    card_client.get_card_chart.assert_called_with(8, None, 4000)
+    for bad in (-1, 4001, "100", 1.5):
+        response = await _call(client, {"type": "zeitarchiv/card/chart", "chart_id": 7, "px": bad})
+        assert response["error"]["code"] == "invalid_format"

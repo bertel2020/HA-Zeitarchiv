@@ -425,7 +425,7 @@ link: false                                   # optional: hide the "Open in Zeit
 ```
 
 **Entities directly:** Instead of a saved chart, the editor lets you choose entities, period and display (source
-"Entities directly"). Only entities archived by Zeitarchiv are offered; the card does not show states and switches yet.
+"Entities directly"). Only entities archived by Zeitarchiv are offered.
 
 ```yaml
 type: custom:zeitarchiv-card
@@ -444,10 +444,9 @@ The link to Zeitarchiv appears automatically (the app reports its address in Hom
 - **Only the integration talks to Zeitarchiv.** The card never contacts the app; it
   goes through Home Assistant and the token stays in the integration. The app needs
   the "cards" capability for this (update the app if the card says so).
-- **What the card draws:** numeric charts as line, bars, stacked and as shares in
-  percent, with tooltip, in the light and dark theme. States, timeline, donut, shares,
-  changes, heatmap and comparison are not shown yet; a notice appears instead. The
-  period saved with the chart applies.
+- **What the card draws:** every view of a saved chart: numbers as line, bars, stacked and as shares in percent,
+  with previous period, previous year and multi-year comparison, plus timeline, donut and, for states, shares,
+  changes and heatmap. Tooltips, light and dark theme. The period saved with the chart applies. Tables follow.
 - If the app is unreachable, the last image stays and the card shows its age.
 
 ### History under a tile card

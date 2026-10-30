@@ -1,5 +1,7 @@
 {
   "en": {
+    "1 Beginn": "1 start",
+    "1 Beobachtung": "1 observation",
     "Apr": "Apr",
     "Aug": "Aug",
     "Dez": "Dec",
@@ -13,9 +15,17 @@
     "Okt": "Oct",
     "Sep": "Sep",
     "Tag": "Day",
+    "Uhr": "h",
     "Vorjahr": "Previous year",
     "Vorperiode": "Previous period",
+    "im Schnitt {duration} je Stunde": "{duration} per hour on average",
+    "keine Daten": "no data",
+    "nicht verfügbar": "unavailable",
+    "nur 1 Beobachtung": "only 1 observation",
+    "nur {count} Beobachtungen": "only {count} observations",
     "vor {dauer}": "{dauer} ago",
+    "{count} Beginne": "{count} starts",
+    "{count} Beobachtungen": "{count} observations",
     "{name} ({year}) kumuliert": "{name} ({year}) cumulative",
     "Ø {from}–{to}": "Ø {from}–{to}"
   }

@@ -31,6 +31,7 @@ CARD_PERIODS = ("day", "week", "month", "year", "24h", "7d", "30d")
 CARD_STYLES = ("auto", "stacked", "percent")
 CARD_MAX_ENTITIES = 10
 CARD_SPARK_RANGES = ("24h", "7d", "30d")
+CARD_MAX_PX = 4000  # Breite der Zeichenfläche, wie MAX_PX der App
 _ENTITY_ID = re.compile(r"^[a-z0-9_]+\.[a-z0-9_]+$")
 
 
@@ -255,7 +256,7 @@ class ZeitarchivClient:
         Eine App ohne die Fähigkeit "cards" kennt die Route nicht (404)."""
         return self._get_card("/api/card/items")
 
-    def get_card_chart(self, chart_id: int, at: str | None = None) -> dict[str, Any]:
+    def get_card_chart(self, chart_id: int, at: str | None = None, px: int = 0) -> dict[str, Any]:
         """Einstellungen und Daten eines gespeicherten Charts (GET /api/card/chart).
 
         Die ID reist als Query-Parameter, nie als Teil des Pfads, und kommt hier
@@ -264,6 +265,8 @@ class ZeitarchivClient:
         params: dict[str, Any] = {"id": int(chart_id)}
         if at:
             params["at"] = at
+        if int(px) > 0:
+            params["px"] = min(int(px), CARD_MAX_PX)
         return self._get_card("/api/card/chart", params)
 
     def get_card_entities(self) -> dict[str, Any]:
@@ -272,7 +275,7 @@ class ZeitarchivClient:
         return self._get_card("/api/card/entities")
 
     def get_card_series(
-        self, entity_ids: list[str], period: str = "month", style: str = "auto", at: str | None = None,
+        self, entity_ids: list[str], period: str = "month", style: str = "auto", at: str | None = None, px: int = 0,
     ) -> dict[str, Any]:
         """Einstellungen und Daten für frei gewählte Entitäten (GET /api/card/series).
 
@@ -289,6 +292,8 @@ class ZeitarchivClient:
         params: dict[str, Any] = {"entity_ids": ",".join(entity_ids), "period": period, "style": style}
         if at:
             params["at"] = at
+        if int(px) > 0:
+            params["px"] = min(int(px), CARD_MAX_PX)
         return self._get_card("/api/card/series", params)
 
     def get_card_spark(self, entity_id: str, range_key: str = "24h") -> dict[str, Any]:

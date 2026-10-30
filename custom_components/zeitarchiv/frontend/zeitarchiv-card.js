@@ -141,13 +141,14 @@ const fetchText = async (name) => {
 
 const loadSources = () => {
   sourcesPromise ||= (async () => {
-    const [echartsSource, render, numberFormat, tooltipHold, serverTime, catalog] = await Promise.all([
+    const [echartsSource, render, numberFormat, tooltipHold, serverTime, htmlEscape, stateEntities, catalog] = await Promise.all([
       fetchText('echarts.min.js'), fetchText('chart-tile-render.js'), fetchText('number-format.js'),
-      fetchText('tooltip-hold.js'), fetchText('server-time.js'), fetchText('catalog.json'),
+      fetchText('tooltip-hold.js'), fetchText('server-time.js'), fetchText('html-escape.js'),
+      fetchText('state-entities.js'), fetchText('catalog.json'),
     ]);
     const module = {exports: {}};
     new Function('module', 'exports', echartsSource).call(module.exports, module, module.exports);
-    return {echarts: module.exports, render, numberFormat, tooltipHold, serverTime, catalog: JSON.parse(catalog)};
+    return {echarts: module.exports, render, numberFormat, tooltipHold, serverTime, htmlEscape, stateEntities, catalog: JSON.parse(catalog)};
   })().catch((err) => { sourcesPromise = null; throw err; });
   return sourcesPromise;
 };
@@ -157,11 +158,20 @@ const evaluate = (source, names, values) => new Function(...names, source)(...va
 const buildRuntime = (sources, {timezone, language, dark}) => {
   const palette = dark ? PALETTES.dark : PALETTES.light;
   const win = {ZA_FORMAT: language};
-  const doc = {documentElement: {dataset: {tz: timezone, format: language}}, body: {}};
+  // Nur das, was die Dateien der App vom Dokument brauchen: die Zeitzone, das Format und Canvas-Elemente
+  // (state-entities.js zeichnet damit das Füllmuster für „nicht verfügbar“).
+  const doc = {
+    documentElement: {dataset: {tz: timezone, format: language}}, body: {},
+    createElement: (tag) => document.createElement(tag),
+  };
+  // Farben aus dem CSS der App (--chart-1 …) und Werte aus dem Thema von Home Assistant, die die Karte
+  // vor jedem Zeichnen setzt (setVars).
+  const vars = {};
   const getComputedStyle = () => ({
     getPropertyValue: (name) => {
       const match = /^--chart-(\d)$/.exec(name);
       if (match) return palette[Number(match[1]) - 1] || '';
+      if (name in vars) return vars[name];
       return name === '--font-scale' ? '1' : '';
     },
   });
@@ -176,25 +186,22 @@ const buildRuntime = (sources, {timezone, language, dark}) => {
   evaluate(sources.numberFormat, ['window', 'document'], [win, doc]);
   evaluate(sources.tooltipHold, ['window', 'document'], [win, doc]);
   evaluate(sources.serverTime, ['window', 'document'], [win, doc]);
-  // Nur Zahlen-Charts: die Zustandsansichten der App (state-entities.js) gehören
-  // nicht zur Karte, ihre Zeitraum-Listen schon, weil draw() sie abfragt.
-  const StateEntities = {
-    SERVER_SHARE_RANGES: ['month', 'year', 'decade'],
-    COLUMN_RANGES: ['year', 'decade'],
-    defaultMode: (range) => (['month', 'year', 'decade'].includes(range) ? 'shares' : 'timeline'),
-  };
-  return evaluate(
+  evaluate(sources.htmlEscape, ['window'], [win]);
+  evaluate(sources.stateEntities, ['window', 'document', 'getComputedStyle', 't', 'NumberFormat', 'escapeHtml'],
+    [win, doc, getComputedStyle, t, win.NumberFormat, win.escapeHtml]);
+  const render = evaluate(
     `${sources.render}\nreturn window.ChartTileRender;`,
-    ['window', 'document', 'getComputedStyle', 't', 'NumberFormat', 'TooltipHold', 'StateEntities', 'PeriodNavigation', 'echarts'],
-    [win, doc, getComputedStyle, t, win.NumberFormat, win.TooltipHold, StateEntities, {}, sources.echarts],
+    ['window', 'document', 'getComputedStyle', 't', 'NumberFormat', 'TooltipHold', 'StateEntities', 'PeriodNavigation', 'echarts', 'escapeHtml'],
+    [win, doc, getComputedStyle, t, win.NumberFormat, win.TooltipHold, win.StateEntities, {}, sources.echarts, win.escapeHtml],
   );
+  return {render, setVars: (map) => Object.assign(vars, map)};
 };
 
 const runtimeFor = async (settings) => {
   const sources = await loadSources();
   const key = `${settings.timezone}|${settings.language}|${settings.dark}`;
   if (!runtimes.has(key)) runtimes.set(key, buildRuntime(sources, settings));
-  return {render: runtimes.get(key), echarts: sources.echarts};
+  return {...runtimes.get(key), echarts: sources.echarts};
 };
 
 // --- Karte -----------------------------------------------------------------------------
@@ -297,10 +304,12 @@ class ZeitarchivCard extends HTMLElement {
   // Die Anfrage an Home Assistant: Entitäten direkt oder ein gespeichertes Chart.
   _request() {
     const config = this._config;
+    // Breite der Karte: der Zeitstrahl in Jahr und Dekade wird in dieser Breite vom Server zusammengefasst.
+    const px = Math.min(4000, Math.max(0, Math.round(this.getBoundingClientRect().width)));
     if (config.entities.length) {
-      return {type: 'zeitarchiv/card/series', entity_ids: config.entities, period: config.period || 'month', style: config.style || 'auto'};
+      return {type: 'zeitarchiv/card/series', entity_ids: config.entities, period: config.period || 'month', style: config.style || 'auto', px};
     }
-    return {type: 'zeitarchiv/card/chart', chart_id: config.chart_id};
+    return {type: 'zeitarchiv/card/chart', chart_id: config.chart_id, px};
   }
 
   _stale() {
@@ -411,7 +420,9 @@ class ZeitarchivCard extends HTMLElement {
     this._els.note.hidden = true;
     this._els.chart.hidden = false;
     if (!this._chart) this._chart = runtime.echarts.init(this._els.chart);
-    const style = this._themeStyle();
+    const vars = this._themeVars();
+    runtime.setVars(vars);
+    const style = {getPropertyValue: (name) => vars[name] ?? ''};
     // Langzeit-Vergleich (ein Jahr, eine Entität): Monate je Jahr statt einer Zeitachse, wie auf der Kachel.
     const multiYear = spec.compare?.longterm && series.length === 1 && Array.isArray(series[0].years)
       ? R.tileMultiYear(series[0], result.data, spec.compare, {
@@ -424,18 +435,17 @@ class ZeitarchivCard extends HTMLElement {
     this._chart.resize();
   }
 
-  // Die Farben, die draw() aus dem CSS der App liest, aus dem Thema von Home Assistant.
-  _themeStyle() {
+  // Die Farben, die die Zeichenregeln aus dem CSS der App lesen, aus dem Thema von Home Assistant.
+  _themeVars() {
     const css = getComputedStyle(this);
     const get = (name, fallback) => css.getPropertyValue(name).trim() || fallback;
-    const map = {
+    return {
       '--border': get('--divider-color', '#e0e0e0'),
       '--ink-faint': get('--secondary-text-color', '#727272'),
       '--ink-muted': get('--primary-text-color', '#212121'),
       '--surface': get('--card-background-color', '#ffffff'),
       '--font-mono': get('--ha-font-family-body', 'Roboto, sans-serif'),
     };
-    return {getPropertyValue: (name) => map[name] ?? ''};
   }
 }
 

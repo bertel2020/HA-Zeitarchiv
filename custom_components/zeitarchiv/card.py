@@ -36,6 +36,7 @@ from .api import (
     ZeitarchivAuthError,
     ZeitarchivCardError,
     CARD_MAX_ENTITIES,
+    CARD_MAX_PX,
     CARD_PERIODS,
     CARD_SPARK_RANGES,
     CARD_STYLES,
@@ -67,7 +68,15 @@ ERROR_UNREACHABLE = "unreachable"
 ERROR_INVALID = "invalid"
 
 _DAY = r"^\d{4}-\d{2}-\d{2}$"
+_PX_STEP = 100
 _ENTITY = r"^[a-z0-9_]+\.[a-z0-9_]+$"
+
+
+def _px(msg: dict[str, Any]) -> int:
+    """Breite der Karte in Schritten von 100 Bildpunkten, nach oben gerundet: ähnlich breite Karten
+    teilen sich eine Antwort, und die App bekommt genau die Breite, nach der der Zwischenspeicher fragt."""
+    width = int(msg.get("px", 0))
+    return min(CARD_MAX_PX, -(-width // _PX_STEP) * _PX_STEP) if width > 0 else 0
 
 
 async def async_setup_card(hass: HomeAssistant) -> None:
@@ -180,14 +189,15 @@ async def ws_card_items(hass: HomeAssistant, connection, msg: dict[str, Any]) ->
         "type": "zeitarchiv/card/chart",
         probatio.Required("chart_id"): probatio.All(int, probatio.Range(min=1)),
         probatio.Optional("at"): probatio.All(str, probatio.Match(_DAY)),
+        probatio.Optional("px", default=0): probatio.All(int, probatio.Range(min=0, max=CARD_MAX_PX)),
         probatio.Optional("entry_id"): str,
     }
 )
 @websocket_api.async_response
 async def ws_card_chart(hass: HomeAssistant, connection, msg: dict[str, Any]) -> None:
     """Einstellungen und Daten eines gespeicherten Charts."""
-    chart_id, at = msg["chart_id"], msg.get("at")
-    await _fetch(hass, connection, msg, ("chart", chart_id, at), lambda client: client.get_card_chart(chart_id, at))
+    chart_id, at, px = msg["chart_id"], msg.get("at"), _px(msg)
+    await _fetch(hass, connection, msg, ("chart", chart_id, at, px), lambda client: client.get_card_chart(chart_id, at, px))
 
 
 @websocket_api.require_admin
@@ -212,16 +222,17 @@ async def ws_card_entities(hass: HomeAssistant, connection, msg: dict[str, Any])
         probatio.Optional("period", default="month"): probatio.In(CARD_PERIODS),
         probatio.Optional("style", default="auto"): probatio.In(CARD_STYLES),
         probatio.Optional("at"): probatio.All(str, probatio.Match(_DAY)),
+        probatio.Optional("px", default=0): probatio.All(int, probatio.Range(min=0, max=CARD_MAX_PX)),
         probatio.Optional("entry_id"): str,
     }
 )
 @websocket_api.async_response
 async def ws_card_series(hass: HomeAssistant, connection, msg: dict[str, Any]) -> None:
     """Einstellungen und Daten für frei gewählte Entitäten."""
-    ids, period, style, at = list(msg["entity_ids"]), msg["period"], msg["style"], msg.get("at")
+    ids, period, style, at, px = list(msg["entity_ids"]), msg["period"], msg["style"], msg.get("at"), _px(msg)
     await _fetch(
-        hass, connection, msg, ("series", tuple(ids), period, style, at),
-        lambda client: client.get_card_series(ids, period, style, at), capability="card_series",
+        hass, connection, msg, ("series", tuple(ids), period, style, at, px),
+        lambda client: client.get_card_series(ids, period, style, at, px), capability="card_series",
     )
 
 
