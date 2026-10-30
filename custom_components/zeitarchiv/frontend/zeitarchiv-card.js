@@ -107,13 +107,13 @@ const fetchText = async (name) => {
 
 const loadSources = () => {
   sourcesPromise ||= (async () => {
-    const [echartsSource, render, numberFormat, tooltipHold, serverTime] = await Promise.all([
+    const [echartsSource, render, numberFormat, tooltipHold, serverTime, catalog] = await Promise.all([
       fetchText('echarts.min.js'), fetchText('chart-tile-render.js'), fetchText('number-format.js'),
-      fetchText('tooltip-hold.js'), fetchText('server-time.js'),
+      fetchText('tooltip-hold.js'), fetchText('server-time.js'), fetchText('catalog.json'),
     ]);
     const module = {exports: {}};
     new Function('module', 'exports', echartsSource).call(module.exports, module, module.exports);
-    return {echarts: module.exports, render, numberFormat, tooltipHold, serverTime};
+    return {echarts: module.exports, render, numberFormat, tooltipHold, serverTime, catalog: JSON.parse(catalog)};
   })().catch((err) => { sourcesPromise = null; throw err; });
   return sourcesPromise;
 };
@@ -131,7 +131,14 @@ const buildRuntime = (sources, {timezone, language, dark}) => {
       return name === '--font-scale' ? '1' : '';
     },
   });
-  const t = (value, values) => (values ? value.replace(/\{(\w+)\}/g, (m, k) => (k in values ? values[k] : m)) : value);
+  // Die Schlüssel der Zeichenregeln sind deutsch (wie t() der App); außer für Deutsch kommt der
+  // englische Text aus catalog.json (scripts/sync_card_assets.py), ohne Eintrag bleibt der Schlüssel.
+  const dictionary = String(language).startsWith('de') ? {} : (sources.catalog.en || {});
+  const t = (value, values) => {
+    let result = Object.prototype.hasOwnProperty.call(dictionary, value) ? dictionary[value] : value;
+    if (values) result = result.replace(/\{(\w+)\}/g, (m, k) => (k in values ? values[k] : m));
+    return result;
+  };
   evaluate(sources.numberFormat, ['window', 'document'], [win, doc]);
   evaluate(sources.tooltipHold, ['window', 'document'], [win, doc]);
   evaluate(sources.serverTime, ['window', 'document'], [win, doc]);

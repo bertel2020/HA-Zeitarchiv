@@ -184,7 +184,7 @@ async def test_the_card_files_are_served_and_announced(
     urls = hass.data[DATA_EXTRA_MODULE_URL]
     assert any(url.startswith("/zeitarchiv_card/zeitarchiv-card.js?v=") for url in urls)
     client = await hass_client()
-    for name in ("zeitarchiv-card.js", "chart-tile-render.js", "number-format.js", "tooltip-hold.js", "server-time.js", "echarts.min.js"):
+    for name in ("zeitarchiv-card.js", "chart-tile-render.js", "number-format.js", "tooltip-hold.js", "server-time.js", "echarts.min.js", "catalog.json"):
         response = await client.get(f"/zeitarchiv_card/{name}")
         assert response.status == 200, name
     # Nur die ausgelieferten Dateien, nichts darüber hinaus.

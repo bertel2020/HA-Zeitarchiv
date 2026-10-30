@@ -1,0 +1,22 @@
+{
+  "en": {
+    "Apr": "Apr",
+    "Aug": "Aug",
+    "Dez": "Dec",
+    "Feb": "Feb",
+    "Jan": "Jan",
+    "Jul": "Jul",
+    "Jun": "Jun",
+    "Mai": "May",
+    "Mär": "Mar",
+    "Nov": "Nov",
+    "Okt": "Oct",
+    "Sep": "Sep",
+    "Tag": "Day",
+    "Vorjahr": "Previous year",
+    "Vorperiode": "Previous period",
+    "vor {dauer}": "{dauer} ago",
+    "{name} ({year}) kumuliert": "{name} ({year}) cumulative",
+    "Ø {from}–{to}": "Ø {from}–{to}"
+  }
+}
