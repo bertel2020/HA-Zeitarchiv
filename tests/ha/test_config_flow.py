@@ -595,3 +595,18 @@ async def test_changing_the_filters_still_reloads_the_connection(
     await hass.async_block_till_done()
     assert loaded_entry.runtime_data is not runtime_before
     assert loaded_entry.state is ConfigEntryState.LOADED
+
+
+async def test_a_chart_deleted_while_the_form_is_open_does_not_end_up_in_the_sharing(
+    hass: HomeAssistant, loaded_entry: MockConfigEntry
+) -> None:
+    """Die Auswahl prüft gegen die Liste beim Anzeigen; wird ein Chart dazwischen gelöscht, fällt er beim Speichern weg."""
+    later = {"spec_version": 1, "items": [{"id": 7, "name": "Verbrauch"}], "tables": [{"id": 3, "name": "Monat"}]}
+    with patch("custom_components.zeitarchiv.api.ZeitarchivClient.get_card_items", side_effect=[CARD_ITEMS, later]):
+        result = await _open_options_step(hass, loaded_entry, "card_sharing")
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {CONF_CARD_SHARED_CHARTS: ["9", "7"], CONF_CARD_SHARED_TABLES: ["3"]}
+        )
+    await hass.async_block_till_done()
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert loaded_entry.options[CONF_CARD_SHARED_CHARTS] == [7]
