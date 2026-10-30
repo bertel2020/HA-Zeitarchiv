@@ -284,7 +284,7 @@
 
   function tileValueFormatter(s, decimals) {
     const isDuration = s.aggregation_type === 'switch' && s.display_mode === 'time';
-    return v => v == null ? '—' : (isDuration ? NumberFormat.fmtDuration(v) : `${fmtCompactNumber(v, decimals)}${s.unit ? ' ' + s.unit : ''}`);
+    return v => v == null ? '—' : (isDuration ? NumberFormat.fmtDuration(v) : `${fmtCompactNumber(v, decimals)}${s.unit ? ' ' + escapeHtml(s.unit) : ''}`);
   }
 
   // Gemeinsamer Rahmen der beiden Monats-Renderpfade unten: feste
@@ -313,9 +313,9 @@
           const rows = params.map(p => {
             const fmt = echartsSeries[p.seriesIndex]?.valueFormatter || (v => String(v));
             return `<div style="display:flex;justify-content:space-between;gap:14px;">`
-                 + `<span>${p.marker}${p.seriesName}</span><strong style="margin-left:8px;">${fmt(p.value)}</strong></div>`;
+                 + `<span>${p.marker}${escapeHtml(p.seriesName)}</span><strong style="margin-left:8px;">${fmt(p.value)}</strong></div>`;
           }).join('');
-          return `<div style="margin-bottom:4px;color:${inkFaint};">${allParams[0]?.axisValue ?? ''}</div>${rows}`;
+          return `<div style="margin-bottom:4px;color:${inkFaint};">${escapeHtml(allParams[0]?.axisValue ?? '')}</div>${rows}`;
         },
         appendToBody: true,
       },
@@ -565,13 +565,13 @@
           const fmtTime = ms => { const t = window.ServerTime.parts(ms / 1000); return `${pad(t.hour)}:${pad(t.minute)}`; };
           const span = `${fmtTime(startMs)}–${fmtTime(endMs)} · <strong>${NumberFormat.fmtDuration((endMs - startMs) / 1000)}</strong>`;
           const s = series[catIndex];
-          if (!s || s.aggregation_type !== 'state') return `${categories[catIndex]}<br>${span}`;
+          if (!s || s.aggregation_type !== 'state') return `${escapeHtml(categories[catIndex])}<br>${span}`;
           if (partsIndex >= 0) {
             // Spalte über mehrere Tage: Datum dazu, in Serverzeit wie überall auf der Kachel.
             const stamp = ms => { const t = window.ServerTime.parts(ms / 1000); return `${pad(t.day)}.${pad(t.month)}. ${pad(t.hour)}:${pad(t.minute)}`; };
             return StateEntities.condensedTooltip(timelineParts[partsIndex], startMs, endMs, s.states, stamp, escapeHtml(categories[catIndex]));
           }
-          return `${categories[catIndex]}<br><strong>${escapeHtml(StateEntities.label(s.states, idx))}</strong><br>${span}`;
+          return `${escapeHtml(categories[catIndex])}<br><strong>${escapeHtml(StateEntities.label(s.states, idx))}</strong><br>${span}`;
         },
         appendToBody: true,
       },
@@ -672,8 +672,8 @@
         textStyle: {color: style.getPropertyValue('--ink-muted').trim(), fontFamily: style.getPropertyValue('--font-mono'), fontSize: scaledFont(12)},
         formatter: p => {
           const s = series[p.dataIndex];
-          const unit = s.unit ? ` ${s.unit}` : '';
-          return `${p.marker} ${p.name}: <strong>${fmtCompactNumber(p.value, effectiveDecimals(s))}${unit}</strong> (${fmtCompactNumber(p.percent, 1)} %)`;
+          const unit = s.unit ? ` ${escapeHtml(s.unit)}` : '';
+          return `${p.marker} ${escapeHtml(p.name)}: <strong>${fmtCompactNumber(p.value, effectiveDecimals(s))}${unit}</strong> (${fmtCompactNumber(p.percent, 1)} %)`;
         },
         appendToBody: true,
       },
@@ -1372,17 +1372,17 @@
             const decimals = p.data[3];
             const value = p.data[4]
               ? NumberFormat.fmtDuration(p.data[1])
-              : `${fmtCompactNumber(p.data[1], decimals)}${unit ? ' ' + unit : ''}`;
+              : `${fmtCompactNumber(p.data[1], decimals)}${unit ? ' ' + escapeHtml(unit) : ''}`;
             // 100%-Normierung: zeigt IMMER beides — Anteil und Original-
             // Absolutwert in Klammern (Felder 5–7, siehe axisNormalized oben)
             // — sonst verliert der Tooltip genau die Zahl, die die
             // Normierung aus dem Balken selbst entfernt.
             const absValue = p.data[5];
             const extra = absValue != null
-              ? ` <span style="color:${inkFaint};">(${fmtCompactNumber(absValue, p.data[7])}${p.data[6] ? ' ' + p.data[6] : ''})</span>`
+              ? ` <span style="color:${inkFaint};">(${fmtCompactNumber(absValue, p.data[7])}${p.data[6] ? ' ' + escapeHtml(p.data[6]) : ''})</span>`
               : '';
             return `<div style="display:flex;justify-content:space-between;gap:14px;">`
-                 + `<span>${p.marker}${p.seriesName}</span>`
+                 + `<span>${p.marker}${escapeHtml(p.seriesName)}</span>`
                  + `<span style="margin-left:8px;text-align:right;"><strong>${value}${extra}</strong>`
                  + `${TooltipHold.note(p, inkFaint, ms => fmtTooltipTimestamp(ms, tooltipBucketSeconds))}</span></div>`;
           }).join('');
