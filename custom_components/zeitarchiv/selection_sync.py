@@ -28,7 +28,7 @@ from homeassistant.helpers.storage import Store
 
 from .api import ZeitarchivApiError, ZeitarchivClient, capabilities_from
 from .catalog import CATALOG_DOMAINS
-from .const import DOMAIN
+from .const import CONF_CARD_SHARED_CHARTS, CONF_CARD_SHARED_TABLES, DOMAIN
 from .events import is_text_state
 from .registry_filter import ArchiveFilterMatcher
 from .selection_apply import apply_jobs, pattern_targets, pending_acks
@@ -111,6 +111,9 @@ class HaSelectionPorts:
             state.entity_id for state in self._hass.states.async_all()
             if state.domain in CATALOG_DOMAINS and matcher.matches(state.entity_id)
         }
+
+
+_CARD_KEYS = (CONF_CARD_SHARED_CHARTS, CONF_CARD_SHARED_TABLES)
 
 
 class SelectionManager:
@@ -208,7 +211,12 @@ class SelectionManager:
             )
             if outcome.options_changed:
                 # Zuletzt: löst den Reload aus; der neue Setup-Lauf sendet den Katalog.
-                self._hass.config_entries.async_update_entry(self._entry, options=outcome.options)
+                # Die Freigabe der Karte gehört nicht zur Auswahl und gilt in ihrem aktuellen Stand:
+                # ein Administrator kann sie während der Awaits oben geändert haben, die Kopie vom Anfang
+                # wäre veraltet und würde seine Änderung zurückdrehen.
+                options = {k: v for k, v in outcome.options.items() if k not in _CARD_KEYS}
+                options.update({k: v for k, v in self._entry.options.items() if k in _CARD_KEYS})
+                self._hass.config_entries.async_update_entry(self._entry, options=options)
             elif self.on_changed is not None:
                 self.on_changed()
         except ZeitarchivApiError as err:
