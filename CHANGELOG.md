@@ -1,5 +1,47 @@
 # Changelog
 
+## Unreleased
+
+### Neu
+
+- **Zeitarchiv-Karte für Lovelace** (`custom:zeitarchiv-card`, nur für
+  Administratoren, braucht eine aktuelle Zeitarchiv-App): Zeigt ein gespeichertes
+  Chart oder eine gespeicherte Tabelle des Zeitarchivs direkt im Dashboard, im
+  Hell- und Dunkelmodus und mit den Beschriftungen der Home-Assistant-Sprache.
+  Die Karte lässt sich im Karteneditor einrichten.
+  - **Entitäten direkt**: Statt eines gespeicherten Charts lassen sich bis zu
+    zehn archivierte Entitäten mit Zeitraum und Darstellung wählen.
+  - **Darstellungen**: Linien, Balken, gestapelt und in Prozent, Vergleich mit
+    Vorperiode oder Vorjahr, Zeitstrahl, Zustände, Heatmap und Donut.
+  - **Link**: Optional öffnet ein Link das Zeitarchiv.
+  - **Ausfälle**: Ist die App nicht erreichbar, zeigt die Karte den letzten
+    Stand mit Hinweis und versucht es mit wachsendem Abstand erneut.
+- **Verlaufsstreifen für Kachelkarten**: Als zusätzliche Funktion der normalen
+  Home-Assistant-Kachelkarte zeigt ein kleiner Streifen den Verlauf einer
+  archivierten Zahlen-Entität (24 Stunden, 7 oder 30 Tage).
+
+---
+
+### English
+
+#### New
+
+- **Zeitarchiv card for Lovelace** (`custom:zeitarchiv-card`, administrators
+  only, needs a current Zeitarchiv app): Shows a saved chart or a saved table
+  of Zeitarchiv directly on your dashboard, in light and dark mode and with
+  labels in the Home Assistant language. The card can be set up in the card
+  editor.
+  - **Entities directly**: Instead of a saved chart you can pick up to ten
+    archived entities with a period and a display style.
+  - **Displays**: Lines, bars, stacked and in percent, comparison with the
+    previous period or year, timeline, states, heatmap and donut.
+  - **Link**: Optionally a link opens Zeitarchiv.
+  - **Outages**: If the app cannot be reached, the card keeps showing the last
+    state with a notice and retries at growing intervals.
+- **Trend strip for tile cards**: As an extra feature of the regular Home
+  Assistant tile card, a small strip shows the history of an archived numeric
+  entity (24 hours, 7 or 30 days).
+
 ## 1.2.1 - 2026-10-25
 
 ### Behoben
