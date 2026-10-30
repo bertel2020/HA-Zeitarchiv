@@ -60,6 +60,7 @@ const TEXTS = {
     title: 'Titel (leer: Name des Charts)',
     refresh: 'Aktualisierung (Sekunden)',
     height: 'Höhe (Pixel)',
+    tap_action: 'Beim Tippen',
     notSupportedShort: 'noch nicht darstellbar',
     description: 'Zeigt ein gespeichertes Chart oder Entitäten aus dem Zeitarchiv.',
   },
@@ -105,6 +106,7 @@ const TEXTS = {
     title: 'Title (empty: chart name)',
     refresh: 'Refresh (seconds)',
     height: 'Height (pixels)',
+    tap_action: 'On tap',
     notSupportedShort: 'not supported yet',
     description: 'Shows a saved chart or entities from Zeitarchiv.',
   },
@@ -222,6 +224,8 @@ const runtimeFor = async (settings) => {
 const STYLE = `
   :host { display: block; }
   ha-card { overflow: hidden; }
+  ha-card.clickable { cursor: pointer; }
+  ha-card.clickable:focus-visible { outline: 2px solid var(--primary-color); outline-offset: -2px; }
   .header { padding: 12px 16px 0; font-size: var(--ha-card-header-font-size, 18px); font-weight: 500; color: var(--primary-text-color); }
   .body { position: relative; padding: 8px 8px 12px; }
   .chart { width: 100%; }
@@ -276,7 +280,48 @@ class ZeitarchivCard extends HTMLElement {
       table: this.shadowRoot.querySelector('.tablebox'),
       tableCss: this.shadowRoot.querySelector('.tablecss'),
     };
+    this._els.card = this.shadowRoot.querySelector('ha-card');
     this._wireTableTips();
+    this._wireAction();
+  }
+
+  // Tippen: die Standard-Aktion von Home Assistant (tap_action). Die Karte löst nur das Ereignis aus,
+  // das Öffnen eines Dashboards, einer URL oder einer Aktion erledigt HA. Ohne Aktion ändert sich nichts.
+  _wireAction() {
+    const card = this._els.card;
+    card.addEventListener('click', () => this._fireAction());
+    card.addEventListener('keydown', (event) => {
+      if ((event.key === 'Enter' || event.key === ' ') && this._actionOn()) { event.preventDefault(); this._fireAction(); }
+    });
+  }
+
+  _actionOn() {
+    const action = this._config?.tap_action?.action;
+    return Boolean(action) && action !== 'none';
+  }
+
+  _fireAction() {
+    if (!this._actionOn()) return;
+    // Bei Entitäten direkt gilt die erste als Ziel von "Mehr Informationen".
+    const entity = this._config.entities?.[0];
+    this.dispatchEvent(new CustomEvent('hass-action', {
+      bubbles: true,
+      composed: true,
+      detail: {config: {...(entity ? {entity} : {}), tap_action: this._config.tap_action}, action: 'tap'},
+    }));
+  }
+
+  // Als Schaltfläche kennzeichnen (Tastatur, Screenreader). Der Beschriftungstext ist der des Charts, weil eine
+  // Schaltfläche ihren Inhalt für Screenreader zusammenfasst.
+  _applyAction() {
+    const card = this._els.card;
+    const on = this._actionOn();
+    card.classList.toggle('clickable', on);
+    if (!on) { card.removeAttribute('role'); card.removeAttribute('tabindex'); card.removeAttribute('aria-label'); return; }
+    card.setAttribute('role', 'button');
+    card.setAttribute('tabindex', '0');
+    const label = this._els.chart.getAttribute('aria-label') || this._els.header.textContent;
+    if (label) card.setAttribute('aria-label', label);
   }
 
   // Hinweise der Tabelle (data-tooltip-fixed). fixed-tooltip.js der App lauscht am document.body und sähe im
@@ -349,6 +394,7 @@ class ZeitarchivCard extends HTMLElement {
     this._lastGood = 0;
     this._failures = 0;
     this._generation += 1;
+    this._applyAction();
     if (this._hass) this._load();
     else this._showNote(this._hasSource() ? 'loading' : 'chooseChart');
   }
@@ -522,6 +568,7 @@ class ZeitarchivCard extends HTMLElement {
       spec, data: result.data, series, viewType: R.viewTypeFor(spec, series), multiYear, hiddenSet: undefined, style,
     });
     this._els.chart.setAttribute('aria-label', this._describe(this._config.title || result.name, series, result.spec));
+    this._applyAction();
     this._chart.resize();
     this._shown = true;
   }
@@ -568,10 +615,12 @@ class ZeitarchivCard extends HTMLElement {
     if (this._els.tableCss.textContent !== runtime.tableCss) this._els.tableCss.textContent = runtime.tableCss;
     this._els.note.hidden = true;
     this._els.chart.hidden = true;
+    this._els.chart.removeAttribute('aria-label');
     this._els.table.hidden = false;
     this._els.table.style.maxHeight = this._explicitHeight ? `${Math.max(120, Number(this._config.height) || 260)}px` : '';
     this._els.table.innerHTML = TableTileRender.buildHtml({...table, style: result.table.style || {}});
     TableTileRender.afterInsert(this._els.table);
+    this._applyAction();
     this._shown = true;
   }
 
@@ -676,6 +725,7 @@ class ZeitarchivCardEditor extends HTMLElement {
       {name: 'title', selector: {text: {}}},
       {name: 'refresh', selector: {number: {min: 15, max: 3600, step: 15, mode: 'box', unit_of_measurement: 's'}}},
       {name: 'height', selector: {number: {min: 120, max: 800, step: 10, mode: 'box', unit_of_measurement: 'px'}}},
+      {name: 'tap_action', selector: {ui_action: {default_action: 'none'}}},
     );
     return schema;
   }
@@ -705,6 +755,7 @@ class ZeitarchivCardEditor extends HTMLElement {
       else delete next[key];
     }
     if (!next.title) delete next.title;
+    if (!next.tap_action || !next.tap_action.action || next.tap_action.action === 'none') delete next.tap_action;
     if (this._source !== 'entities') for (const key of ['entities', 'period', 'style']) delete next[key];
     if (this._source !== 'chart') delete next.chart_id;
     if (this._source !== 'table') delete next.table_id;

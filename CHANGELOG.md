@@ -11,7 +11,9 @@
   Die Karte lässt sich im Karteneditor einrichten; im Kartenwähler zeigt sie
   schon eine Vorschau mit deinem ersten Chart. Im Abschnitts-Layout nimmt sie
   die volle Breite und ihre Höhe selbst. Screenreader lesen zu jedem Diagramm
-  Namen und Werte vor. Zuerst die App aktualisieren, dann die Integration.
+  Namen und Werte vor. Beim Tippen führt die Karte auf Wunsch eine Aktion von
+  Home Assistant aus, zum Beispiel ein anderes Dashboard öffnen. Zuerst die App
+  aktualisieren, dann die Integration.
   - **Für alle Benutzer freigeben**: Standardmäßig sehen nur Administratoren die
     Karte. In den Einstellungen der Integration unter **Karte freigeben**
     wählst du Charts und Tabellen, die jeder angemeldete Benutzer sieht, zum
@@ -39,8 +41,9 @@
   labels in the Home Assistant language. The card can be set up in the card
   editor; the card picker already shows a preview with your first chart. In
   the sections layout it takes the full width and its own height. Screen
-  readers read names and values for every chart. Update the app first, then the
-  integration.
+  readers read names and values for every chart. On tap, the card can run a
+  Home Assistant action if you like, for example open another dashboard. Update
+  the app first, then the integration.
   - **Share with all users**: By default only administrators see the card. In
     the integration settings under **Share card** you choose charts and tables
     that every signed-in user sees, for example on a wall tablet. Entities

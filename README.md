@@ -443,7 +443,14 @@ chart_id: 12
 title: Stromverbrauch
 refresh: 60
 height: 260
+tap_action:            # optional: Standard-Aktion von Home Assistant beim Tippen
+  action: navigate
+  navigation_path: /lovelace/energie
 ```
+
+**Beim Tippen:** Im Editor unter „Beim Tippen“ lässt sich wie bei jeder Home-Assistant-Karte eine Aktion
+wählen (Dashboard öffnen, URL, Aktion ausführen). Ohne Auswahl passiert nichts. Bei „Entitäten direkt“ gilt
+die erste Entität als Ziel von „Mehr Informationen“. Mit Aktion ist die Karte per Tastatur erreichbar.
 
 **Entitäten direkt:** Statt eines gespeicherten Charts lassen sich im Editor Entitäten, Zeitraum und Darstellung
 einstellen (Quelle „Entitäten direkt“). Zur Auswahl stehen nur Entitäten, die das Zeitarchiv archiviert.

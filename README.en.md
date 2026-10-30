@@ -421,7 +421,14 @@ chart_id: 12
 title: Power consumption
 refresh: 60
 height: 260
+tap_action:            # optional: Home Assistant's standard action on tap
+  action: navigate
+  navigation_path: /lovelace/energie
 ```
+
+**On tap:** In the editor under "On tap" you can choose an action as on any Home Assistant card (open a dashboard,
+URL, perform action). Without a choice nothing happens. With "Entities directly" the first entity is the target
+of "More info". With an action the card can be reached by keyboard.
 
 **Entities directly:** Instead of a saved chart, the editor lets you choose entities, period and display (source
 "Entities directly"). Only entities archived by Zeitarchiv are offered.
