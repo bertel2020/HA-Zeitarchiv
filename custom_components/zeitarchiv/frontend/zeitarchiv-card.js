@@ -318,7 +318,24 @@ class ZeitarchivCard extends HTMLElement {
 
   static getConfigElement() { return document.createElement('zeitarchiv-card-editor'); }
 
-  static getStubConfig() { return {}; }
+  // Der Kartenwähler zeigt die Karte mit dieser Konfiguration als Vorschau: das erste darstellbare gespeicherte
+  // Chart, sonst die erste Tabelle. Ohne Rechte, ohne App oder bei einer langsamen Antwort bleibt sie leer
+  // (dann zeigt die Vorschau den Hinweis „Chart wählen“).
+  static async getStubConfig(hass) {
+    try {
+      const listed = await Promise.race([
+        hass.callWS({type: 'zeitarchiv/card/items'}),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000)),
+      ]);
+      const chart = (listed.items || []).find((item) => item.supported);
+      if (chart) return {chart_id: chart.id};
+      const table = (listed.tables || [])[0];
+      if (table) return {table_id: table.id};
+    } catch (err) {
+      // Vorschau bleibt leer.
+    }
+    return {};
+  }
 
   setConfig(config) {
     this._config = {refresh: 60, height: 260, ...config};
@@ -690,6 +707,6 @@ if (!customElements.get('zeitarchiv-card')) {
     type: 'zeitarchiv-card',
     name: 'Zeitarchiv',
     description: TEXTS.en.description,
-    preview: false,
+    preview: true,
   });
 }
