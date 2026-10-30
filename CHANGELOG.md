@@ -8,7 +8,8 @@
   Administratoren, braucht eine aktuelle Zeitarchiv-App): Zeigt ein gespeichertes
   Chart oder eine gespeicherte Tabelle des Zeitarchivs direkt im Dashboard, im
   Hell- und Dunkelmodus und mit den Beschriftungen der Home-Assistant-Sprache.
-  Die Karte lässt sich im Karteneditor einrichten.
+  Die Karte lässt sich im Karteneditor einrichten. Zuerst die App
+  aktualisieren, dann die Integration.
   - **Entitäten direkt**: Statt eines gespeicherten Charts lassen sich bis zu
     zehn archivierte Entitäten mit Zeitraum und Darstellung wählen.
   - **Darstellungen**: Linien, Balken, gestapelt und in Prozent, Vergleich mit
@@ -29,7 +30,7 @@
   only, needs a current Zeitarchiv app): Shows a saved chart or a saved table
   of Zeitarchiv directly on your dashboard, in light and dark mode and with
   labels in the Home Assistant language. The card can be set up in the card
-  editor.
+  editor. Update the app first, then the integration.
   - **Entities directly**: Instead of a saved chart you can pick up to ten
     archived entities with a period and a display style.
   - **Displays**: Lines, bars, stacked and in percent, comparison with the

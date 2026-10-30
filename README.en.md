@@ -440,10 +440,12 @@ style: stacked       # auto (per entity), stacked, percent (shares in percent)
 - **Only the integration talks to Zeitarchiv.** The card never contacts the app; it
   goes through Home Assistant and the token stays in the integration. The app needs
   the "cards" capability for this (update the app if the card says so).
+- **Update order:** the Zeitarchiv app first, then the integration. If the app is older than the
+  integration, the card shows "The Zeitarchiv app is too old for the card" until the app is updated.
 - **What the card draws:** every view of a saved chart: numbers as line, bars, stacked and as shares in percent,
   with previous period, previous year and multi-year comparison, plus timeline, donut and, for states, shares,
   changes and heatmap. Tooltips, light and dark theme. The period saved with the chart applies. Saved comparison tables are shown with the same cells, formulas and
-  styles as in the tile (source "Saved table", `table_id`); the hover hints of the table are not in the card yet.
+  styles as in the tile (source "Saved table", `table_id`).
 - If the app is unreachable, the last image stays and the card shows its age.
 
 ### History under a tile card

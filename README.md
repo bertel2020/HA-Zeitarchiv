@@ -462,11 +462,13 @@ style: stacked       # auto (je Entität), stacked (gestapelt), percent (Anteile
 - **Nur die Integration spricht mit dem Zeitarchiv.** Die Karte spricht nie mit der App,
   sondern über Home Assistant; der Token bleibt in der Integration. Dafür braucht die
   App die Fähigkeit „cards“ (App-Update, wenn die Karte darauf hinweist).
+- **Reihenfolge beim Aktualisieren:** erst die Zeitarchiv-App, dann die Integration. Ist die App älter als
+  die Integration, zeigt die Karte „Die Zeitarchiv-App ist zu alt für die Karte“, bis die App aktualisiert ist.
 - **Was die Karte zeichnet:** alle Darstellungen eines gespeicherten Charts: Zahlen als Linie, Balken, gestapelt
   und als Anteile in Prozent, mit Vorperiode, Vorjahr und Mehrjahresvergleich, dazu Zeitstrahl, Donut und bei
   Zuständen Anteile, Wechsel und Heatmap. Tooltips, helles und dunkles Thema. Der im Chart gespeicherte Zeitraum
   gilt. Gespeicherte Vergleichstabellen werden mit denselben Zellen, Formeln und Stilen wie in der Kachel gezeigt
-  (Quelle „Gespeicherte Tabelle“, `table_id`); die Hinweise beim Überfahren der Tabelle gibt es in der Karte noch nicht.
+  (Quelle „Gespeicherte Tabelle“, `table_id`).
 - Bei einem Ausfall der App bleibt das letzte Bild stehen und die Karte nennt sein Alter.
 
 ### Verlauf unter einer Kachelkarte
