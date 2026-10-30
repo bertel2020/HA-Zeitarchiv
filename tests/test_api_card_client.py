@@ -64,9 +64,20 @@ def test_failures_are_told_apart() -> None:
         with patch(GET, return_value=_Resp({}, status)), pytest.raises(ZeitarchivCardError) as raised:
             client.get_card_chart(1)
         assert raised.value.status == status
-    for bad in (_Resp({}, 500), _Resp(None), _Resp([1])):
-        with patch(GET, return_value=bad), pytest.raises(ZeitarchivApiError):
+        assert raised.value.route_missing is False
+    # Ein Fehler der App ist ein eigener Fall, nicht "nicht erreichbar".
+    for status in (500, 502, 503):
+        with patch(GET, return_value=_Resp(None, status)), pytest.raises(ZeitarchivCardError) as raised:
             client.get_card_chart(1)
+        assert raised.value.status == status
+    # Eine 404 ohne JSON kommt von einer Route, die die App (oder ihr nginx) nicht kennt.
+    with patch(GET, return_value=_Resp(None, 404)), pytest.raises(ZeitarchivCardError) as raised:
+        client.get_card_chart(1)
+    assert raised.value.route_missing is True
+    for bad in (_Resp(None), _Resp([1])):
+        with patch(GET, return_value=bad), pytest.raises(ZeitarchivApiError) as raised:
+            client.get_card_chart(1)
+        assert not isinstance(raised.value, ZeitarchivCardError)
     assert not issubclass(ZeitarchivCardError, ZeitarchivAuthError)
 
 

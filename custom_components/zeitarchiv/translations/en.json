@@ -144,7 +144,7 @@
       },
       "card_sharing": {
         "title": "Zeitarchiv – Share card",
-        "description": "Charts and tables chosen here are shown in the Zeitarchiv card to every signed-in user, even without administrator rights. Everything else stays with administrators, as do the card with freely chosen entities and the sparkline.",
+        "description": "Charts and tables chosen here are shown in the Zeitarchiv card to every signed-in user, even without administrator rights. The sparkline under a tile card may be fetched by all users anyway. The card with freely chosen entities stays with administrators.",
         "data": {
           "card_shared_charts": "Saved charts",
           "card_shared_tables": "Saved tables"

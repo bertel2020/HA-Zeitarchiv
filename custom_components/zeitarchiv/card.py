@@ -8,8 +8,10 @@ Token der Verbindung serverseitig behalten. Dahinter stehen /api/card/items und
 Standardmäßig nur Administratoren: Jeder angemeldete Benutzer könnte sonst jedes
 gespeicherte Chart über seine ID abfragen, und Home Assistant kennt keine Rechte je
 Chart. Was ein Administrator in den Optionen unter "Karte freigeben" benennt, sehen
-auch andere Benutzer (Wandtablets, Familienkonten); Entitäten direkt und die
-Sparkline bleiben Administratoren vorbehalten. Die Befehle nehmen deshalb ausschließlich eine ganzzahlige Chart-ID (und einen
+auch andere Benutzer (Wandtablets, Familienkonten). Die Sparkline unter einer Kachelkarte
+dürfen alle Benutzer abrufen: wer eine Entität in Home Assistant sieht, kann ihren Verlauf
+dort ohnehin lesen (History-API, ohne Administratorrechte). Entitäten direkt bleiben
+Administratoren vorbehalten. Die Befehle nehmen deshalb ausschließlich eine ganzzahlige Chart-ID (und einen
 Stichtag) an und bauen den Pfad selbst; nie reicht die Integration einen frei
 wählbaren Pfad oder Parameter an die App durch, sonst wäre sie ein Proxy an der
 Whitelist des Token-Ports vorbei.
@@ -21,6 +23,7 @@ der der Dashboard-Kacheln der App; frontend/ enthält unveränderte Kopien.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from pathlib import Path
@@ -59,6 +62,12 @@ CACHE_SECONDS = 30.0
 CACHE_MAX_ENTRIES = 64
 
 _CACHE_KEY = f"{DOMAIN}_card_cache"
+_INFLIGHT_KEY = f"{DOMAIN}_card_inflight"
+_SLOTS_KEY = f"{DOMAIN}_card_slots"
+
+#: Wie viele Abfragen der Karte gleichzeitig zur App laufen. Die App erlaubt vier und
+#: antwortet sonst mit 429; ein Platz bleibt frei für die Auswahl im Editor.
+MAX_APP_QUERIES = 3
 
 # Die Codes sind der Vertrag mit der Karte (sie übersetzt sie selbst).
 ERROR_NOT_LOADED = "not_loaded"
@@ -69,6 +78,7 @@ ERROR_AUTH = "auth_failed"
 ERROR_UNREACHABLE = "unreachable"
 ERROR_INVALID = "invalid"
 ERROR_TOO_LARGE = "too_large"
+ERROR_APP_ERROR = "app_error"
 
 _DAY = r"^\d{4}-\d{2}-\d{2}$"
 _PX_STEP = 100
@@ -93,6 +103,8 @@ async def async_setup_card(hass: HomeAssistant) -> None:
         _LOGGER.debug("Kein Webserver, Zeitarchiv-Karte wird nicht angemeldet")
         return
     hass.data[_CACHE_KEY] = {}
+    hass.data[_INFLIGHT_KEY] = {}
+    hass.data[_SLOTS_KEY] = {}
     integration = await async_get_integration(hass, DOMAIN)
     await hass.http.async_register_static_paths([StaticPathConfig(URL_BASE, str(FRONTEND_DIR), True)])
     # Das Frontend ist bewusst keine harte Abhängigkeit (after_dependencies
@@ -137,6 +149,35 @@ def _remember(hass: HomeAssistant, key: tuple, value: dict[str, Any]) -> None:
     cache[key] = (now, value)
 
 
+async def _query_app(hass: HomeAssistant, entry, key: tuple, call) -> dict[str, Any]:
+    """Eine Abfrage an die App. Gleiche Abfragen, die gleichzeitig eintreffen (ein Dashboard mit
+    mehreren Karten desselben Charts, mehrere Betrachter), teilen sich einen Abruf; verschiedene
+    laufen höchstens MAX_APP_QUERIES gleichzeitig, der Rest wartet. So bekommt niemand ein
+    "beschäftigt" der App, nur weil ein Dashboard viele Karten auf einmal öffnet."""
+    inflight: dict[tuple, asyncio.Task] = hass.data[_INFLIGHT_KEY]
+    task = inflight.get(key)
+    if task is None:
+        slots = hass.data[_SLOTS_KEY].setdefault(entry.entry_id, asyncio.Semaphore(MAX_APP_QUERIES))
+
+        async def run() -> dict[str, Any]:
+            try:
+                async with slots:
+                    result = await hass.async_add_executor_job(call, entry.runtime_data.client)
+                _remember(hass, key, result)
+                return result
+            finally:
+                inflight.pop(key, None)
+
+        # Nicht eifrig starten: der Abruf darf erst laufen, wenn er in inflight eingetragen ist, sonst
+        # räumt sein finally einen Eintrag ab, der noch gar nicht da war, und er bliebe für immer stehen.
+        task = hass.async_create_task(run(), eager_start=False)
+        inflight[key] = task
+        # Ein Fehler, den gerade niemand mehr abwartet, ist trotzdem "gesehen".
+        task.add_done_callback(lambda done: done.cancelled() or done.exception())
+    # shield: bricht ein Betrachter ab (Verbindung zu), läuft der Abruf für die anderen weiter.
+    return await asyncio.shield(task)
+
+
 def shared_ids(entry, option: str) -> set[int]:
     """Die für alle Benutzer freigegebenen IDs (Optionen der Verbindung)."""
     return {value for value in entry.options.get(option, []) if isinstance(value, int)}
@@ -153,6 +194,16 @@ def _may_see(hass: HomeAssistant, connection, msg: dict[str, Any], option: str, 
         return True
     connection.send_error(msg["id"], "unauthorized", "Nicht für die Karte freigegeben")
     return False
+
+
+def _mark_shared(entry, result: dict[str, Any]) -> dict[str, Any]:
+    """Für Administratoren: je Eintrag, ob ihn auch andere Benutzer sehen (Hinweis im Editor)."""
+    charts, tables = shared_ids(entry, CONF_CARD_SHARED_CHARTS), shared_ids(entry, CONF_CARD_SHARED_TABLES)
+    return {
+        **result,
+        "items": [{**item, "shared": item.get("id") in charts} for item in result.get("items", [])],
+        "tables": [{**item, "shared": item.get("id") in tables} for item in result.get("tables", [])],
+    }
 
 
 def _only_shared(entry, result: dict[str, Any]) -> dict[str, Any]:
@@ -186,12 +237,16 @@ async def _fetch(
     result = _cached(hass, key)
     if result is None:
         try:
-            result = await hass.async_add_executor_job(call, runtime.client)
+            result = await _query_app(hass, entry, key, call)
         except ZeitarchivAuthError:
             connection.send_error(msg["id"], ERROR_AUTH, "Zugangsdaten von der App abgelehnt")
             return
         except ZeitarchivCardError as err:
-            if err.status == 429:
+            if err.route_missing:
+                connection.send_error(msg["id"], ERROR_APP_OUTDATED, "Die Zeitarchiv-App ist zu alt für die Karte")
+            elif err.status >= 500:
+                connection.send_error(msg["id"], ERROR_APP_ERROR, "Die Zeitarchiv-App hat einen Fehler gemeldet")
+            elif err.status == 429:
                 connection.send_error(msg["id"], ERROR_BUSY, "Zeitarchiv ist gerade beschäftigt")
             elif err.status == 413:
                 connection.send_error(msg["id"], ERROR_TOO_LARGE, "Zu viele Datenpunkte für diesen Zeitraum")
@@ -204,7 +259,6 @@ async def _fetch(
             _LOGGER.debug("Karte: Abruf in der App fehlgeschlagen: %s", err)
             connection.send_error(msg["id"], ERROR_UNREACHABLE, "Zeitarchiv nicht erreichbar")
             return
-        _remember(hass, key, result)
     connection.send_result(msg["id"], transform(entry, result) if transform else result)
 
 
@@ -217,7 +271,7 @@ async def ws_card_items(hass: HomeAssistant, connection, msg: dict[str, Any]) ->
     sehen nur die freigegebenen (und im Editor ohnehin nichts zu tun)."""
     await _fetch(
         hass, connection, msg, ("items",), lambda client: client.get_card_items(),
-        transform=None if connection.user.is_admin else _only_shared,
+        transform=_mark_shared if connection.user.is_admin else _only_shared,
     )
 
 
@@ -275,7 +329,6 @@ async def ws_card_series(hass: HomeAssistant, connection, msg: dict[str, Any]) -
     )
 
 
-@websocket_api.require_admin
 @websocket_api.websocket_command(
     {
         "type": "zeitarchiv/card/spark",
@@ -286,7 +339,7 @@ async def ws_card_series(hass: HomeAssistant, connection, msg: dict[str, Any]) -
 )
 @websocket_api.async_response
 async def ws_card_spark(hass: HomeAssistant, connection, msg: dict[str, Any]) -> None:
-    """Kurze Reihe einer Entität für die Sparkline unter einer Kachelkarte."""
+    """Kurze Reihe einer Entität für die Sparkline unter einer Kachelkarte (alle Benutzer)."""
     entity_id, range_key = msg["entity_id"], msg["range"]
     await _fetch(
         hass, connection, msg, ("spark", entity_id, range_key),

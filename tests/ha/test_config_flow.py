@@ -528,6 +528,7 @@ async def test_options_card_sharing_saves_known_ids_only(
         loaded_entry, options={**loaded_entry.options, CONF_CARD_SHARED_CHARTS: [7, 99]}
     )
     await hass.async_block_till_done()
+    runtime_before = loaded_entry.runtime_data
     with patch("custom_components.zeitarchiv.api.ZeitarchivClient.get_card_items", return_value=CARD_ITEMS):
         result = await _open_options_step(hass, loaded_entry, "card_sharing")
         assert result["step_id"] == "card_sharing"
@@ -542,6 +543,9 @@ async def test_options_card_sharing_saves_known_ids_only(
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert loaded_entry.options[CONF_CARD_SHARED_CHARTS] == [7, 9]
     assert loaded_entry.options[CONF_CARD_SHARED_TABLES] == [3]
+    # Die Freigabe liest die Karte bei jeder Anfrage; die Verbindung wird dafür nicht neu geladen.
+    assert loaded_entry.runtime_data is runtime_before
+    assert loaded_entry.state is ConfigEntryState.LOADED
 
 
 async def test_options_card_sharing_aborts_without_the_app(
@@ -581,3 +585,13 @@ async def test_the_card_sharing_survives_saving_the_filters_and_an_import(
     await hass.async_block_till_done()
     assert loaded_entry.options[CONF_CARD_SHARED_CHARTS] == [7]
     assert loaded_entry.options[CONF_CARD_SHARED_TABLES] == [3]
+
+
+async def test_changing_the_filters_still_reloads_the_connection(
+    hass: HomeAssistant, loaded_entry: MockConfigEntry
+) -> None:
+    runtime_before = loaded_entry.runtime_data
+    hass.config_entries.async_update_entry(loaded_entry, options={**loaded_entry.options, CONF_ENTITIES: ["sensor.x"]})
+    await hass.async_block_till_done()
+    assert loaded_entry.runtime_data is not runtime_before
+    assert loaded_entry.state is ConfigEntryState.LOADED

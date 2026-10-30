@@ -23,6 +23,8 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Mapping
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT, EVENT_STATE_CHANGED
@@ -47,6 +49,8 @@ from homeassistant.loader import async_get_integration
 from .api import ZeitarchivApiError, ZeitarchivAuthError, ZeitarchivClient, capabilities_from
 from .const import (
     CONF_API_TOKEN,
+    CONF_CARD_SHARED_CHARTS,
+    CONF_CARD_SHARED_TABLES,
     CONF_DECIMAL_PLACES,
     DEFAULT_DECIMAL_PLACES,
     DOMAIN,
@@ -76,6 +80,8 @@ PLATFORMS: list = ["sensor", "binary_sensor"]
 # dabei den dortigen Index-Lock so dicht besetzt hält, dass parallele
 # Anfragen mit 503 scheitern (an einer echten Installation beobachtet).
 _WATERMARK_STORAGE_VERSION = 1
+#: Die Optionen (ohne Freigabe der Karte), mit denen der Eintrag geladen wurde, je Eintrag.
+_OPTIONS_SEEN = f"{DOMAIN}_options_seen"
 
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
@@ -402,6 +408,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
     entry.async_on_unload(notices_coordinator.async_add_listener(_send_catalog))
     _send_catalog()
 
+    hass.data.setdefault(_OPTIONS_SEEN, {})[entry.entry_id] = _reload_relevant(entry)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     # Erst NACH dem obigen runtime_data weiterreichen — sensor.py liest
     # genau diese Daten in seinem eigenen async_setup_entry.
@@ -485,8 +492,22 @@ def _watermark_store(hass: HomeAssistant, entry: ConfigEntry) -> Store[dict[str,
     return Store(hass, _WATERMARK_STORAGE_VERSION, f"{DOMAIN}_{entry.entry_id}_watermark")
 
 
+def _reload_relevant(entry: ZeitarchivConfigEntry) -> dict[str, Any]:
+    """Verbindungsdaten und Optionen ohne die Freigabe der Karte: nur sie ändern, was beim
+    Laden entsteht."""
+    options: Mapping[str, Any] = entry.options
+    return {
+        "data": dict(entry.data),
+        "options": {k: v for k, v in options.items() if k not in (CONF_CARD_SHARED_CHARTS, CONF_CARD_SHARED_TABLES)},
+    }
+
+
 async def _async_update_listener(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -> None:
-    """Lädt den Entry neu, wenn sich die Options-Flow-Filter ändern."""
+    """Lädt den Entry neu, wenn sich die Options-Flow-Filter ändern. Die Freigabe der Karte
+    liest die Karte bei jeder Anfrage aus den Optionen; sie zu ändern braucht kein Neuladen
+    (sonst zeigten alle Karten für den Moment "nicht geladen")."""
+    if _reload_relevant(entry) == hass.data.get(_OPTIONS_SEEN, {}).get(entry.entry_id):
+        return
     await hass.config_entries.async_reload(entry.entry_id)
 
 

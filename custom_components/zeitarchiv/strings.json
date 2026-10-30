@@ -144,7 +144,7 @@
       },
       "card_sharing": {
         "title": "Zeitarchiv – Karte freigeben",
-        "description": "Hier gewählte Charts und Tabellen sieht jeder angemeldete Benutzer in der Zeitarchiv-Karte, auch ohne Administratorrechte. Alles andere bleibt Administratoren vorbehalten, ebenso die Karte mit frei gewählten Entitäten und die Sparkline.",
+        "description": "Hier gewählte Charts und Tabellen sieht jeder angemeldete Benutzer in der Zeitarchiv-Karte, auch ohne Administratorrechte. Die Sparkline unter einer Kachelkarte dürfen ohnehin alle Benutzer abrufen. Die Karte mit frei gewählten Entitäten bleibt Administratoren vorbehalten.",
         "data": {
           "card_shared_charts": "Gespeicherte Charts",
           "card_shared_tables": "Gespeicherte Tabellen"

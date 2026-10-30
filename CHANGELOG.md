@@ -17,8 +17,8 @@
   - **Für alle Benutzer freigeben**: Standardmäßig sehen nur Administratoren die
     Karte. In den Einstellungen der Integration unter **Karte freigeben**
     wählst du Charts und Tabellen, die jeder angemeldete Benutzer sieht, zum
-    Beispiel auf einem Wandtablet. Entitäten direkt und die Sparkline bleiben
-    Administratoren vorbehalten.
+    Beispiel auf einem Wandtablet. Entitäten direkt bleiben Administratoren
+    vorbehalten.
   - **Entitäten direkt**: Statt eines gespeicherten Charts lassen sich bis zu
     zehn archivierte Entitäten mit Zeitraum und Darstellung wählen.
   - **Darstellungen**: Linien, Balken, gestapelt und in Prozent, Vergleich mit
@@ -27,7 +27,8 @@
     Stand mit Hinweis und versucht es mit wachsendem Abstand erneut.
 - **Sparkline für Kachelkarten**: Als zusätzliche Funktion der normalen
   Home-Assistant-Kachelkarte zeigt eine kleine Sparkline den Verlauf einer
-  archivierten Zahlen-Entität (24 Stunden, 7 oder 30 Tage).
+  archivierten Zahlen-Entität (24 Stunden, 7 oder 30 Tage). Sie ist für alle
+  Benutzer sichtbar.
 
 ---
 
@@ -47,7 +48,7 @@
   - **Share with all users**: By default only administrators see the card. In
     the integration settings under **Share card** you choose charts and tables
     that every signed-in user sees, for example on a wall tablet. Entities
-    directly and the sparkline stay with administrators.
+    directly stay with administrators.
   - **Entities directly**: Instead of a saved chart you can pick up to ten
     archived entities with a period and a display style.
   - **Displays**: Lines, bars, stacked and in percent, comparison with the
@@ -56,7 +57,7 @@
     state with a notice and retries at growing intervals.
 - **Sparkline for tile cards**: As an extra feature of the regular Home
   Assistant tile card, a small sparkline shows the history of an archived numeric
-  entity (24 hours, 7 or 30 days).
+  entity (24 hours, 7 or 30 days). It is visible to all users.
 
 ## 1.2.1 - 2026-10-25
 

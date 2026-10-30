@@ -60,7 +60,12 @@ async def test_an_administrator_gets_the_items(
     client = await hass_ws_client(hass)
     response = await _call(client, {"type": "zeitarchiv/card/items"})
     assert response["success"] is True
-    assert response["result"] == ITEMS
+    # Der Administrator sieht je Eintrag, ob ihn auch andere Benutzer sehen (Hinweis im Editor).
+    assert response["result"] == {
+        "spec_version": 1,
+        "items": [{**ITEMS["items"][0], "shared": False}],
+        "tables": [],
+    }
 
 
 async def test_a_chart_is_asked_for_by_whole_number_and_day_only(
@@ -166,6 +171,9 @@ async def test_the_cache_expires(
     ("error", "code"),
     [
         (ZeitarchivCardError("weg", 404), "not_found"),
+        (ZeitarchivCardError("keine Route", 404, route_missing=True), "app_outdated"),
+        (ZeitarchivCardError("kaputt", 500), "app_error"),
+        (ZeitarchivCardError("kaputt", 503), "app_error"),
         (ZeitarchivCardError("voll", 429), "busy"),
         (ZeitarchivCardError("zu groß", 413), "too_large"),
         (ZeitarchivCardError("abgelehnt", 400), "invalid"),
@@ -184,7 +192,8 @@ async def test_failures_of_the_app_come_back_as_codes(
     assert response["error"]["code"] == code
     # Ein Fehler landet nicht im Zwischenspeicher.
     card_client.get_card_chart.side_effect = None
-    assert (await _call(client, {"type": "zeitarchiv/card/chart", "chart_id": 7}))["success"] is True
+    again = await _call(client, {"type": "zeitarchiv/card/chart", "chart_id": 7})
+    assert again["success"] is True, again
 
 
 async def test_an_app_without_the_capability_is_named(
@@ -355,15 +364,19 @@ async def test_a_spark_takes_one_id_and_a_known_range_only(
     ask.assert_not_called()
 
 
-async def test_a_spark_needs_an_admin_and_an_app_that_knows_it(
+async def test_a_spark_is_open_to_all_users_and_needs_an_app_that_knows_it(
     hass: HomeAssistant, hass_ws_client: WebSocketGenerator, hass_read_only_access_token: str,
     series_client: MagicMock, loaded_entry: MockConfigEntry,
 ) -> None:
     loaded_entry.runtime_data.notices_coordinator.async_set_updated_data({**NOTICES, "capabilities": ["cards", "card_series"]})
     admin = await hass_ws_client(hass)
     assert (await _call(admin, {"type": "zeitarchiv/card/spark", "entity_id": "sensor.a"}))["error"]["code"] == "app_outdated"
+    # Wer die Entität in HA sieht, liest ihren Verlauf dort ohnehin; die Sparkline ist nicht auf Administratoren beschränkt.
     other = await hass_ws_client(hass, hass_read_only_access_token)
-    assert (await _call(other, {"type": "zeitarchiv/card/spark", "entity_id": "sensor.a"}))["error"]["code"] == "unauthorized"
+    assert (await _call(other, {"type": "zeitarchiv/card/spark", "entity_id": "sensor.a"}))["error"]["code"] == "app_outdated"
+    loaded_entry.runtime_data.notices_coordinator.async_set_updated_data({**NOTICES, "capabilities": ["cards", "card_spark"]})
+    with patch("custom_components.zeitarchiv.api.ZeitarchivClient.get_card_spark", return_value=SPARK):
+        assert (await _call(other, {"type": "zeitarchiv/card/spark", "entity_id": "sensor.a"}))["success"] is True
 
 
 async def test_the_width_of_the_card_is_rounded_up_and_part_of_the_cache_key(
@@ -412,3 +425,67 @@ async def test_a_table_needs_a_share_for_other_users_and_an_app_that_knows_it(
     assert (await _call(admin, {"type": "zeitarchiv/card/table", "table_id": 4}))["error"]["code"] == "app_outdated"
     other = await hass_ws_client(hass, hass_read_only_access_token)
     assert (await _call(other, {"type": "zeitarchiv/card/table", "table_id": 4}))["error"]["code"] == "unauthorized"
+
+
+
+async def test_equal_asks_arriving_together_share_one_call_to_the_app(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, card_client: MagicMock, loaded_entry: MockConfigEntry
+) -> None:
+    """Ein Dashboard mit mehreren Karten desselben Charts fragt die App einmal, nicht mehrfach."""
+    import threading
+
+    started = threading.Event()
+    release = threading.Event()
+
+    def slow(*_args, **_kwargs):
+        started.set()
+        release.wait(5)
+        return CHART
+
+    card_client.get_card_chart.side_effect = slow
+    client = await hass_ws_client(hass)
+    ids = []
+    for _ in range(4):
+        client.last_id = getattr(client, "last_id", 0) + 1
+        ids.append(client.last_id)
+        await client.send_json({"id": client.last_id, "type": "zeitarchiv/card/chart", "chart_id": 7})
+    await hass.async_add_executor_job(started.wait, 5)
+    release.set()
+    answers = [await client.receive_json() for _ in ids]
+    assert all(answer["success"] for answer in answers)
+    assert card_client.get_card_chart.call_count == 1
+
+
+async def test_different_asks_run_a_few_at_a_time_and_none_is_turned_away(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, card_client: MagicMock, loaded_entry: MockConfigEntry
+) -> None:
+    """Die App erlaubt vier gleichzeitige Abfragen und antwortet sonst 429; die Integration lässt höchstens
+    drei los und stellt den Rest an."""
+    import threading
+    import time
+
+    from custom_components.zeitarchiv.card import MAX_APP_QUERIES
+
+    lock = threading.Lock()
+    running = {"now": 0, "most": 0}
+
+    def tracked(*_args, **_kwargs):
+        with lock:
+            running["now"] += 1
+            running["most"] = max(running["most"], running["now"])
+        time.sleep(0.05)
+        with lock:
+            running["now"] -= 1
+        return CHART
+
+    card_client.get_card_chart.side_effect = tracked
+    client = await hass_ws_client(hass)
+    ids = []
+    for chart_id in range(1, 11):
+        client.last_id = getattr(client, "last_id", 0) + 1
+        ids.append(client.last_id)
+        await client.send_json({"id": client.last_id, "type": "zeitarchiv/card/chart", "chart_id": chart_id})
+    answers = [await client.receive_json() for _ in ids]
+    assert all(answer["success"] for answer in answers), [a for a in answers if not a["success"]]
+    assert card_client.get_card_chart.call_count == 10
+    assert 1 < running["most"] <= MAX_APP_QUERIES

@@ -445,8 +445,8 @@ style: stacked       # auto (per entity), stacked, percent (shares in percent)
 - **Administrators only by default.** Home Assistant has no per-chart permissions, so the card
   shows nothing to other users. To run it on a wall tablet or under a family account, choose in
   the integration settings (**Configure → Share card**) the charts and tables every signed-in
-  user may see. Only those can be fetched; entities directly and the sparkline stay with
-  administrators.
+  user may see. Only those can be fetched; entities directly stay with administrators. All users
+  may fetch the sparkline under a tile card: whoever sees an entity in Home Assistant can read its history there anyway.
 - **Only the integration talks to Zeitarchiv.** The card never contacts the app; it
   goes through Home Assistant and the token stays in the integration. The app needs
   the "cards" capability for this (update the app if the card says so).

@@ -34,6 +34,10 @@ const TEXTS = {
     busy: 'Zeitarchiv ist gerade beschäftigt, nächster Versuch folgt.',
     auth_failed: 'Zeitarchiv hat die Zugangsdaten abgelehnt.',
     unreachable: 'Zeitarchiv ist nicht erreichbar.',
+    app_error: 'Zeitarchiv hat einen Fehler gemeldet. Details stehen im Protokoll der App.',
+    staleError: 'Fehler in Zeitarchiv · Stand vor {min} Min',
+    notShared: 'Nicht freigegeben: Andere Benutzer sehen diese Karte nicht. Freigabe in den Einstellungen der Integration unter „Karte freigeben“.',
+    entitiesAdminOnly: 'Entitäten direkt sehen nur Administratoren. Für andere Benutzer ein gespeichertes Chart freigeben.',
     unauthorized: 'Für dich nicht freigegeben. Ein Administrator kann Charts und Tabellen in den Einstellungen der Integration unter „Karte freigeben“ freigeben.',
     unknown: 'Die Karte konnte nicht geladen werden.',
     spec: 'Die Karte passt nicht zur Version der Zeitarchiv-App.',
@@ -80,6 +84,10 @@ const TEXTS = {
     busy: 'Zeitarchiv is busy, trying again shortly.',
     auth_failed: 'Zeitarchiv rejected the credentials.',
     unreachable: 'Zeitarchiv is not reachable.',
+    app_error: 'Zeitarchiv reported an error. Details are in the app log.',
+    staleError: 'Error in Zeitarchiv · as of {min} min ago',
+    notShared: 'Not shared: other users will not see this card. Share it in the integration settings under “Share card”.',
+    entitiesAdminOnly: 'Entities directly are visible to administrators only. Share a saved chart for other users.',
     unauthorized: 'Not shared with you. An administrator can share charts and tables in the integration settings under “Share card”.',
     unknown: 'The card could not be loaded.',
     spec: 'The card does not match the version of the Zeitarchiv app.',
@@ -156,13 +164,14 @@ const loadSources = () => {
       fetchText('table.css'), fetchText('catalog.json'),
     ]);
     const module = {exports: {}};
-    new Function('module', 'exports', echartsSource).call(module.exports, module, module.exports);
+    new Function('module', 'exports', `${echartsSource}\n//# sourceURL=zeitarchiv/echarts.min.js`).call(module.exports, module, module.exports);
     return {echarts: module.exports, render, numberFormat, tooltipHold, serverTime, htmlEscape, stateEntities, tableCompute, tableRender, tableCss, catalog: JSON.parse(catalog)};
   })().catch((err) => { sourcesPromise = null; throw err; });
   return sourcesPromise;
 };
 
-const evaluate = (source, names, values) => new Function(...names, source)(...values);
+// Mit sourceURL, damit Fehler in den ausgewerteten Dateien in der Konsole ihren Dateinamen tragen.
+const evaluate = (source, names, values, file) => new Function(...names, `${source}\n//# sourceURL=zeitarchiv/${file}`)(...values);
 
 const buildRuntime = (sources, {timezone, language, dark}) => {
   const palette = dark ? PALETTES.dark : PALETTES.light;
@@ -192,22 +201,23 @@ const buildRuntime = (sources, {timezone, language, dark}) => {
     if (values) result = result.replace(/\{(\w+)\}/g, (m, k) => (k in values ? values[k] : m));
     return result;
   };
-  evaluate(sources.numberFormat, ['window', 'document'], [win, doc]);
-  evaluate(sources.tooltipHold, ['window', 'document', 't', 'NumberFormat'], [win, doc, t, win.NumberFormat]);
-  evaluate(sources.serverTime, ['window', 'document'], [win, doc]);
-  evaluate(sources.htmlEscape, ['window'], [win]);
+  evaluate(sources.numberFormat, ['window', 'document'], [win, doc], 'number-format.js');
+  evaluate(sources.tooltipHold, ['window', 'document', 't', 'NumberFormat'], [win, doc, t, win.NumberFormat], 'tooltip-hold.js');
+  evaluate(sources.serverTime, ['window', 'document'], [win, doc], 'server-time.js');
+  evaluate(sources.htmlEscape, ['window'], [win], 'html-escape.js');
   evaluate(sources.stateEntities, ['window', 'document', 'getComputedStyle', 't', 'NumberFormat', 'escapeHtml'],
-    [win, doc, getComputedStyle, t, win.NumberFormat, win.escapeHtml]);
+    [win, doc, getComputedStyle, t, win.NumberFormat, win.escapeHtml], 'state-entities.js');
   const render = evaluate(
     `${sources.render}\nreturn window.ChartTileRender;`,
     ['window', 'document', 'getComputedStyle', 't', 'NumberFormat', 'TooltipHold', 'StateEntities', 'PeriodNavigation', 'echarts', 'escapeHtml'],
     [win, doc, getComputedStyle, t, win.NumberFormat, win.TooltipHold, win.StateEntities, {}, sources.echarts, win.escapeHtml],
+    'chart-tile-render.js',
   );
   // Tabellen: dieselben Dateien wie die Tabellen-Kachel der App.
-  evaluate(sources.tableCompute, ['window', 'document', 't'], [win, doc, t]);
+  evaluate(sources.tableCompute, ['window', 'document', 't'], [win, doc, t], 'table-compute.js');
   const TableTileRender = evaluate(
     `${sources.tableRender}\nreturn window.TableTileRender;`,
-    ['window', 't', 'escapeHtml', 'TableCompute'], [win, t, win.escapeHtml, win.TableCompute],
+    ['window', 't', 'escapeHtml', 'TableCompute'], [win, t, win.escapeHtml, win.TableCompute], 'table-tile-render.js',
   );
   return {render, setVars: (map) => Object.assign(vars, map), tables: {TableCompute: win.TableCompute, TableTileRender}};
 };
@@ -402,7 +412,18 @@ class ZeitarchivCard extends HTMLElement {
   set hass(hass) {
     const first = !this._hass;
     this._hass = hass;
-    if (first && this._config) this._load();
+    if (first && this._config) { this._look = this._lookOf(hass); this._load(); return; }
+    // Hell/Dunkel, Thema oder Sprache gewechselt: neu zeichnen, statt bis zur nächsten Aktualisierung
+    // (bis zu einer Stunde) mit den alten Farben stehen zu bleiben. Die Antwort kommt meist aus dem Cache.
+    const look = this._lookOf(hass);
+    if (this._look !== look) {
+      this._look = look;
+      if (this._config && this._shown) this._load();
+    }
+  }
+
+  _lookOf(hass) {
+    return `${hass?.themes?.darkMode}|${hass?.themes?.theme}|${hass?.locale?.language || hass?.language}`;
   }
 
   // Abschnittsansicht: volle Breite (mindestens die halbe), die Höhe ergibt sich aus der Karte selbst
@@ -520,8 +541,8 @@ class ZeitarchivCard extends HTMLElement {
     if (key !== 'unknown' && key !== 'script' && err.code !== 'unauthorized') console.debug('Zeitarchiv-Karte:', err.code, err.message);
     else console.warn('Zeitarchiv-Karte:', err);
     // Ein Ausfall nach einem guten Stand lässt das Bild stehen und sagt nur, wie alt es ist.
-    if (this._shown && this._lastGood && ['unreachable', 'busy', 'auth_failed', 'too_large'].includes(key)) {
-      this._els.badge.textContent = text(this._hass, 'stale', {min: Math.max(1, Math.round((Date.now() - this._lastGood) / 60000))});
+    if (this._shown && this._lastGood && ['unreachable', 'busy', 'auth_failed', 'too_large', 'app_error'].includes(key)) {
+      this._els.badge.textContent = text(this._hass, key === 'app_error' ? 'staleError' : 'stale', {min: Math.max(1, Math.round((Date.now() - this._lastGood) / 60000))});
       this._els.badge.hidden = false;
       return;
     }
@@ -770,13 +791,27 @@ class ZeitarchivCardEditor extends HTMLElement {
       this._form = document.createElement('ha-form');
       this._form.computeLabel = (schema) => text(this._hass, schema.name);
       this._form.addEventListener('value-changed', (event) => this._changed(event.detail.value));
-      this.replaceChildren(this._form);
+      this._hint = document.createElement('div');
+      this._hint.style.cssText = 'color: var(--secondary-text-color); font-size: 13px; padding: 4px 0 8px;';
+      this.replaceChildren(this._form, this._hint);
     }
     if (this._source === 'entities' && !this._entities) this._loadEntities();
     this._form.hass = this._hass;
     this._form.schema = this._schema();
     this._form.data = this._data();
     this._form.error = this._error ? {base: this._error} : undefined;
+    const hint = this._hintKey();
+    this._hint.textContent = hint ? text(this._hass, hint) : '';
+    this._hint.hidden = !hint;
+  }
+
+  // Der Administrator baut das Dashboard und sieht alles; was andere Benutzer sehen, zeigt dieser Hinweis.
+  _hintKey() {
+    const config = this._config || {};
+    if (this._source === 'entities') return config.entities?.length ? 'entitiesAdminOnly' : null;
+    const [list, id] = this._source === 'table' ? [this._tables, config.table_id] : [this._items, config.chart_id];
+    const item = id != null ? (list || []).find((entry) => String(entry.id) === String(id)) : null;
+    return item && item.shared === false ? 'notShared' : null;
   }
 }
 
