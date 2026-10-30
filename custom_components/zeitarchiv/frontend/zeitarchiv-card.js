@@ -411,9 +411,15 @@ class ZeitarchivCard extends HTMLElement {
     this._els.note.hidden = true;
     this._els.chart.hidden = false;
     if (!this._chart) this._chart = runtime.echarts.init(this._els.chart);
+    const style = this._themeStyle();
+    // Langzeit-Vergleich (ein Jahr, eine Entität): Monate je Jahr statt einer Zeitachse, wie auf der Kachel.
+    const multiYear = spec.compare?.longterm && series.length === 1 && Array.isArray(series[0].years)
+      ? R.tileMultiYear(series[0], result.data, spec.compare, {
+        small: false, color: spec.colorFor(series[0].entity_id), inkMuted: style.getPropertyValue('--ink-muted').trim(),
+      })
+      : null;
     R.draw(this._chart, {
-      spec, data: result.data, series, viewType: R.viewTypeFor(spec, series),
-      multiYear: null, hiddenSet: undefined, style: this._themeStyle(),
+      spec, data: result.data, series, viewType: R.viewTypeFor(spec, series), multiYear, hiddenSet: undefined, style,
     });
     this._chart.resize();
   }
