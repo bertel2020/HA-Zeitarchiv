@@ -443,7 +443,6 @@ chart_id: 12
 title: Stromverbrauch
 refresh: 60
 height: 260
-link: false                                   # optional: Link „Im Zeitarchiv öffnen“ ausblenden
 ```
 
 **Entitäten direkt:** Statt eines gespeicherten Charts lassen sich im Editor Entitäten, Zeitraum und Darstellung
@@ -457,9 +456,6 @@ entities:
 period: month        # day, week, month, year, 24h, 7d, 30d
 style: stacked       # auto (je Entität), stacked (gestapelt), percent (Anteile in Prozent)
 ```
-
-Der Link zum Zeitarchiv erscheint automatisch (die App meldet ihre Adresse in Home Assistant).
-Mit `link: /eigener/pfad` lässt sich eine andere Adresse eintragen.
 
 - **Nur für Administratoren.** Home Assistant kennt keine Rechte je Chart, deshalb
   zeigt die Karte anderen Benutzern nichts.

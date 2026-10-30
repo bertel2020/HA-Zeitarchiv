@@ -13,7 +13,6 @@
     zehn archivierte Entitäten mit Zeitraum und Darstellung wählen.
   - **Darstellungen**: Linien, Balken, gestapelt und in Prozent, Vergleich mit
     Vorperiode oder Vorjahr, Zeitstrahl, Zustände, Heatmap und Donut.
-  - **Link**: Optional öffnet ein Link das Zeitarchiv.
   - **Ausfälle**: Ist die App nicht erreichbar, zeigt die Karte den letzten
     Stand mit Hinweis und versucht es mit wachsendem Abstand erneut.
 - **Sparkline für Kachelkarten**: Als zusätzliche Funktion der normalen
@@ -35,7 +34,6 @@
     archived entities with a period and a display style.
   - **Displays**: Lines, bars, stacked and in percent, comparison with the
     previous period or year, timeline, states, heatmap and donut.
-  - **Link**: Optionally a link opens Zeitarchiv.
   - **Outages**: If the app cannot be reached, the card keeps showing the last
     state with a notice and retries at growing intervals.
 - **Sparkline for tile cards**: As an extra feature of the regular Home

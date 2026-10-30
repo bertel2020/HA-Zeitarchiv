@@ -75,6 +75,10 @@ table.dt.dt-cards td.dt-card-title {display:block;text-align:left;color:var(--in
 table.dt.dt-cards td.dt-card-title::before {content:none;}
 table.dt.dt-cards td.dt-card-title .ts-time, table.dt.dt-cards td.dt-card-title .id {display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 }
+.dtile-tooltip-fixed {position:fixed;background:var(--ink);color:var(--bg);padding:5px 9px;border-radius:6px;
+  font-size:calc(11px * var(--font-scale, 1));font-family:var(--font-mono);white-space:normal;
+  width:max-content;max-width:min(320px,calc(100vw - 16px));overflow-wrap:anywhere;
+  box-shadow:0 2px 8px rgba(0,0,0,.25);pointer-events:none;font-weight:400;z-index:1000;}
 table.dt tr.has-pending-purge td {background:color-mix(in srgb, var(--warning-soft) 55%, transparent);}
 table.dt tbody tr.has-pending-purge:hover td {background:var(--warning-soft);}
 @media (max-width:640px) {

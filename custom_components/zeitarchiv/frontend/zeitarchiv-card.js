@@ -24,7 +24,6 @@ const TEXTS = {
     chooseChart: 'Bitte ein Chart, eine Tabelle oder Entitäten aus dem Zeitarchiv wählen.',
     noVisible: 'Die Tabelle hat keine sichtbaren Zeilen oder Spalten.',
     unsupported: 'Diese Darstellung zeigt die Karte noch nicht.',
-    openLink: 'Im Zeitarchiv öffnen',
     stale: 'Stand vor {min} Min, Zeitarchiv nicht erreichbar',
     not_loaded: 'Keine Zeitarchiv-Verbindung eingerichtet.',
     app_outdated: 'Die Zeitarchiv-App ist zu alt für die Karte. Bitte die App aktualisieren.',
@@ -60,7 +59,6 @@ const TEXTS = {
     title: 'Titel (leer: Name des Charts)',
     refresh: 'Aktualisierung (Sekunden)',
     height: 'Höhe (Pixel)',
-    link: 'Eigener Link zum Zeitarchiv (leer: automatisch)',
     notSupportedShort: 'noch nicht darstellbar',
     description: 'Zeigt ein gespeichertes Chart oder Entitäten aus dem Zeitarchiv.',
   },
@@ -70,7 +68,6 @@ const TEXTS = {
     chooseChart: 'Please choose a chart, a table or entities from Zeitarchiv.',
     noVisible: 'The table has no visible rows or columns.',
     unsupported: 'The card cannot show this kind of chart yet.',
-    openLink: 'Open in Zeitarchiv',
     stale: 'As of {min} min ago, Zeitarchiv not reachable',
     not_loaded: 'No Zeitarchiv connection is set up.',
     app_outdated: 'The Zeitarchiv app is too old for the card. Please update the app.',
@@ -106,7 +103,6 @@ const TEXTS = {
     title: 'Title (empty: chart name)',
     refresh: 'Refresh (seconds)',
     height: 'Height (pixels)',
-    link: 'Own link to Zeitarchiv (empty: automatic)',
     notSupportedShort: 'not supported yet',
     description: 'Shows a saved chart or entities from Zeitarchiv.',
   },
@@ -231,9 +227,6 @@ const STYLE = `
   .note.error { color: var(--error-color); }
   .badge { display: inline-block; margin: 0 16px 8px; padding: 2px 10px; border-radius: 999px; font-size: 12px;
            color: var(--warning-color, #b26a00); border: 1px solid currentColor; }
-  .footer { padding: 0 16px 12px; font-size: 13px; }
-  .footer a { color: var(--primary-color); text-decoration: none; }
-  .footer a:hover { text-decoration: underline; }
   .tablebox { overflow: auto; padding: 4px 8px 12px; color: var(--primary-text-color); }
   .tablebox table { margin: 0; }
   [hidden] { display: none !important; }
@@ -245,7 +238,7 @@ const STYLE = `
     --accent-bar: var(--primary-color); --accent-contrast: var(--text-primary-color, #fff); --danger: var(--error-color, #db4437);
     --danger-soft: rgba(219, 68, 55, .12); --warning-soft: rgba(255, 152, 0, .15); --shadow: none;
     --font-display: var(--ha-font-family-body, Roboto, sans-serif); --font-mono: var(--ha-font-family-body, Roboto, sans-serif);
-    --font-scale: 1;
+    --bg: var(--card-background-color, #fff); --font-scale: 1;
   }
 `;
 
@@ -274,14 +267,53 @@ class ZeitarchivCard extends HTMLElement {
           <div class="note"></div>
         </div>
         <div class="badge" hidden></div>
-        <div class="footer" hidden></div>
       </ha-card>`;
     this._els = {
       header: this.shadowRoot.querySelector('.header'), chart: this.shadowRoot.querySelector('.chart'),
       note: this.shadowRoot.querySelector('.note'), badge: this.shadowRoot.querySelector('.badge'),
-      footer: this.shadowRoot.querySelector('.footer'), table: this.shadowRoot.querySelector('.tablebox'),
+      table: this.shadowRoot.querySelector('.tablebox'),
       tableCss: this.shadowRoot.querySelector('.tablecss'),
     };
+    this._wireTableTips();
+  }
+
+  // Hinweise der Tabelle (data-tooltip-fixed). fixed-tooltip.js der App lauscht am document.body und sähe im
+  // Shadow-DOM nur den Host; hier derselbe Hinweis (gleiche Klasse, gleiche Verzögerung), im Shadow-DOM der Karte.
+  _wireTableTips() {
+    const box = this._els.table;
+    let timer = null;
+    let tip = null;
+    let target = null;
+    const hide = () => {
+      clearTimeout(timer);
+      timer = null;
+      tip?.remove();
+      tip = null;
+      target = null;
+    };
+    const show = (el) => {
+      tip = document.createElement('div');
+      tip.className = 'dtile-tooltip-fixed';
+      tip.textContent = el.getAttribute('data-tooltip-fixed');
+      target = el;
+      this.shadowRoot.appendChild(tip);
+      const rect = el.getBoundingClientRect();
+      const size = tip.getBoundingClientRect();
+      tip.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - size.width - 8))}px`;
+      const above = rect.top - size.height - 6;
+      tip.style.top = `${above < 8 ? rect.bottom + 6 : above}px`;
+    };
+    box.addEventListener('mouseover', (event) => {
+      const el = event.target.closest?.('[data-tooltip-fixed]');
+      if (!el || el === target) return;
+      hide();
+      if (el.getAttribute('data-tooltip-fixed')) timer = setTimeout(() => show(el), 600);
+    });
+    box.addEventListener('mouseout', (event) => {
+      if (event.target.closest?.('[data-tooltip-fixed]')) hide();
+    });
+    box.addEventListener('scroll', hide);
+    this._hideTableTip = hide;
   }
 
   static getConfigElement() { return document.createElement('zeitarchiv-card-editor'); }
@@ -311,6 +343,7 @@ class ZeitarchivCard extends HTMLElement {
   getCardSize() { return Math.ceil((Number(this._config?.height) || 260) / 50) + 1; }
 
   connectedCallback() {
+    window.addEventListener('scroll', this._hideTableTip, true);
     if (typeof IntersectionObserver !== 'undefined') {
       this._observer = new IntersectionObserver((entries) => {
         this._visible = entries.some((entry) => entry.isIntersecting);
@@ -329,6 +362,8 @@ class ZeitarchivCard extends HTMLElement {
     clearTimeout(this._timer);
     this._timer = null;
     this._observer?.disconnect();
+    window.removeEventListener('scroll', this._hideTableTip, true);
+    this._hideTableTip();
     this._resize?.disconnect();
     if (this._chart) { this._chart.dispose(); this._chart = null; }
   }
@@ -376,29 +411,6 @@ class ZeitarchivCard extends HTMLElement {
     const title = this._config.title || name;
     this._els.header.textContent = title || '';
     this._els.header.hidden = !title;
-  }
-
-  // appLink: die Seite des Zeitarchivs in Home Assistant, von der App gemeldet. Ein eigener
-  // Eintrag `link` in der Karte hat Vorrang, `link: false` blendet den Link aus.
-  _setFooter(appLink) {
-    const configured = this._config.link;
-    const link = configured === false ? null : (configured || appLink);
-    this._els.footer.replaceChildren();
-    if (link) {
-      const anchor = document.createElement('a');
-      anchor.href = link;
-      anchor.textContent = text(this._hass, 'openLink');
-      // Ein Pfad in Home Assistant wird dort geöffnet, ohne die Seite neu zu laden.
-      if (link.startsWith('/')) {
-        anchor.addEventListener('click', (event) => {
-          event.preventDefault();
-          history.pushState(null, '', link);
-          window.dispatchEvent(new CustomEvent('location-changed', {detail: {replace: false}}));
-        });
-      }
-      this._els.footer.append(anchor);
-    }
-    this._els.footer.hidden = !link;
   }
 
   async _load() {
@@ -449,7 +461,6 @@ class ZeitarchivCard extends HTMLElement {
   async _draw(result) {
     if (!result || result.spec_version !== SPEC_VERSION) { const err = new Error('spec_version'); err.code = 'spec'; throw err; }
     this._setHeader(result.name);
-    this._setFooter(result.app_link);
     if (result.table) { await this._drawTable(result); return; }
     this._els.table.hidden = true;
     if (!result.supported || !result.data) {
@@ -618,7 +629,6 @@ class ZeitarchivCardEditor extends HTMLElement {
       {name: 'title', selector: {text: {}}},
       {name: 'refresh', selector: {number: {min: 15, max: 3600, step: 15, mode: 'box', unit_of_measurement: 's'}}},
       {name: 'height', selector: {number: {min: 120, max: 800, step: 10, mode: 'box', unit_of_measurement: 'px'}}},
-      {name: 'link', selector: {text: {}}},
     );
     return schema;
   }
@@ -631,7 +641,6 @@ class ZeitarchivCardEditor extends HTMLElement {
       data.period = data.period || 'month';
       data.style = data.style || 'auto';
     }
-    if (data.link === false) delete data.link;
     return data;
   }
 
@@ -648,7 +657,7 @@ class ZeitarchivCardEditor extends HTMLElement {
       if (next[key] !== undefined && next[key] !== '') next[key] = Number(next[key]);
       else delete next[key];
     }
-    for (const key of ['title', 'link']) if (!next[key]) delete next[key];
+    if (!next.title) delete next.title;
     if (this._source !== 'entities') for (const key of ['entities', 'period', 'style']) delete next[key];
     if (this._source !== 'chart') delete next.chart_id;
     if (this._source !== 'table') delete next.table_id;
