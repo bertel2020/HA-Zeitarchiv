@@ -16,8 +16,8 @@
   - **Link**: Optional öffnet ein Link das Zeitarchiv.
   - **Ausfälle**: Ist die App nicht erreichbar, zeigt die Karte den letzten
     Stand mit Hinweis und versucht es mit wachsendem Abstand erneut.
-- **Verlaufsstreifen für Kachelkarten**: Als zusätzliche Funktion der normalen
-  Home-Assistant-Kachelkarte zeigt ein kleiner Streifen den Verlauf einer
+- **Sparkline für Kachelkarten**: Als zusätzliche Funktion der normalen
+  Home-Assistant-Kachelkarte zeigt eine kleine Sparkline den Verlauf einer
   archivierten Zahlen-Entität (24 Stunden, 7 oder 30 Tage).
 
 ---
@@ -38,8 +38,8 @@
   - **Link**: Optionally a link opens Zeitarchiv.
   - **Outages**: If the app cannot be reached, the card keeps showing the last
     state with a notice and retries at growing intervals.
-- **Trend strip for tile cards**: As an extra feature of the regular Home
-  Assistant tile card, a small strip shows the history of an archived numeric
+- **Sparkline for tile cards**: As an extra feature of the regular Home
+  Assistant tile card, a small sparkline shows the history of an archived numeric
   entity (24 hours, 7 or 30 days).
 
 ## 1.2.1 - 2026-10-25
