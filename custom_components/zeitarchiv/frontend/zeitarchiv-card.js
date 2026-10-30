@@ -86,6 +86,14 @@ const text = (hass, key, values) => {
   return result;
 };
 
+// Abstand bis zum nächsten Abruf in Sekunden: im Normalfall die eingestellte
+// Aktualisierung, nach Fehlern 10, 20, 40 … Sekunden, nie mehr als die Aktualisierung.
+// Ein Ausfall der App wird so schnell bemerkt, ohne sie bei längerem Ausfall zu bedrängen.
+const retryDelaySeconds = (failures, refresh) => {
+  const normal = Math.max(15, Number(refresh) || 60);
+  return failures > 0 ? Math.min(normal, 10 * 2 ** (failures - 1)) : normal;
+};
+
 // --- Laufzeit: Dateien laden und in der Hülle auswerten ---------------------------------
 
 let sourcesPromise = null;
@@ -177,6 +185,7 @@ class ZeitarchivCard extends HTMLElement {
     this._visible = true;
     this._loading = false;
     this._lastGood = 0;
+    this._failures = 0;
     this.shadowRoot.innerHTML = `<style>${STYLE}</style>
       <ha-card>
         <div class="header" part="header" hidden></div>
@@ -203,6 +212,7 @@ class ZeitarchivCard extends HTMLElement {
     if (this._config.chart_id != null) this._config.chart_id = Number(this._config.chart_id);
     this._els.chart.style.height = `${Math.max(120, Number(this._config.height) || 260)}px`;
     this._lastGood = 0;
+    this._failures = 0;
     if (this._hass) this._load();
     else this._showNote(this._config.chart_id ? 'loading' : 'chooseChart');
   }
@@ -227,12 +237,11 @@ class ZeitarchivCard extends HTMLElement {
       this._resize = new ResizeObserver(() => this._chart && this._chart.resize());
       this._resize.observe(this._els.chart);
     }
-    this._schedule();
     if (this._hass && this._config) this._load();
   }
 
   disconnectedCallback() {
-    clearInterval(this._timer);
+    clearTimeout(this._timer);
     this._timer = null;
     this._observer?.disconnect();
     this._resize?.disconnect();
@@ -244,11 +253,12 @@ class ZeitarchivCard extends HTMLElement {
   }
 
   _schedule() {
-    clearInterval(this._timer);
-    const seconds = Math.max(15, Number(this._config?.refresh) || 60);
-    this._timer = setInterval(() => {
+    clearTimeout(this._timer);
+    if (!this.isConnected) return;
+    this._timer = setTimeout(() => {
       if (!document.hidden && this._visible) this._load();
-    }, seconds * 1000);
+      else this._schedule();
+    }, retryDelaySeconds(this._failures, this._config?.refresh) * 1000);
   }
 
   _showNote(key, error = false) {
@@ -281,16 +291,18 @@ class ZeitarchivCard extends HTMLElement {
     if (this._loading || !this._config || !this._hass) return;
     if (!this._config.chart_id) { this._showNote('chooseChart'); return; }
     this._loading = true;
-    this._schedule();
     try {
       const result = await this._hass.callWS({type: 'zeitarchiv/card/chart', chart_id: this._config.chart_id});
       await this._draw(result);
       this._lastGood = Date.now();
+      this._failures = 0;
       this._els.badge.hidden = true;
     } catch (err) {
+      this._failures += 1;
       this._fail(err);
     } finally {
       this._loading = false;
+      this._schedule();
     }
   }
 
