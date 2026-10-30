@@ -145,3 +145,16 @@ def test_the_width_goes_along_only_when_known_and_is_bounded() -> None:
         assert "px" not in get.call_args.kwargs["params"]
         client.get_card_series(["sensor.a"], px=300)
         assert get.call_args.kwargs["params"]["px"] == 300
+
+
+def test_a_table_goes_to_a_fixed_path_with_a_whole_number() -> None:
+    client = ZeitarchivClient("h", 1, "t")
+    with patch(GET, return_value=_Resp({"table": {}})) as get:
+        client.get_card_table(4, "2026-10-01")
+        assert get.call_args.args[0] == "http://h:1/api/card/table"
+        assert get.call_args.kwargs["params"] == {"id": 4, "at": "2026-10-01"}
+        client.get_card_table("5")  # type: ignore[arg-type]
+        assert get.call_args.kwargs["params"] == {"id": 5}
+    with patch(GET) as get, pytest.raises(ValueError):
+        client.get_card_table("5/../x")  # type: ignore[arg-type]
+    get.assert_not_called()

@@ -185,7 +185,7 @@ async def test_the_card_files_are_served_and_announced(
     assert any(url.startswith("/zeitarchiv_card/zeitarchiv-card.js?v=") for url in urls)
     assert any(url.startswith("/zeitarchiv_card/zeitarchiv-sparkline.js?v=") for url in urls)
     client = await hass_client()
-    for name in ("zeitarchiv-card.js", "zeitarchiv-sparkline.js", "chart-tile-render.js", "number-format.js", "tooltip-hold.js", "server-time.js", "html-escape.js", "state-entities.js", "echarts.min.js", "catalog.json"):
+    for name in ("zeitarchiv-card.js", "zeitarchiv-sparkline.js", "chart-tile-render.js", "number-format.js", "tooltip-hold.js", "server-time.js", "html-escape.js", "state-entities.js", "table-compute.js", "table-tile-render.js", "table.css", "echarts.min.js", "catalog.json"):
         response = await client.get(f"/zeitarchiv_card/{name}")
         assert response.status == 200, name
     # Nur die ausgelieferten Dateien, nichts darüber hinaus.
@@ -351,3 +351,34 @@ async def test_the_width_of_the_card_is_rounded_up_and_part_of_the_cache_key(
     for bad in (-1, 4001, "100", 1.5):
         response = await _call(client, {"type": "zeitarchiv/card/chart", "chart_id": 7, "px": bad})
         assert response["error"]["code"] == "invalid_format"
+
+
+TABLE = {"spec_version": 1, "id": 4, "name": "Tabelle", "table": {"columns": [], "rows": [], "style": {}}, "query": {"columns": []}}
+
+
+async def test_a_table_is_passed_on_by_whole_number_and_day_only(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, series_client: MagicMock, loaded_entry: MockConfigEntry
+) -> None:
+    loaded_entry.runtime_data.notices_coordinator.async_set_updated_data({**NOTICES, "capabilities": ["card_table"]})
+    series_client.get_card_table = MagicMock(return_value=TABLE)
+    client = await hass_ws_client(hass)
+    with patch("custom_components.zeitarchiv.api.ZeitarchivClient.get_card_table", series_client.get_card_table):
+        assert (await _call(client, {"type": "zeitarchiv/card/table", "table_id": 4, "at": "2026-10-01"}))["result"] == TABLE
+        series_client.get_card_table.assert_called_once_with(4, "2026-10-01")
+        await _call(client, {"type": "zeitarchiv/card/table", "table_id": 4, "at": "2026-10-01"})  # Zwischenspeicher
+        assert series_client.get_card_table.call_count == 1
+        for bad in ({}, {"table_id": 0}, {"table_id": "4"}, {"table_id": 4, "at": "gestern"}, {"table_id": 4.5}):
+            response = await _call(client, {"type": "zeitarchiv/card/table", **bad})
+            assert response["error"]["code"] == "invalid_format"
+        assert series_client.get_card_table.call_count == 1
+
+
+async def test_a_table_needs_an_admin_and_an_app_that_knows_it(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, hass_read_only_access_token: str,
+    series_client: MagicMock, loaded_entry: MockConfigEntry,
+) -> None:
+    loaded_entry.runtime_data.notices_coordinator.async_set_updated_data({**NOTICES, "capabilities": ["cards", "card_series", "card_spark"]})
+    admin = await hass_ws_client(hass)
+    assert (await _call(admin, {"type": "zeitarchiv/card/table", "table_id": 4}))["error"]["code"] == "app_outdated"
+    other = await hass_ws_client(hass, hass_read_only_access_token)
+    assert (await _call(other, {"type": "zeitarchiv/card/table", "table_id": 4}))["error"]["code"] == "unauthorized"

@@ -107,6 +107,7 @@ async def async_setup_card(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_card_entities)
     websocket_api.async_register_command(hass, ws_card_series)
     websocket_api.async_register_command(hass, ws_card_spark)
+    websocket_api.async_register_command(hass, ws_card_table)
 
 
 def _entry(hass: HomeAssistant, entry_id: str | None):
@@ -252,4 +253,23 @@ async def ws_card_spark(hass: HomeAssistant, connection, msg: dict[str, Any]) ->
     await _fetch(
         hass, connection, msg, ("spark", entity_id, range_key),
         lambda client: client.get_card_spark(entity_id, range_key), capability="card_spark",
+    )
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        "type": "zeitarchiv/card/table",
+        probatio.Required("table_id"): probatio.All(int, probatio.Range(min=1)),
+        probatio.Optional("at"): probatio.All(str, probatio.Match(_DAY)),
+        probatio.Optional("entry_id"): str,
+    }
+)
+@websocket_api.async_response
+async def ws_card_table(hass: HomeAssistant, connection, msg: dict[str, Any]) -> None:
+    """Aufbau und fertige Abfrage einer gespeicherten Vergleichstabelle."""
+    table_id, at = msg["table_id"], msg.get("at")
+    await _fetch(
+        hass, connection, msg, ("table", table_id, at), lambda client: client.get_card_table(table_id, at),
+        capability="card_table",
     )

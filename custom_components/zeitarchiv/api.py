@@ -269,6 +269,14 @@ class ZeitarchivClient:
             params["px"] = min(int(px), CARD_MAX_PX)
         return self._get_card("/api/card/chart", params)
 
+    def get_card_table(self, table_id: int, at: str | None = None) -> dict[str, Any]:
+        """Aufbau und fertige Abfrage einer gespeicherten Vergleichstabelle (GET /api/card/table,
+        Fähigkeit "card_table"). Die ID reist als Query-Parameter und kommt als int an."""
+        params: dict[str, Any] = {"id": int(table_id)}
+        if at:
+            params["at"] = at
+        return self._get_card("/api/card/table", params)
+
     def get_card_entities(self) -> dict[str, Any]:
         """Archivierte Entitäten, die die Karte ohne gespeichertes Chart zeigen kann
         (GET /api/card/entities, Fähigkeit "card_series")."""

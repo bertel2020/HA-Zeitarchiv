@@ -469,7 +469,8 @@ Mit `link: /eigener/pfad` lässt sich eine andere Adresse eintragen.
 - **Was die Karte zeichnet:** alle Darstellungen eines gespeicherten Charts: Zahlen als Linie, Balken, gestapelt
   und als Anteile in Prozent, mit Vorperiode, Vorjahr und Mehrjahresvergleich, dazu Zeitstrahl, Donut und bei
   Zuständen Anteile, Wechsel und Heatmap. Tooltips, helles und dunkles Thema. Der im Chart gespeicherte Zeitraum
-  gilt. Tabellen folgen.
+  gilt. Gespeicherte Vergleichstabellen werden mit denselben Zellen, Formeln und Stilen wie in der Kachel gezeigt
+  (Quelle „Gespeicherte Tabelle“, `table_id`); die Hinweise beim Überfahren der Tabelle gibt es in der Karte noch nicht.
 - Bei einem Ausfall der App bleibt das letzte Bild stehen und die Karte nennt sein Alter.
 
 ### Verlauf unter einer Kachelkarte

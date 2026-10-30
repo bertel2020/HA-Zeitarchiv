@@ -446,7 +446,8 @@ The link to Zeitarchiv appears automatically (the app reports its address in Hom
   the "cards" capability for this (update the app if the card says so).
 - **What the card draws:** every view of a saved chart: numbers as line, bars, stacked and as shares in percent,
   with previous period, previous year and multi-year comparison, plus timeline, donut and, for states, shares,
-  changes and heatmap. Tooltips, light and dark theme. The period saved with the chart applies. Tables follow.
+  changes and heatmap. Tooltips, light and dark theme. The period saved with the chart applies. Saved comparison tables are shown with the same cells, formulas and
+  styles as in the tile (source "Saved table", `table_id`); the hover hints of the table are not in the card yet.
 - If the app is unreachable, the last image stays and the card shows its age.
 
 ### History under a tile card

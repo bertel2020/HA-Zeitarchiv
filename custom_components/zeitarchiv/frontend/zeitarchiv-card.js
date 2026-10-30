@@ -21,13 +21,14 @@ const TEXTS = {
   de: {
     loading: 'Lade …',
     noData: 'Keine Daten',
-    chooseChart: 'Bitte ein Chart oder Entitäten aus dem Zeitarchiv wählen.',
+    chooseChart: 'Bitte ein Chart, eine Tabelle oder Entitäten aus dem Zeitarchiv wählen.',
+    noVisible: 'Die Tabelle hat keine sichtbaren Zeilen oder Spalten.',
     unsupported: 'Diese Darstellung zeigt die Karte noch nicht.',
     openLink: 'Im Zeitarchiv öffnen',
     stale: 'Stand vor {min} Min, Zeitarchiv nicht erreichbar',
     not_loaded: 'Keine Zeitarchiv-Verbindung eingerichtet.',
     app_outdated: 'Die Zeitarchiv-App ist zu alt für die Karte. Bitte die App aktualisieren.',
-    not_found: 'Dieses Chart oder eine der Entitäten gibt es im Zeitarchiv nicht (mehr).',
+    not_found: 'Dieses Chart, diese Tabelle oder eine der Entitäten gibt es im Zeitarchiv nicht (mehr).',
     invalid: 'Die App hat die Angaben der Karte abgelehnt.',
     busy: 'Zeitarchiv ist gerade beschäftigt, nächster Versuch folgt.',
     auth_failed: 'Zeitarchiv hat die Zugangsdaten abgelehnt.',
@@ -38,6 +39,8 @@ const TEXTS = {
     script: 'Die Karte konnte ihre Dateien nicht laden.',
     source: 'Quelle',
     sourceChart: 'Gespeichertes Chart',
+    sourceTable: 'Gespeicherte Tabelle',
+    table_id: 'Tabelle aus dem Zeitarchiv',
     sourceEntities: 'Entitäten direkt',
     chart_id: 'Chart aus dem Zeitarchiv',
     entities: 'Entitäten (nur archivierte)',
@@ -63,13 +66,14 @@ const TEXTS = {
   en: {
     loading: 'Loading …',
     noData: 'No data',
-    chooseChart: 'Please choose a chart or entities from Zeitarchiv.',
+    chooseChart: 'Please choose a chart, a table or entities from Zeitarchiv.',
+    noVisible: 'The table has no visible rows or columns.',
     unsupported: 'The card cannot show this kind of chart yet.',
     openLink: 'Open in Zeitarchiv',
     stale: 'As of {min} min ago, Zeitarchiv not reachable',
     not_loaded: 'No Zeitarchiv connection is set up.',
     app_outdated: 'The Zeitarchiv app is too old for the card. Please update the app.',
-    not_found: 'This chart or one of the entities no longer exists in Zeitarchiv.',
+    not_found: 'This chart, table or one of the entities no longer exists in Zeitarchiv.',
     invalid: 'The app rejected the settings of the card.',
     busy: 'Zeitarchiv is busy, trying again shortly.',
     auth_failed: 'Zeitarchiv rejected the credentials.',
@@ -80,6 +84,8 @@ const TEXTS = {
     script: 'The card could not load its files.',
     source: 'Source',
     sourceChart: 'Saved chart',
+    sourceTable: 'Saved table',
+    table_id: 'Table from Zeitarchiv',
     sourceEntities: 'Entities directly',
     chart_id: 'Chart from Zeitarchiv',
     entities: 'Entities (archived only)',
@@ -141,14 +147,15 @@ const fetchText = async (name) => {
 
 const loadSources = () => {
   sourcesPromise ||= (async () => {
-    const [echartsSource, render, numberFormat, tooltipHold, serverTime, htmlEscape, stateEntities, catalog] = await Promise.all([
+    const [echartsSource, render, numberFormat, tooltipHold, serverTime, htmlEscape, stateEntities, tableCompute, tableRender, tableCss, catalog] = await Promise.all([
       fetchText('echarts.min.js'), fetchText('chart-tile-render.js'), fetchText('number-format.js'),
       fetchText('tooltip-hold.js'), fetchText('server-time.js'), fetchText('html-escape.js'),
-      fetchText('state-entities.js'), fetchText('catalog.json'),
+      fetchText('state-entities.js'), fetchText('table-compute.js'), fetchText('table-tile-render.js'),
+      fetchText('table.css'), fetchText('catalog.json'),
     ]);
     const module = {exports: {}};
     new Function('module', 'exports', echartsSource).call(module.exports, module, module.exports);
-    return {echarts: module.exports, render, numberFormat, tooltipHold, serverTime, htmlEscape, stateEntities, catalog: JSON.parse(catalog)};
+    return {echarts: module.exports, render, numberFormat, tooltipHold, serverTime, htmlEscape, stateEntities, tableCompute, tableRender, tableCss, catalog: JSON.parse(catalog)};
   })().catch((err) => { sourcesPromise = null; throw err; });
   return sourcesPromise;
 };
@@ -161,7 +168,7 @@ const buildRuntime = (sources, {timezone, language, dark}) => {
   // Nur das, was die Dateien der App vom Dokument brauchen: die Zeitzone, das Format und Canvas-Elemente
   // (state-entities.js zeichnet damit das Füllmuster für „nicht verfügbar“).
   const doc = {
-    documentElement: {dataset: {tz: timezone, format: language}}, body: {},
+    documentElement: {dataset: {tz: timezone, format: language}, lang: String(language).startsWith('de') ? 'de' : 'en'}, body: {},
     createElement: (tag) => document.createElement(tag),
   };
   // Farben aus dem CSS der App (--chart-1 …) und Werte aus dem Thema von Home Assistant, die die Karte
@@ -194,14 +201,20 @@ const buildRuntime = (sources, {timezone, language, dark}) => {
     ['window', 'document', 'getComputedStyle', 't', 'NumberFormat', 'TooltipHold', 'StateEntities', 'PeriodNavigation', 'echarts', 'escapeHtml'],
     [win, doc, getComputedStyle, t, win.NumberFormat, win.TooltipHold, win.StateEntities, {}, sources.echarts, win.escapeHtml],
   );
-  return {render, setVars: (map) => Object.assign(vars, map)};
+  // Tabellen: dieselben Dateien wie die Tabellen-Kachel der App.
+  evaluate(sources.tableCompute, ['window', 'document', 't'], [win, doc, t]);
+  const TableTileRender = evaluate(
+    `${sources.tableRender}\nreturn window.TableTileRender;`,
+    ['window', 't', 'escapeHtml', 'TableCompute'], [win, t, win.escapeHtml, win.TableCompute],
+  );
+  return {render, setVars: (map) => Object.assign(vars, map), tables: {TableCompute: win.TableCompute, TableTileRender}};
 };
 
 const runtimeFor = async (settings) => {
   const sources = await loadSources();
   const key = `${settings.timezone}|${settings.language}|${settings.dark}`;
   if (!runtimes.has(key)) runtimes.set(key, buildRuntime(sources, settings));
-  return {...runtimes.get(key), echarts: sources.echarts};
+  return {...runtimes.get(key), echarts: sources.echarts, tableCss: sources.tableCss};
 };
 
 // --- Karte -----------------------------------------------------------------------------
@@ -219,7 +232,19 @@ const STYLE = `
   .footer { padding: 0 16px 12px; font-size: 13px; }
   .footer a { color: var(--primary-color); text-decoration: none; }
   .footer a:hover { text-decoration: underline; }
+  .tablebox { overflow: auto; padding: 4px 8px 12px; color: var(--primary-text-color); }
+  .tablebox table { margin: 0; }
   [hidden] { display: none !important; }
+  /* Variablen der App für die Tabelle, aus dem Thema von Home Assistant */
+  :host {
+    --ink: var(--primary-text-color); --ink-muted: var(--secondary-text-color); --ink-faint: var(--secondary-text-color);
+    --border: var(--divider-color); --border-strong: var(--divider-color); --surface: var(--card-background-color);
+    --surface-alt: var(--secondary-background-color, rgba(127, 127, 127, .08)); --accent-line: var(--primary-color);
+    --accent-bar: var(--primary-color); --accent-contrast: var(--text-primary-color, #fff); --danger: var(--error-color, #db4437);
+    --danger-soft: rgba(219, 68, 55, .12); --warning-soft: rgba(255, 152, 0, .15); --shadow: none;
+    --font-display: var(--ha-font-family-body, Roboto, sans-serif); --font-mono: var(--ha-font-family-body, Roboto, sans-serif);
+    --font-scale: 1;
+  }
 `;
 
 class ZeitarchivCard extends HTMLElement {
@@ -239,6 +264,8 @@ class ZeitarchivCard extends HTMLElement {
         <div class="header" part="header" hidden></div>
         <div class="body">
           <div class="chart" hidden></div>
+          <div class="tablebox" hidden></div>
+          <style class="tablecss"></style>
           <div class="note"></div>
         </div>
         <div class="badge" hidden></div>
@@ -247,7 +274,8 @@ class ZeitarchivCard extends HTMLElement {
     this._els = {
       header: this.shadowRoot.querySelector('.header'), chart: this.shadowRoot.querySelector('.chart'),
       note: this.shadowRoot.querySelector('.note'), badge: this.shadowRoot.querySelector('.badge'),
-      footer: this.shadowRoot.querySelector('.footer'),
+      footer: this.shadowRoot.querySelector('.footer'), table: this.shadowRoot.querySelector('.tablebox'),
+      tableCss: this.shadowRoot.querySelector('.tablecss'),
     };
   }
 
@@ -258,6 +286,8 @@ class ZeitarchivCard extends HTMLElement {
   setConfig(config) {
     this._config = {refresh: 60, height: 260, ...config};
     if (this._config.chart_id != null) this._config.chart_id = Number(this._config.chart_id);
+    if (this._config.table_id != null) this._config.table_id = Number(this._config.table_id);
+    this._explicitHeight = config.height != null;
     this._config.entities = Array.isArray(config.entities) ? config.entities.filter((id) => typeof id === 'string' && id) : [];
     this._els.chart.style.height = `${Math.max(120, Number(this._config.height) || 260)}px`;
     this._lastGood = 0;
@@ -298,7 +328,7 @@ class ZeitarchivCard extends HTMLElement {
   }
 
   _hasSource() {
-    return Boolean(this._config?.entities?.length || this._config?.chart_id);
+    return Boolean(this._config?.entities?.length || this._config?.chart_id || this._config?.table_id);
   }
 
   // Die Anfrage an Home Assistant: Entitäten direkt oder ein gespeichertes Chart.
@@ -309,6 +339,7 @@ class ZeitarchivCard extends HTMLElement {
     if (config.entities.length) {
       return {type: 'zeitarchiv/card/series', entity_ids: config.entities, period: config.period || 'month', style: config.style || 'auto', px};
     }
+    if (config.table_id && !config.chart_id) return {type: 'zeitarchiv/card/table', table_id: config.table_id};
     return {type: 'zeitarchiv/card/chart', chart_id: config.chart_id, px};
   }
 
@@ -331,6 +362,7 @@ class ZeitarchivCard extends HTMLElement {
     note.className = error ? 'note error' : 'note';
     note.hidden = false;
     this._els.chart.hidden = true;
+    this._els.table.hidden = true;
   }
 
   _setHeader(name) {
@@ -398,6 +430,8 @@ class ZeitarchivCard extends HTMLElement {
     if (!result || result.spec_version !== SPEC_VERSION) { const err = new Error('spec_version'); err.code = 'spec'; throw err; }
     this._setHeader(result.name);
     this._setFooter(result.app_link);
+    if (result.table) { await this._drawTable(result); return; }
+    this._els.table.hidden = true;
     if (!result.supported || !result.data) {
       this._showNote('unsupported');
       return;
@@ -435,6 +469,32 @@ class ZeitarchivCard extends HTMLElement {
     this._chart.resize();
   }
 
+  // Gespeicherte Tabelle: dieselben Dateien wie die Tabellen-Kachel der App rechnen die Zellen aus der fertigen
+  // Antwort des Servers und bauen das HTML; table.css liefert das Aussehen.
+  async _drawTable(result) {
+    let runtime;
+    try {
+      runtime = await runtimeFor({
+        timezone: result.env?.timezone || 'UTC',
+        language: this._hass.locale?.language || this._hass.language || 'en',
+        dark: Boolean(this._hass.themes?.darkMode),
+      });
+    } catch (err) {
+      err.script = true;
+      throw err;
+    }
+    const {TableTileRender} = runtime.tables;
+    const table = await TableTileRender.compute(result.table.columns, result.table.rows, {queryTable: async () => result.query});
+    if (table.empty) { this._showNote('noVisible'); return; }
+    if (this._els.tableCss.textContent !== runtime.tableCss) this._els.tableCss.textContent = runtime.tableCss;
+    this._els.note.hidden = true;
+    this._els.chart.hidden = true;
+    this._els.table.hidden = false;
+    this._els.table.style.maxHeight = this._explicitHeight ? `${Math.max(120, Number(this._config.height) || 260)}px` : '';
+    this._els.table.innerHTML = TableTileRender.buildHtml({...table, style: result.table.style || {}});
+    TableTileRender.afterInsert(this._els.table);
+  }
+
   // Die Farben, die die Zeichenregeln aus dem CSS der App lesen, aus dem Thema von Home Assistant.
   _themeVars() {
     const css = getComputedStyle(this);
@@ -457,6 +517,7 @@ class ZeitarchivCardEditor extends HTMLElement {
     this._config = {};
     this._hass = null;
     this._items = null;
+    this._tables = [];
     this._entities = null;
     this._source = 'chart';
     this._error = null;
@@ -465,7 +526,10 @@ class ZeitarchivCardEditor extends HTMLElement {
 
   setConfig(config) {
     this._config = config || {};
-    this._source = Array.isArray(this._config.entities) && this._config.entities.length ? 'entities' : (this._source === 'entities' && !this._config.chart_id ? 'entities' : 'chart');
+    const pickedEntities = Array.isArray(this._config.entities) && this._config.entities.length;
+    if (pickedEntities) this._source = 'entities';
+    else if (this._config.table_id && !this._config.chart_id) this._source = 'table';
+    else if (this._config.chart_id) this._source = 'chart';
     this._render();
   }
 
@@ -482,7 +546,9 @@ class ZeitarchivCardEditor extends HTMLElement {
 
   async _load() {
     try {
-      this._items = (await this._hass.callWS({type: 'zeitarchiv/card/items'})).items || [];
+      const listed = await this._hass.callWS({type: 'zeitarchiv/card/items'});
+      this._items = listed.items || [];
+      this._tables = listed.tables || [];
     } catch (err) {
       this._items = [];
       this._error = this._failure(err);
@@ -508,13 +574,19 @@ class ZeitarchivCardEditor extends HTMLElement {
       label: item.supported ? item.name : `${item.name} (${label('notSupportedShort')})`,
     }));
     const select = (name, options) => ({name, selector: {select: {mode: 'dropdown', options}}});
-    const schema = [select('source', [{value: 'chart', label: label('sourceChart')}, {value: 'entities', label: label('sourceEntities')}])];
+    const tableOptions = this._tables.map((item) => ({value: String(item.id), label: item.name}));
+    const schema = [select('source', [
+      {value: 'chart', label: label('sourceChart')}, {value: 'table', label: label('sourceTable')},
+      {value: 'entities', label: label('sourceEntities')},
+    ])];
     if (this._source === 'entities') {
       schema.push(
         {name: 'entities', required: true, selector: {entity: {multiple: true, include_entities: (this._entities || []).map((e) => e.entity_id)}}},
         select('period', ['month', 'day', 'week', 'year', '24h', '7d', '30d'].map((value) => ({value, label: label(`period_${value}`)}))),
         select('style', ['auto', 'stacked', 'percent'].map((value) => ({value, label: label(`style_${value}`)}))),
       );
+    } else if (this._source === 'table') {
+      schema.push({...select('table_id', tableOptions), required: true});
     } else {
       schema.push({...select('chart_id', chartOptions), required: true});
     }
@@ -530,6 +602,7 @@ class ZeitarchivCardEditor extends HTMLElement {
   _data() {
     const data = {...this._config, source: this._source};
     if (data.chart_id != null) data.chart_id = String(data.chart_id);
+    if (data.table_id != null) data.table_id = String(data.table_id);
     if (this._source === 'entities') {
       data.period = data.period || 'month';
       data.style = data.style || 'auto';
@@ -544,12 +617,17 @@ class ZeitarchivCardEditor extends HTMLElement {
     delete next.source;
     if (source !== this._source) {
       this._source = source;
-      if (source === 'entities') { delete next.chart_id; this._loadEntities(); } else { delete next.entities; delete next.period; delete next.style; }
+      delete next.chart_id; delete next.table_id; delete next.entities; delete next.period; delete next.style;
+      if (source === 'entities') this._loadEntities();
     }
-    if (next.chart_id !== undefined && next.chart_id !== '') next.chart_id = Number(next.chart_id);
-    else delete next.chart_id;
+    for (const key of ['chart_id', 'table_id']) {
+      if (next[key] !== undefined && next[key] !== '') next[key] = Number(next[key]);
+      else delete next[key];
+    }
     for (const key of ['title', 'link']) if (!next[key]) delete next[key];
-    if (this._source === 'chart') for (const key of ['entities', 'period', 'style']) delete next[key];
+    if (this._source !== 'entities') for (const key of ['entities', 'period', 'style']) delete next[key];
+    if (this._source !== 'chart') delete next.chart_id;
+    if (this._source !== 'table') delete next.table_id;
     this._config = {...next, type: 'custom:zeitarchiv-card'};
     this.dispatchEvent(new CustomEvent('config-changed', {detail: {config: this._config}, bubbles: true, composed: true}));
     this._render();
