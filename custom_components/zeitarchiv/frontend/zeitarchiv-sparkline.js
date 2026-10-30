@@ -7,7 +7,7 @@
 
 const TEXTS = {
   de: {
-    name: 'Zeitarchiv-Verlauf',
+    name: 'Zeitarchiv-Verlauf', latest: 'zuletzt', changed: 'Änderung',
     range_24h: '24 Std', range_7d: '7 Tage', range_30d: '30 Tage',
     notArchived: 'Nicht archiviert', noData: 'Keine Daten', unsupported: 'Nicht darstellbar',
     unreachable: 'Zeitarchiv nicht erreichbar', stale: 'Stand vor {min} Min', unauthorized: 'Nur für Administratoren',
@@ -18,7 +18,7 @@ const TEXTS = {
     color_accent: 'Akzentfarbe', color_trend: 'Nach Trend (steigt oder fällt)',
   },
   en: {
-    name: 'Zeitarchiv history',
+    name: 'Zeitarchiv history', latest: 'latest', changed: 'change',
     range_24h: '24 h', range_7d: '7 days', range_30d: '30 days',
     notArchived: 'Not archived', noData: 'No data', unsupported: 'Not supported',
     unreachable: 'Zeitarchiv not reachable', stale: 'As of {min} min ago', unauthorized: 'Administrators only',
@@ -66,7 +66,7 @@ const sparkSvg = (values, o) => {
     ? (rising ? 'var(--success-color, #43a047)' : 'var(--error-color, #db4437)')
     : 'var(--primary-color, #03a9f4)';
   const points = values.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`);
-  let svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-hidden="true">`;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${esc(o.label || '')}">`;
   if (o.style === 'bars') {
     const width = Math.max(1.5, ((W - 2 * pad) / count) * 0.62);
     const base = y(Math.max(min, 0));
@@ -190,7 +190,7 @@ class ZeitarchivSparkline extends HTMLElement {
   }
 
   _note(key, error = false) {
-    this._box.innerHTML = `<div class="note${error ? ' error' : ''}">${text(this._hass, key)}</div>`;
+    this._box.innerHTML = `<div class="note${error ? ' error' : ''}" role="${error ? 'alert' : 'status'}">${text(this._hass, key)}</div>`;
   }
 
   async _load() {
@@ -243,7 +243,9 @@ class ZeitarchivSparkline extends HTMLElement {
     const right = c.show_change
       ? `<span class="${change >= 0 ? 'up' : 'down'}">${change >= 0 ? '+' : '−'}${number.format(Math.abs(change))}${unit}</span>`
       : '<span></span>';
-    this._box.innerHTML = `${sparkSvg(values, {style: c.style, color: c.color, minMax: Boolean(c.min_max), zero: Boolean(c.include_zero)})}<div class="foot">${left}${right}</div>`;
+    const last = number.format(values[values.length - 1]);
+    const label = `${text(this._hass, 'name')}, ${text(this._hass, `range_${c.range}`)}: ${text(this._hass, 'latest')} ${[last, data.unit].filter(Boolean).join(' ')}, ${text(this._hass, 'changed')} ${change >= 0 ? '+' : '−'}${number.format(Math.abs(change))}`;
+    this._box.innerHTML = `${sparkSvg(values, {label, style: c.style, color: c.color, minMax: Boolean(c.min_max), zero: Boolean(c.include_zero)})}<div class="foot">${left}${right}</div>`;
   }
 }
 

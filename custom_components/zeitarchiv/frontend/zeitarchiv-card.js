@@ -20,6 +20,7 @@ const VERSION_QUERY = new URL(import.meta.url).search;
 const TEXTS = {
   de: {
     loading: 'Lade …',
+    chartLabel: 'Diagramm {title}', sum: 'Summe', last: 'zuletzt', more: 'und {n} weitere',
     noData: 'Keine Daten',
     chooseChart: 'Bitte ein Chart, eine Tabelle oder Entitäten aus dem Zeitarchiv wählen.',
     noVisible: 'Die Tabelle hat keine sichtbaren Zeilen oder Spalten.',
@@ -64,6 +65,7 @@ const TEXTS = {
   },
   en: {
     loading: 'Loading …',
+    chartLabel: 'Chart {title}', sum: 'total', last: 'latest', more: 'and {n} more',
     noData: 'No data',
     chooseChart: 'Please choose a chart, a table or entities from Zeitarchiv.',
     noVisible: 'The table has no visible rows or columns.',
@@ -261,12 +263,12 @@ class ZeitarchivCard extends HTMLElement {
       <ha-card>
         <div class="header" part="header" hidden></div>
         <div class="body">
-          <div class="chart" hidden></div>
+          <div class="chart" role="img" hidden></div>
           <div class="tablebox" hidden></div>
           <style class="tablecss"></style>
-          <div class="note"></div>
+          <div class="note" role="status"></div>
         </div>
-        <div class="badge" hidden></div>
+        <div class="badge" role="status" hidden></div>
       </ha-card>`;
     this._els = {
       header: this.shadowRoot.querySelector('.header'), chart: this.shadowRoot.querySelector('.chart'),
@@ -422,6 +424,7 @@ class ZeitarchivCard extends HTMLElement {
     const note = this._els.note;
     note.textContent = text(this._hass, key);
     note.className = error ? 'note error' : 'note';
+    note.setAttribute('role', error ? 'alert' : 'status');
     note.hidden = false;
     this._els.chart.hidden = true;
     this._els.table.hidden = true;
@@ -518,8 +521,31 @@ class ZeitarchivCard extends HTMLElement {
     R.draw(this._chart, {
       spec, data: result.data, series, viewType: R.viewTypeFor(spec, series), multiYear, hiddenSet: undefined, style,
     });
+    this._els.chart.setAttribute('aria-label', this._describe(this._config.title || result.name, series, result.spec));
     this._chart.resize();
     this._shown = true;
+  }
+
+  // Text für Screenreader: das Chart ist ein Bild (Canvas), also nennt der Name zu jeder Serie ihren Wert, bei
+  // Zählern die Summe, sonst den letzten. Serien ohne Zahlenwerte (Zustände, Heatmap) erscheinen nur mit Namen.
+  _describe(title, series, spec) {
+    const language = this._hass.locale?.language || this._hass.language || 'en';
+    let hidden = [];
+    let names = {};
+    try { hidden = JSON.parse(spec?.hiddenEntityIds || '[]'); names = JSON.parse(spec?.entityNames || '{}'); } catch (err) { /* ohne */ }
+    const parts = series.filter((s) => !hidden.includes(s.entity_id)).map((s) => {
+      const name = names[s.entity_id] || s.friendly_name || s.entity_id;
+      const values = (s.points || []).map((point) => point.value).filter(Number.isFinite);
+      if (!values.length) return name;
+      const counter = s.aggregation_type === 'counter';
+      const value = counter ? values.reduce((a, b) => a + b, 0) : values[values.length - 1];
+      const digits = Number.isInteger(s.decimals) ? s.decimals : 2;
+      const shown = new Intl.NumberFormat(language, {maximumFractionDigits: digits}).format(value);
+      return `${name}: ${text(this._hass, counter ? 'sum' : 'last')} ${shown}${s.unit ? ` ${s.unit}` : ''}`;
+    });
+    const shownParts = parts.slice(0, 8);
+    if (parts.length > 8) shownParts.push(text(this._hass, 'more', {n: parts.length - 8}));
+    return `${text(this._hass, 'chartLabel', {title: title || ''})}. ${shownParts.join('; ')}`;
   }
 
   // Gespeicherte Tabelle: dieselben Dateien wie die Tabellen-Kachel der App rechnen die Zellen aus der fertigen
