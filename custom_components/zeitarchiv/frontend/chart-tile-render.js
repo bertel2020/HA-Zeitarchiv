@@ -868,7 +868,10 @@
   // style (computed style, aus dem die Farben gelesen werden — Canvas kennt
   // keine CSS-Variablen).
   function draw(chart, ctx) {
-    const {spec, data, series, viewType, multiYear, hiddenSet, style} = ctx;
+    const {spec, data, viewType, multiYear, hiddenSet, style} = ctx;
+    // Kompatible Einheiten (Wh/kWh, W/kW) teilen sich eine Achse; die Legende
+    // oben berechnet ihre Kennzahlen weiter aus den Originalserien.
+    const series = NumberFormat.harmonizeUnits(ctx.series);
     const {
       entityNames, colorFor, range, resolutionPreset, dynamicYAxis, animation, timeline, donut,
       donutAggregation, effectiveDecimals, showValues, averageLine, averageStyle, areaFill,

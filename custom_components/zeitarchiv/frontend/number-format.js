@@ -56,5 +56,49 @@ window.NumberFormat = (() => {
     return `${s}s`;
   }
 
-  return {LOCALE, DECIMAL_SEP, THOUSANDS_SEP, fmt, parse, fmtDuration};
+  // Einheiten, die sich verlustfrei ineinander umrechnen lassen (Faktor zur
+  // Basiseinheit der Familie).
+  const UNIT_FAMILIES = [
+    {Wh: 1, kWh: 1e3, MWh: 1e6, GWh: 1e9},
+    {W: 1, kW: 1e3, MW: 1e6, GW: 1e9},
+  ];
+
+  // Charts zeichnen eine Y-Achse je Einheit. Eine Wh- und eine kWh-Serie (z. B.
+  // Ertrag von der OpenDTU und Prognose) lägen deshalb auf zwei Achsen mit
+  // unabhängiger Skala und wären optisch nicht vergleichbar. Kommen aus EINER
+  // Familie mindestens zwei verschiedene Einheiten vor, werden diese Serien auf
+  // die größte vorkommende Einheit der Familie umgerechnet (Kopien — die
+  // Originale bleiben für die Kennzahlen-Tabelle in ihrer eigenen Einheit).
+  // Bei nur einer Einheit je Familie ändert sich nichts. decimals wandert mit:
+  // 0 Stellen in Wh wären als kWh sonst "1" statt "0,78".
+  function harmonizeUnits(series) {
+    const targets = new Map();
+    for (const family of UNIT_FAMILIES) {
+      const present = [...new Set(series.map(s => s.unit).filter(u => u in family))];
+      if (present.length < 2) continue;
+      const target = present.reduce((a, b) => (family[b] > family[a] ? b : a));
+      for (const u of present) if (u !== target) targets.set(u, {target, factor: family[u] / family[target]});
+    }
+    if (!targets.size) return series;
+    const scale = (points, factor) => points && points.map(p => ({
+      ...p,
+      value: p.value == null ? p.value : p.value * factor,
+      min: p.min == null ? p.min : p.min * factor,
+      max: p.max == null ? p.max : p.max * factor,
+    }));
+    return series.map(s => {
+      const conv = targets.get(s.unit);
+      if (!conv) return s;
+      const {target, factor} = conv;
+      const copy = {
+        ...s, unit: target, points: scale(s.points, factor),
+        decimals: s.decimals == null ? s.decimals : s.decimals + Math.round(-Math.log10(factor)),
+      };
+      if (s.compare_points) copy.compare_points = scale(s.compare_points, factor);
+      if (s.compare_cut_points) copy.compare_cut_points = scale(s.compare_cut_points, factor);
+      return copy;
+    });
+  }
+
+  return {LOCALE, DECIMAL_SEP, THOUSANDS_SEP, fmt, parse, fmtDuration, harmonizeUnits};
 })();
