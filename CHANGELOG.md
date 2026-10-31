@@ -1,11 +1,11 @@
 # Changelog
 
-## Unreleased
+## 1.3.0 - 2026-10-31
 
 ### Neu
 
 - **Zeitarchiv-Karte für Lovelace** (`custom:zeitarchiv-card`, braucht
-  eine aktuelle Zeitarchiv-App): Zeigt ein gespeichertes
+  die Zeitarchiv-App ab 1.12.0): Zeigt ein gespeichertes
   Chart oder eine gespeicherte Tabelle des Zeitarchivs direkt im Dashboard, im
   Hell- und Dunkelmodus und mit den Beschriftungen der Home-Assistant-Sprache.
   Die Karte lässt sich im Karteneditor einrichten; im Kartenwähler zeigt sie
@@ -36,8 +36,8 @@
 
 #### New
 
-- **Zeitarchiv card for Lovelace** (`custom:zeitarchiv-card`, needs a
-  current Zeitarchiv app): Shows a saved chart or a saved table
+- **Zeitarchiv card for Lovelace** (`custom:zeitarchiv-card`, needs
+  Zeitarchiv app 1.12.0 or later): Shows a saved chart or a saved table
   of Zeitarchiv directly on your dashboard, in light and dark mode and with
   labels in the Home Assistant language. The card can be set up in the card
   editor; the card picker already shows a preview with your first chart. In

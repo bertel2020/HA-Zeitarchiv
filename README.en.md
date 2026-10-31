@@ -67,7 +67,8 @@ can find the API token there under **Settings → Connection**.
 App and integration are versioned independently; no particular minimum
 version is required — newer features (e.g. the operating mode sensor) are
 simply left unused against an older counterpart instead of disrupting the
-connection.
+connection. The dashboard card needs app version 1.12.0 or later; with an older
+app it shows “App too old”.
 
 #### 2. Copy the custom integration
 

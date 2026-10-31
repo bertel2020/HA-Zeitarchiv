@@ -69,7 +69,8 @@ du dort unter **Einstellungen → Verbindung**.
 App und Integration versionieren unabhängig voneinander, keine bestimmte
 Mindestversion nötig — neuere Funktionen (z. B. der Betriebsmodus-Sensor)
 bleiben gegen eine ältere Gegenseite einfach ungenutzt, statt die
-Verbindung zu stören.
+Verbindung zu stören. Die Karte im Dashboard braucht die App ab Version
+1.12.0; mit einer älteren App zeigt sie „App zu alt“.
 
 #### 2. Custom Integration kopieren
 
