@@ -1,9 +1,13 @@
 # Changelog
 
-## Unreleased
+## 1.3.1 - 2026-11-01
 
 ### Behoben
 
+- **Zeitarchiv-Karte, Wh und kWh**: Serien in Wh und kWh im selben Chart landeten
+  auf zwei getrennten Achsen mit eigener Skala und waren nicht vergleichbar. Sie
+  teilen sich jetzt eine Achse in der größten vorkommenden Einheit; reine
+  Wh-Charts bleiben in Wh.
 - **Zeitarchiv-Karte**: Die Dateien der Karte werden nicht mehr bis zu 31 Tage
   im Browser zwischengespeichert. Nach einem Update bleibt dadurch seltener
   eine alte Kartenversion hängen, die im Kartenwähler nur einen Ladekreis
@@ -15,6 +19,9 @@
 
 #### Fixed
 
+- **Zeitarchiv card, Wh and kWh**: Series in Wh and kWh in the same chart ended
+  up on two separate axes with their own scale and could not be compared. They
+  now share one axis in the largest unit present; pure Wh charts stay in Wh.
 - **Zeitarchiv card**: The card files are no longer cached in the browser for
   up to 31 days. After an update this makes it less likely that an old card
   version gets stuck and shows only a loading spinner in the card picker. The
