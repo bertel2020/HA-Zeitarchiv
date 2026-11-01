@@ -249,14 +249,37 @@ class ZeitarchivSparkline extends HTMLElement {
   }
 }
 
-if (!customElements.get('zeitarchiv-sparkline')) {
-  customElements.define('zeitarchiv-sparkline', ZeitarchivSparkline);
+// Home Assistant 2026.10 lädt Module aus add_extra_js_url parallel zur App. Läuft ein kleines Modul vor
+// dem Polyfill für getrennte Registries, trägt es seine Elemente in die native Registry ein; danach findet
+// customElements.get() sie nicht mehr, und die Karte endet mit "Custom element not found"
+// (home-assistant/frontend#53890, behoben ab 2026.11). Darum nach dem Start der App prüfen und
+// fehlende Elemente noch einmal eintragen; ab 2026.11 findet das nichts mehr zu tun.
+const defineElement = (tag, Base) => {
+  if (customElements.get(tag)) return;
+  try {
+    customElements.define(tag, Base);
+  } catch {
+    // Dieselbe Klasse darf in derselben Registry nur einmal definiert werden: Unterklasse.
+    customElements.define(tag, class extends Base {});
+  }
+};
+const whenAppReady = (register, tries = 0) => {
+  if (customElements.get('home-assistant')) register();
+  else if (tries < 600) setTimeout(() => whenAppReady(register, tries + 1), 100);
+};
+
+const registerSparkline = () => {
+  defineElement('zeitarchiv-sparkline', ZeitarchivSparkline);
   window.customCardFeatures = window.customCardFeatures || [];
-  window.customCardFeatures.push({
-    type: 'zeitarchiv-sparkline',
-    name: TEXTS[(document.documentElement.lang || 'en').startsWith('de') ? 'de' : 'en'].name,
-    configurable: true,
-    // Nur Zahlen-Entitäten; ob das Zeitarchiv sie archiviert, zeigt das Feature selbst an.
-    isSupported: (hass, context) => NUMERIC_DOMAINS.test(context?.entity_id || ''),
-  });
-}
+  if (!window.customCardFeatures.some((feature) => feature.type === 'zeitarchiv-sparkline')) {
+    window.customCardFeatures.push({
+      type: 'zeitarchiv-sparkline',
+      name: TEXTS[(document.documentElement.lang || 'en').startsWith('de') ? 'de' : 'en'].name,
+      configurable: true,
+      // Nur Zahlen-Entitäten; ob das Zeitarchiv sie archiviert, zeigt das Feature selbst an.
+      isSupported: (hass, context) => NUMERIC_DOMAINS.test(context?.entity_id || ''),
+    });
+  }
+};
+registerSparkline();
+whenAppReady(registerSparkline);
