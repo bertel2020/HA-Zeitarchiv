@@ -427,6 +427,12 @@ tap_action:            # optional: Home Assistant's standard action on tap
   navigation_path: /lovelace/energie
 ```
 
+**Card missing in the card picker or only a loading spinner?** The card is registered when Home
+Assistant starts, so restart Home Assistant after installing or updating. Then reload the page in the
+browser completely (Ctrl+Shift+R, or Cmd+Shift+R on a Mac); in the companion app use Settings →
+Companion app → Troubleshooting → Reset frontend cache. If it persists, the browser console (F12) shows
+an error loading `zeitarchiv-card.js`.
+
 **On tap:** In the editor under "On tap" you can choose an action as on any Home Assistant card (open a dashboard,
 URL, perform action). Without a choice nothing happens. With "Entities directly" the first entity is the target
 of "More info". With an action the card can be reached by keyboard.

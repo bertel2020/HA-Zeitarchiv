@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+### Behoben
+
+- **Zeitarchiv-Karte**: Die Dateien der Karte werden nicht mehr bis zu 31 Tage
+  im Browser zwischengespeichert. Nach einem Update bleibt dadurch seltener
+  eine alte Kartenversion hängen, die im Kartenwähler nur einen Ladekreis
+  zeigt. In der Dokumentation steht jetzt, was in dem Fall zu tun ist.
+
+---
+
+### English
+
+#### Fixed
+
+- **Zeitarchiv card**: The card files are no longer cached in the browser for
+  up to 31 days. After an update this makes it less likely that an old card
+  version gets stuck and shows only a loading spinner in the card picker. The
+  documentation now describes what to do in that case.
+
 ## 1.3.0 - 2026-10-31
 
 ### Neu

@@ -449,6 +449,12 @@ tap_action:            # optional: Standard-Aktion von Home Assistant beim Tippe
   navigation_path: /lovelace/energie
 ```
 
+**Karte fehlt im Kartenwähler oder zeigt nur einen Ladekreis?** Die Karte wird beim Start von Home
+Assistant angemeldet, nach der Installation oder einem Update also zuerst Home Assistant neu starten.
+Danach die Seite im Browser komplett neu laden (Strg+Umschalt+R bzw. Cmd+Umschalt+R); die Companion-App
+unter Einstellungen → Companion-App → Fehlerbehebung → Frontend-Cache zurücksetzen. Bleibt es dabei, hilft
+die Browser-Konsole (F12): Ein Fehler beim Laden von `zeitarchiv-card.js` steht dort.
+
 **Beim Tippen:** Im Editor unter „Beim Tippen“ lässt sich wie bei jeder Home-Assistant-Karte eine Aktion
 wählen (Dashboard öffnen, URL, Aktion ausführen). Ohne Auswahl passiert nichts. Bei „Entitäten direkt“ gilt
 die erste Entität als Ziel von „Mehr Informationen“. Mit Aktion ist die Karte per Tastatur erreichbar.

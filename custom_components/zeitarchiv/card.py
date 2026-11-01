@@ -115,7 +115,10 @@ async def async_setup_card(hass: HomeAssistant) -> None:
     hass.data[_FAILED_KEY] = {}
     hass.data[_SLOTS_KEY] = {}
     integration = await async_get_integration(hass, DOMAIN)
-    await hass.http.async_register_static_paths([StaticPathConfig(URL_BASE, str(FRONTEND_DIR), True)])
+    # Ohne langen Cache (cache_headers=False): Die URL trägt zwar die Version, ein Browser mit
+    # altem Seitenstand oder Service Worker fragt aber weiter die alte URL ab und behielte die alte
+    # Datei sonst bis zu 31 Tage. So fragt er per ETag nach (kurzes 304, ECharts wird nicht neu geladen).
+    await hass.http.async_register_static_paths([StaticPathConfig(URL_BASE, str(FRONTEND_DIR), False)])
     # Das Frontend ist bewusst keine harte Abhängigkeit (after_dependencies
     # sichert nur die Reihenfolge): wer es abgeschaltet hat, braucht auch keine
     # Karte, und die Integration läuft trotzdem.

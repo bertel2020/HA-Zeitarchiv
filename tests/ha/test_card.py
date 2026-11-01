@@ -233,6 +233,10 @@ async def test_the_card_files_are_served_and_announced(
     for name in ("zeitarchiv-card.js", "zeitarchiv-sparkline.js", "chart-tile-render.js", "number-format.js", "tooltip-hold.js", "server-time.js", "html-escape.js", "state-entities.js", "table-compute.js", "table-tile-render.js", "table.css", "echarts.min.js", "catalog.json"):
         response = await client.get(f"/zeitarchiv_card/{name}")
         assert response.status == 200, name
+    # Kein langer Cache: ein veralteter Seitenstand soll die Karte nicht wochenlang festhalten.
+    response = await client.get("/zeitarchiv_card/zeitarchiv-card.js")
+    assert "max-age" not in response.headers.get("Cache-Control", "")
+    assert response.headers.get("ETag")
     # Nur die ausgelieferten Dateien, nichts darüber hinaus.
     assert (await client.get("/zeitarchiv_card/../card.py")).status in (403, 404)
     assert (await client.get("/zeitarchiv_card/card.py")).status == 404
