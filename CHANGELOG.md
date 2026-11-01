@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.3.2 - 2026-11-01
+
+### Behoben
+
+- **Zeitarchiv-Karte unter Home Assistant 2026.10**: Die Karte fehlte im
+  Kartenwähler und im Dashboard oder erschien nur zufällig (Konsole: „Custom
+  element not found: zeitarchiv-card“), je nach Browser und Ladezeitpunkt. Die
+  Ursache liegt im Frontend von Home Assistant 2026.10 und ist ab 2026.11
+  behoben. Die Karte und die Sparkline melden sich jetzt nach dem Start der App
+  bei Bedarf noch einmal an und funktionieren damit auch unter 2026.10.
+
+---
+
+### English
+
+#### Fixed
+
+- **Zeitarchiv card on Home Assistant 2026.10**: The card was missing from the
+  card picker and the dashboard, or showed up only at random (console: "Custom
+  element not found: zeitarchiv-card"), depending on browser and load timing.
+  The cause is in the Home Assistant 2026.10 frontend and is fixed from 2026.11
+  on. The card and the sparkline now register themselves again after the app
+  has started if needed, so they also work on 2026.10.
+
 ## 1.3.1 - 2026-11-01
 
 ### Behoben
