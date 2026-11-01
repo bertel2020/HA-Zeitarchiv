@@ -169,3 +169,12 @@ def test_a_table_goes_to_a_fixed_path_with_a_whole_number() -> None:
     with patch(GET) as get, pytest.raises(ValueError):
         client.get_card_table("5/../x")  # type: ignore[arg-type]
     get.assert_not_called()
+
+
+def test_a_chart_period_is_sent_only_when_known() -> None:
+    client = ZeitarchivClient("h", 1, "t")
+    with patch(GET, return_value=_Resp({})) as get:
+        client.get_card_chart(7, None, 0, "30d")
+        assert get.call_args.kwargs["params"] == {"id": 7, "period": "30d"}
+        with pytest.raises(ValueError):
+            client.get_card_chart(7, None, 0, "x/../y")

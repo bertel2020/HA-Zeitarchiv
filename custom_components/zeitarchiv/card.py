@@ -326,6 +326,7 @@ async def ws_card_items(hass: HomeAssistant, connection, msg: dict[str, Any]) ->
         "type": "zeitarchiv/card/chart",
         probatio.Required("chart_id"): probatio.All(int, probatio.Range(min=1)),
         probatio.Optional("at"): probatio.All(str, probatio.Match(_DAY)),
+        probatio.Optional("period"): probatio.In(CARD_PERIODS),
         probatio.Optional("px", default=0): probatio.All(int, probatio.Range(min=0, max=CARD_MAX_PX)),
         probatio.Optional("entry_id"): str,
     }
@@ -333,10 +334,13 @@ async def ws_card_items(hass: HomeAssistant, connection, msg: dict[str, Any]) ->
 @websocket_api.async_response
 async def ws_card_chart(hass: HomeAssistant, connection, msg: dict[str, Any]) -> None:
     """Einstellungen und Daten eines gespeicherten Charts."""
-    chart_id, at, px = msg["chart_id"], msg.get("at"), _px(msg)
+    chart_id, at, px, period = msg["chart_id"], msg.get("at"), _px(msg), msg.get("period")
     if not _may_see(hass, connection, msg, CONF_CARD_SHARED_CHARTS, chart_id):
         return
-    await _fetch(hass, connection, msg, ("chart", chart_id, at, px), lambda client: client.get_card_chart(chart_id, at, px))
+    await _fetch(
+        hass, connection, msg, ("chart", chart_id, at, px, period),
+        lambda client: client.get_card_chart(chart_id, at, px, period),
+    )
 
 
 @websocket_api.require_admin

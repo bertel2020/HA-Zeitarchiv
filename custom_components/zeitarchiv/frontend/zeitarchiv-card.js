@@ -51,6 +51,8 @@ const TEXTS = {
     entities: 'Entitäten (nur archivierte)',
     period: 'Zeitraum',
     style: 'Darstellung',
+    period_saved: 'Wie im Chart gespeichert',
+    legend: 'Legende anzeigen',
     period_day: 'Heute',
     period_week: 'Diese Woche',
     period_month: 'Dieser Monat',
@@ -101,6 +103,8 @@ const TEXTS = {
     entities: 'Entities (archived only)',
     period: 'Period',
     style: 'Display',
+    period_saved: 'As saved in the chart',
+    legend: 'Show legend',
     period_day: 'Today',
     period_week: 'This week',
     period_month: 'This month',
@@ -243,6 +247,11 @@ const STYLE = `
   .note.error { color: var(--error-color); }
   .badge { display: inline-block; margin: 0 16px 8px; padding: 2px 10px; border-radius: 999px; font-size: 12px;
            color: var(--warning-color, #b26a00); border: 1px solid currentColor; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 4px 8px 0; font-size: 13px; color: var(--primary-text-color); }
+  .legend-item { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; background: none; border: 0; padding: 2px 0;
+                 font: inherit; color: inherit; }
+  .legend-item.inactive { opacity: .45; text-decoration: line-through; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
   .tablebox { overflow: auto; padding: 4px 8px 12px; color: var(--primary-text-color); }
   .tablebox table { margin: 0; }
   [hidden] { display: none !important; }
@@ -258,6 +267,8 @@ const STYLE = `
   }
 `;
 
+const PERIODS = ['month', 'day', 'week', 'year', '24h', '7d', '30d'];
+
 class ZeitarchivCard extends HTMLElement {
   constructor() {
     super();
@@ -271,6 +282,7 @@ class ZeitarchivCard extends HTMLElement {
     this._generation = 0;
     this._reload = false;
     this._shown = false;
+    this._hidden = new Set();
     this._lastGood = 0;
     this._failures = 0;
     this.shadowRoot.innerHTML = `<style>${STYLE}</style>
@@ -278,6 +290,7 @@ class ZeitarchivCard extends HTMLElement {
         <div class="header" part="header" hidden></div>
         <div class="body">
           <div class="chart" role="img" hidden></div>
+          <div class="legend" hidden></div>
           <div class="tablebox" hidden></div>
           <style class="tablecss"></style>
           <div class="note" role="status"></div>
@@ -285,7 +298,7 @@ class ZeitarchivCard extends HTMLElement {
         <div class="badge" role="status" hidden></div>
       </ha-card>`;
     this._els = {
-      header: this.shadowRoot.querySelector('.header'), chart: this.shadowRoot.querySelector('.chart'),
+      header: this.shadowRoot.querySelector('.header'), legend: this.shadowRoot.querySelector('.legend'), chart: this.shadowRoot.querySelector('.chart'),
       note: this.shadowRoot.querySelector('.note'), badge: this.shadowRoot.querySelector('.badge'),
       table: this.shadowRoot.querySelector('.tablebox'),
       tableCss: this.shadowRoot.querySelector('.tablecss'),
@@ -401,6 +414,7 @@ class ZeitarchivCard extends HTMLElement {
     this._explicitHeight = config.height != null;
     this._config.entities = Array.isArray(config.entities) ? config.entities.filter((id) => typeof id === 'string' && id) : [];
     this._els.chart.style.height = `${Math.max(120, Number(this._config.height) || 260)}px`;
+    this._hidden.clear();
     this._lastGood = 0;
     this._failures = 0;
     this._generation += 1;
@@ -471,7 +485,9 @@ class ZeitarchivCard extends HTMLElement {
       return {type: 'zeitarchiv/card/series', entity_ids: config.entities, period: config.period || 'month', style: config.style || 'auto', px};
     }
     if (config.table_id && !config.chart_id) return {type: 'zeitarchiv/card/table', table_id: config.table_id};
-    return {type: 'zeitarchiv/card/chart', chart_id: config.chart_id, px};
+    const request = {type: 'zeitarchiv/card/chart', chart_id: config.chart_id, px};
+    if (PERIODS.includes(config.period)) request.period = config.period;
+    return request;
   }
 
   _stale() {
@@ -494,6 +510,7 @@ class ZeitarchivCard extends HTMLElement {
     note.setAttribute('role', error ? 'alert' : 'status');
     note.hidden = false;
     this._els.chart.hidden = true;
+    this._els.legend.hidden = true;
     this._els.table.hidden = true;
     this._shown = false;
   }
@@ -554,6 +571,7 @@ class ZeitarchivCard extends HTMLElement {
     this._setHeader(result.name);
     if (result.table) { await this._drawTable(result); return; }
     this._els.table.hidden = true;
+    this._els.legend.hidden = true;
     if (!result.supported || !result.data) {
       this._showNote('unsupported');
       return;
@@ -586,12 +604,48 @@ class ZeitarchivCard extends HTMLElement {
       })
       : null;
     R.draw(this._chart, {
-      spec, data: result.data, series, viewType: R.viewTypeFor(spec, series), multiYear, hiddenSet: undefined, style,
+      spec, data: result.data, series, viewType: R.viewTypeFor(spec, series), multiYear, hiddenSet: this._hidden, style,
     });
+    this._renderLegend();
     this._els.chart.setAttribute('aria-label', this._describe(this._config.title || result.name, series, result.spec));
     this._applyAction();
     this._chart.resize();
     this._shown = true;
+  }
+
+  // Legende unter dem Chart: ein Eintrag je Serie (Name und Farbe wie im Chart), ein Klick blendet die Serie
+  // ein oder aus. Bei nur einer Serie und beim Donut entfällt sie (Titel bzw. Beschriftung nennen alles).
+  _renderLegend() {
+    const box = this._els.legend;
+    box.replaceChildren();
+    const option = this._chart.getOption();
+    const series = option.series || [];
+    const names = [];
+    (option.legend?.[0]?.data || []).forEach((entry) => {
+      const name = typeof entry === 'string' ? entry : entry?.name;
+      if (name && !names.includes(name)) names.push(name);
+    });
+    const donut = series.some((entry) => entry.type === 'pie');
+    box.hidden = this._config.legend === false || donut || names.length < 2;
+    if (box.hidden) return;
+    names.forEach((name) => {
+      const index = series.findIndex((entry) => entry.name === name);
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = `legend-item${this._hidden.has(name) ? ' inactive' : ''}`;
+      const dot = document.createElement('span');
+      dot.className = 'legend-dot';
+      dot.style.background = (index >= 0 && this._chart.getVisual({seriesIndex: index}, 'color')) || 'var(--primary-color)';
+      item.append(dot, document.createTextNode(name));
+      item.addEventListener('click', (event) => {
+        // Kein Auslösen der tap_action der Karte.
+        event.stopPropagation();
+        if (this._hidden.has(name)) this._hidden.delete(name); else this._hidden.add(name);
+        item.classList.toggle('inactive', this._hidden.has(name));
+        this._chart.dispatchAction({type: 'legendToggleSelect', name});
+      });
+      box.appendChild(item);
+    });
   }
 
   // Text für Screenreader: das Chart ist ein Bild (Canvas), also nennt der Name zu jeder Serie ihren Wert, bei
@@ -736,15 +790,22 @@ class ZeitarchivCardEditor extends HTMLElement {
     ])];
     if (this._source === 'entities') {
       schema.push(
-        {name: 'entities', required: true, selector: {entity: {multiple: true, include_entities: (this._entities || []).map((e) => e.entity_id)}}},
-        select('period', ['month', 'day', 'week', 'year', '24h', '7d', '30d'].map((value) => ({value, label: label(`period_${value}`)}))),
+        // Die gewählten Entitäten gehören immer in die Liste: beim Wiederöffnen ist die Liste des Servers noch
+        // nicht da, und der Picker meldete sie sonst als "Unbekannte Entität".
+        {name: 'entities', required: true, selector: {entity: {multiple: true, include_entities: [...new Set([
+          ...(this._config.entities || []), ...(this._entities || []).map((e) => e.entity_id)])]}}},
+        select('period', PERIODS.map((value) => ({value, label: label(`period_${value}`)}))),
         select('style', ['auto', 'stacked', 'percent'].map((value) => ({value, label: label(`style_${value}`)}))),
       );
     } else if (this._source === 'table') {
       schema.push({...select('table_id', tableOptions), required: true});
     } else {
-      schema.push({...select('chart_id', chartOptions), required: true});
+      schema.push(
+        {...select('chart_id', chartOptions), required: true},
+        select('period', ['saved', ...PERIODS].map((value) => ({value, label: label(`period_${value}`)}))),
+      );
     }
+    if (this._source !== 'table') schema.push({name: 'legend', selector: {boolean: {}}});
     schema.push(
       {name: 'title', selector: {text: {}}},
       {name: 'refresh', selector: {number: {min: 15, max: 3600, step: 15, mode: 'box', unit_of_measurement: 's'}}},
@@ -761,7 +822,10 @@ class ZeitarchivCardEditor extends HTMLElement {
     if (this._source === 'entities') {
       data.period = data.period || 'month';
       data.style = data.style || 'auto';
+    } else if (this._source === 'chart') {
+      data.period = data.period || 'saved';
     }
+    data.legend = data.legend !== false;
     return data;
   }
 
@@ -771,7 +835,7 @@ class ZeitarchivCardEditor extends HTMLElement {
     delete next.source;
     if (source !== this._source) {
       this._source = source;
-      delete next.chart_id; delete next.table_id; delete next.entities; delete next.period; delete next.style;
+      delete next.chart_id; delete next.table_id; delete next.entities; delete next.period; delete next.style; delete next.legend;
       if (source === 'entities') this._loadEntities();
     }
     for (const key of ['chart_id', 'table_id']) {
@@ -780,7 +844,9 @@ class ZeitarchivCardEditor extends HTMLElement {
     }
     if (!next.title) delete next.title;
     if (!next.tap_action || !next.tap_action.action || next.tap_action.action === 'none') delete next.tap_action;
-    if (this._source !== 'entities') for (const key of ['entities', 'period', 'style']) delete next[key];
+    if (this._source !== 'entities') for (const key of ['entities', 'style']) delete next[key];
+    if (this._source === 'table' || next.period === 'saved') delete next.period;
+    if (next.legend !== false) delete next.legend;
     if (this._source !== 'chart') delete next.chart_id;
     if (this._source !== 'table') delete next.table_id;
     this._config = {...next, type: 'custom:zeitarchiv-card'};

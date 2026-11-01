@@ -263,7 +263,7 @@ class ZeitarchivClient:
         Eine App ohne die Fähigkeit "cards" kennt die Route nicht (404)."""
         return self._get_card("/api/card/items")
 
-    def get_card_chart(self, chart_id: int, at: str | None = None, px: int = 0) -> dict[str, Any]:
+    def get_card_chart(self, chart_id: int, at: str | None = None, px: int = 0, period: str | None = None) -> dict[str, Any]:
         """Einstellungen und Daten eines gespeicherten Charts (GET /api/card/chart).
 
         Die ID reist als Query-Parameter, nie als Teil des Pfads, und kommt hier
@@ -272,6 +272,10 @@ class ZeitarchivClient:
         params: dict[str, Any] = {"id": int(chart_id)}
         if at:
             params["at"] = at
+        if period:
+            if period not in CARD_PERIODS:
+                raise ValueError(f"invalid period: {period}")
+            params["period"] = period
         if int(px) > 0:
             params["px"] = min(int(px), CARD_MAX_PX)
         return self._get_card("/api/card/chart", params)
