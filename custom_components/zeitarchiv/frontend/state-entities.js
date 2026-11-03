@@ -115,7 +115,10 @@ window.StateEntities = (() => {
     }));
   }
 
-  // Lokale Kalendergrenzen für die Buckets aus Abschnitten.
+  // Kalendergrenzen der Buckets aus Abschnitten, in der Zeitzone des SERVERS. Mit getHours()/setDate() des Browsers
+  // lägen sie bei abweichender Browserzone verschoben (Server Berlin, Browser Portugal: der Tag begänne eine Stunde
+  // zu früh, aus "Jan 2026" würde "Dez 2025"). ServerTime.toEpoch() rechnet Überläufe (Tag 0, Monat 13) selbst.
+  const ST = () => window.ServerTime;
   const bucketFns = {
     minutes(n) {
       const size = n * 60;
@@ -123,26 +126,26 @@ window.StateEntities = (() => {
     },
     hour() {
       return [
-        ts => { const d = new Date(ts * 1000); d.setMinutes(0, 0, 0); return d.getTime() / 1000; },
-        start => { const d = new Date(start * 1000); d.setHours(d.getHours() + 1); return d.getTime() / 1000; },
+        ts => { const p = ST().parts(ts); return ST().toEpoch(p.year, p.month, p.day, p.hour); },
+        start => start + 3600,
       ];
     },
     day() {
       return [
-        ts => { const d = new Date(ts * 1000); d.setHours(0, 0, 0, 0); return d.getTime() / 1000; },
-        start => { const d = new Date(start * 1000); d.setDate(d.getDate() + 1); return d.getTime() / 1000; },
+        ts => { const p = ST().parts(ts); return ST().toEpoch(p.year, p.month, p.day); },
+        start => { const p = ST().parts(start); return ST().toEpoch(p.year, p.month, p.day + 1); },
       ];
     },
     month() {
       return [
-        ts => { const d = new Date(ts * 1000); d.setHours(0, 0, 0, 0); d.setDate(1); return d.getTime() / 1000; },
-        start => { const d = new Date(start * 1000); d.setMonth(d.getMonth() + 1); return d.getTime() / 1000; },
+        ts => { const p = ST().parts(ts); return ST().toEpoch(p.year, p.month, 1); },
+        start => { const p = ST().parts(start); return ST().toEpoch(p.year, p.month + 1, 1); },
       ];
     },
     year() {
       return [
-        ts => { const d = new Date(ts * 1000); d.setHours(0, 0, 0, 0); d.setMonth(0, 1); return d.getTime() / 1000; },
-        start => { const d = new Date(start * 1000); d.setFullYear(d.getFullYear() + 1); return d.getTime() / 1000; },
+        ts => { const p = ST().parts(ts); return ST().toEpoch(p.year, 1, 1); },
+        start => { const p = ST().parts(start); return ST().toEpoch(p.year + 1, 1, 1); },
       ];
     },
   };
@@ -202,11 +205,12 @@ window.StateEntities = (() => {
   function bucketLabel(range, ts) {
     const d = new Date(ts * 1000);
     const loc = window.ZA_FORMAT;
-    if (range === 'hour' || range === 'day') return d.toLocaleTimeString(loc, {hour: '2-digit', minute: '2-digit'});
-    if (range === 'week') return d.toLocaleDateString(loc, {weekday: 'short', day: '2-digit', month: '2-digit'});
-    if (range === 'month') return d.toLocaleDateString(loc, {day: '2-digit', month: '2-digit'});
-    if (range === 'decade') return d.toLocaleDateString(loc, {year: 'numeric'});
-    return d.toLocaleDateString(loc, {month: 'short', year: 'numeric'});
+    const zoned = options => ST().withZone(options);
+    if (range === 'hour' || range === 'day') return d.toLocaleTimeString(loc, zoned({hour: '2-digit', minute: '2-digit'}));
+    if (range === 'week') return d.toLocaleDateString(loc, zoned({weekday: 'short', day: '2-digit', month: '2-digit'}));
+    if (range === 'month') return d.toLocaleDateString(loc, zoned({day: '2-digit', month: '2-digit'}));
+    if (range === 'decade') return d.toLocaleDateString(loc, zoned({year: 'numeric'}));
+    return d.toLocaleDateString(loc, zoned({month: 'short', year: 'numeric'}));
   }
 
   // Anteile (gestapelt auf 100 %) oder Wechsel (Beginne je Zustand) je Bucket,

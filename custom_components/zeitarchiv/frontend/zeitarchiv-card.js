@@ -314,6 +314,9 @@ class ZeitarchivCard extends HTMLElement {
     const card = this._els.card;
     card.addEventListener('click', () => this._fireAction());
     card.addEventListener('keydown', (event) => {
+      // Nur, wenn die Karte selbst den Fokus hat: Enter/Leertaste auf einem Legendeneintrag bubbelte sonst hierher,
+      // löste die tap_action aus und verhinderte mit preventDefault() das Umschalten der Serie.
+      if (event.target !== card) return;
       if ((event.key === 'Enter' || event.key === ' ') && this._actionOn()) { event.preventDefault(); this._fireAction(); }
     });
   }
@@ -587,6 +590,9 @@ class ZeitarchivCard extends HTMLElement {
       err.script = true;
       throw err;
     }
+    // Wurde die Karte entfernt, während die Quellen luden: sonst legte echarts.init() an dem abgelösten Element eine
+    // Instanz an, die nie freigegeben wird (ECharts hält sie in seiner globalen Liste).
+    if (!this.isConnected) return;
     const R = runtime.render;
     const spec = R.readSpec(result.spec);
     const series = R.prepareSeries(result.data);
@@ -689,6 +695,7 @@ class ZeitarchivCard extends HTMLElement {
     }
     const {TableTileRender} = runtime.tables;
     const table = await TableTileRender.compute(result.table.columns, result.table.rows, {queryTable: async () => result.query});
+    if (!this.isConnected) return;
     if (table.empty) { this._showNote('noVisible'); return; }
     if (this._els.tableCss.textContent !== runtime.tableCss) this._els.tableCss.textContent = runtime.tableCss;
     this._els.note.hidden = true;

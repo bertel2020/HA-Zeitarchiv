@@ -12,6 +12,12 @@
 - **Reauth bei abgelehntem Token**: Der Hinweis zur erneuten Anmeldung erscheint
   jetzt auch, wenn gerade nichts zu schreiben ist.
 
+- **Karte, Tastatur und Aufräumen**: Enter oder Leertaste auf einem
+  Legendeneintrag löst nicht mehr die Tippaktion der Karte aus und schaltet
+  die Serie wie gewohnt um. Wird die Karte entfernt, während Daten laden,
+  zeichnet sie nicht mehr ins Leere. Jahres-, Monats- und Tagesgrenzen folgen
+  der Zeitzone des Servers.
+
 ### Geändert
 
 - **Geringere Last**: Zustandsänderungen werden im Event-Loop gefiltert statt im
@@ -37,6 +43,11 @@
 
 - **Reauth for a rejected token**: The re-authentication notice now also
   appears when there is currently nothing to write.
+
+- **Card, keyboard and cleanup**: Enter or Space on a legend entry no longer
+  triggers the card's tap action and toggles the series as usual. If the card
+  is removed while data is loading, it no longer draws into nothing. Year,
+  month and day boundaries follow the server's time zone.
 
 #### Changed
 

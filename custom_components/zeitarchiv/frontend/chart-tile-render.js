@@ -30,7 +30,7 @@
     const groups = Array.from({length: 12}, () => []);
     (points || []).forEach(point => {
       if (!Number.isFinite(point.value)) return;
-      groups[new Date(point.ts * 1000).getMonth()].push(point.value);
+      groups[window.ServerTime.parts(point.ts).month - 1].push(point.value);  // Kalendermonat des Servers, nicht des Browsers
     });
     return groups.map(values => {
       if (!values.length) return null;
@@ -251,9 +251,9 @@
   function tileMultiYear(s, data, compare, {small, color, inkMuted}) {
     const agg = s.aggregation_type;
     const mean = values => values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
-    const currentYear = data.window_start ? new Date(data.window_start * 1000).getFullYear() : new Date().getFullYear();
+    const currentYear = data.window_start ? window.ServerTime.parts(data.window_start).year : new Date().getFullYear();
     const running = (data.is_current ?? true) && data.window_end != null;
-    const cutMonth = running ? new Date(data.window_end * 1000 - 1).getMonth() : null;
+    const cutMonth = running ? window.ServerTime.parts(data.window_end - 1).month - 1 : null;
     const years = [
       {year: currentYear, monthly: monthlyBuckets(s.points, agg), isCurrent: true},
       ...s.years.map(y => ({year: y.year, monthly: monthlyBuckets(y.points, agg), isCurrent: false})),
@@ -376,7 +376,7 @@
     const axisUnit = s => isDurationSeries(s) ? ' duration' : s.unit;
     const hasCompare = s => !!s.compare_points;
     const isSoll = s => !!compare.target && s.entity_id === compare.target;
-    const currentYear = data.window_start ? new Date(data.window_start * 1000).getFullYear() : new Date().getFullYear();
+    const currentYear = data.window_start ? window.ServerTime.parts(data.window_start).year : new Date().getFullYear();
     const units = [...new Set(series.filter(hasCompare).map(axisUnit))];
     const cumUnits = compare.cumsum ? [...new Set(series.filter(s => hasCompare(s) && !isSoll(s)).map(axisUnit))] : [];
     const barUnits = new Set(series.filter(s => hasCompare(s) && !isSoll(s)).map(axisUnit));
@@ -827,8 +827,12 @@
       wantColumns ? fetch(`${base}/api/query-multi?${columnsParams}`) : Promise.resolve(null),
     ]);
     const columnsData = columnsRes && columnsRes.ok ? await columnsRes.json() : null;
-    const data = res.ok ? await res.json() : (columnsData || {});
-    const heatmapData = heatmapRes ? await heatmapRes.json() : null;
+    // Schlägt die Hauptabfrage fehl und gibt es auch keine Spaltenantwort als Ersatz, ist das ein Fehler und nicht
+    // "keine Daten": sonst zeigte die Kachel bei einem 413/422/500 "Keine Daten".
+    if (!res.ok && !columnsData) throw new Error(`HTTP ${res.status}`);
+    const data = res.ok ? await res.json() : columnsData;
+    // Die Heatmap ist eine Zugabe: ihr Fehlschlag darf die gelungene Hauptabfrage nicht als Fehler erscheinen lassen.
+    const heatmapData = heatmapRes && heatmapRes.ok ? await heatmapRes.json() : null;
     if (heatmapData) {
       const cellsById = new Map((heatmapData.series || []).map(x => [x.entity_id, x.cells]));
       for (const entry of data.series || []) if (cellsById.get(entry.entity_id)) entry.cells = cellsById.get(entry.entity_id);
