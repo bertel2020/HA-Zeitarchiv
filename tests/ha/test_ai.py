@@ -303,3 +303,82 @@ async def test_the_account_kind_is_sent_to_the_app(
         )
         await tool.async_call(hass, llm.ToolInput(tool_name=tool.name, tool_args={}), llm_context)
         ai_client.ai_call.assert_called_once_with("get_notices", {}, expected)
+
+
+# ---------------------------------------------------------------- Konten ohne Administratorrechte
+
+ENTITY_TOOL_NAMES = {
+    "zeitarchiv_search_entities", "zeitarchiv_get_summary", "zeitarchiv_get_series", "zeitarchiv_compare_periods",
+}
+
+
+async def _context_of(hass: HomeAssistant, *, admin: bool | None) -> llm.LLMContext:
+    """Eine Anfrage im Namen eines Administrators, eines normalen Kontos oder ohne Konto (None)."""
+    if admin is None:
+        return _context()
+    from homeassistant.auth.const import GROUP_ID_ADMIN, GROUP_ID_USER
+
+    if not await hass.auth.async_get_users():
+        # Das erste Konto einer Instanz ist der Besitzer und damit immer Administrator.
+        await hass.auth.async_create_user("Besitzer", group_ids=[GROUP_ID_ADMIN])
+    user = await hass.auth.async_create_user("Konto", group_ids=[GROUP_ID_ADMIN if admin else GROUP_ID_USER])
+    return llm.LLMContext(
+        platform="mcp_server", context=Context(user_id=user.id), language="de", assistant="conversation", device_id=None,
+    )
+
+
+async def _tools_for(hass: HomeAssistant, entry: MockConfigEntry, context: llm.LLMContext) -> dict[str, llm.Tool]:
+    instance = await llm.async_get_api(hass, f"zeitarchiv_{entry.entry_id}", context)
+    return {tool.name: tool for tool in instance.tools}
+
+
+async def test_accounts_without_administrator_rights_get_no_entity_tools(
+    hass: HomeAssistant, ai_client: MagicMock, unload_after_test: MockConfigEntry
+) -> None:
+    """Wie bei der Karte: "Entitäten direkt" bleibt Administratoren vorbehalten."""
+    await _setup(hass, unload_after_test)
+    everything = {tool["name"] for tool in CONFIG_ON["tools"]}
+
+    admin = await _tools_for(hass, unload_after_test, await _context_of(hass, admin=True))
+    user = await _tools_for(hass, unload_after_test, await _context_of(hass, admin=False))
+    local = await _tools_for(hass, unload_after_test, await _context_of(hass, admin=None))
+
+    assert set(admin) == everything and set(local) == everything  # ohne Konto bleibt es wie bisher
+    assert set(user) == {"zeitarchiv_get_notices"}
+    assert ENTITY_TOOL_NAMES <= everything
+
+
+async def test_a_call_with_a_user_account_is_refused_before_it_reaches_the_app(
+    hass: HomeAssistant, ai_client: MagicMock, unload_after_test: MockConfigEntry
+) -> None:
+    await _setup(hass, unload_after_test)
+    user_context = await _context_of(hass, admin=False)
+    admin_context = await _context_of(hass, admin=True)
+    tool = (await _tools_for(hass, unload_after_test, admin_context))["zeitarchiv_get_summary"]
+
+    # Der Client hat sich die Werkzeugliste als Administrator geholt und ruft mit dem Konto eines anderen auf.
+    refused = await tool.async_call(
+        hass, llm.ToolInput(tool_name=tool.name, tool_args={"entity_ids": ["sensor.a"], "period": "day"}), user_context,
+    )
+    assert refused.error is True and refused.data["error"] == "admin_only"
+    ai_client.ai_call.assert_not_called()
+
+    allowed = await tool.async_call(
+        hass, llm.ToolInput(tool_name=tool.name, tool_args={"entity_ids": ["sensor.a"], "period": "day"}), admin_context,
+    )
+    assert allowed.error is False
+    ai_client.ai_call.assert_called_once_with("get_summary", {"entity_ids": ["sensor.a"], "period": "day"}, "admin")
+
+
+async def test_the_notices_tool_stays_available_to_user_accounts(
+    hass: HomeAssistant, ai_client: MagicMock, unload_after_test: MockConfigEntry
+) -> None:
+    await _setup(hass, unload_after_test)
+    context = await _context_of(hass, admin=False)
+    tool = (await _tools_for(hass, unload_after_test, context))["zeitarchiv_get_notices"]
+    ai_client.ai_call.return_value = (200, {"healthy": True})
+
+    result = await tool.async_call(hass, llm.ToolInput(tool_name=tool.name, tool_args={}), context)
+
+    assert result.error is False
+    ai_client.ai_call.assert_called_once_with("get_notices", {}, "user")

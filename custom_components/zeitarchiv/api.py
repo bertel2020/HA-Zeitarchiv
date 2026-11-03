@@ -358,8 +358,10 @@ class ZeitarchivClient:
         Token und unlesbare Antworten werfen.
 
         account ("admin" oder "user") sagt der App, mit was für einem Konto der
-        Client in Home Assistant angemeldet ist; sie zeigt es nur an (Einstellungen
-        → KI-Zugriff → Nutzung), gesperrt wird nichts."""
+        Client in Home Assistant angemeldet ist. Sie zeigt es in der Nutzung an
+        (Einstellungen → KI-Zugriff) und lehnt für "user" die Werkzeuge ab, die
+        einzelne Entitäten abfragen (siehe ai.ENTITY_TOOLS); die Integration bietet
+        sie solchen Konten gar nicht erst an."""
         headers = {**self._headers, "X-Zeitarchiv-Ai-User": account} if account else self._headers
         try:
             response = requests.post(

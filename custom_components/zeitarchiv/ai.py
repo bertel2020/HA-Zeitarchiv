@@ -12,6 +12,13 @@ Titeln und Beschreibungen. Die Integration kennt nur die Parameter-Schemata
 neue Integrationsversion verbessern, und ein ausgeschalteter Zugriff nimmt die
 API wieder aus HA heraus.
 
+Wer was abrufen darf, richtet sich nach dem Konto, mit dem der Client in Home Assistant angemeldet ist: Konten
+ohne Administratorrechte bekommen die Werkzeuge nicht, die einzelne Entitäten abfragen (ENTITY_TOOLS), und ein
+Aufruf wird abgelehnt — dieselbe Regel wie bei der Karte (card.py), wo "Entitäten direkt" Administratoren
+vorbehalten sind. Energieübersicht und Meldungen bleiben allen Konten; was die App darin zeigt, bestimmt die
+Freigabe des Besitzers. Eine Anfrage ohne Konto (etwa der lokale Gesprächsagent von Home Assistant) bleibt
+unbeschränkt, wie bisher.
+
 Braucht Home Assistant 2026.10 (probatio-Schemas, ToolResult, annotations).
 Ältere Versionen importieren dieses Modul nicht erfolgreich — __init__.py
 fängt das ab und meldet einmal einen Hinweis, statt Kompatibilitätscode für
@@ -74,6 +81,10 @@ SCHEMAS: dict[str, probatio.Schema] = {
     "get_notices": probatio.Schema({}),
 }
 
+#: Werkzeuge der App, die einzelne Entitäten abfragen (Vertrag mit app/ai_tools.py, ENTITY_TOOLS). Für Konten ohne
+#: Administratorrechte nicht angeboten und nicht ausführbar.
+ENTITY_TOOLS = frozenset({"search_entities", "get_summary", "get_series", "compare_periods"})
+
 _ANNOTATIONS = llm.ToolAnnotations(
     read_only=True, destructive=False, idempotent=True, open_world=False
 )
@@ -100,6 +111,8 @@ class ZeitarchivTool(llm.Tool):
     ) -> llm.ToolResult:
         arguments = self.parameters(tool_input.tool_args)
         account = await _account_kind(hass, llm_context)
+        if account == "user" and self.app_tool in ENTITY_TOOLS:
+            return _error("admin_only", "This tool reads individual entities and is limited to Home Assistant administrators.")
         try:
             status, body = await hass.async_add_executor_job(self._client.ai_call, self.app_tool, arguments, account)
         except ZeitarchivAuthError:
@@ -148,10 +161,13 @@ class ZeitarchivApi(llm.API):
 
     async def async_get_api_instance(self, llm_context: llm.LLMContext) -> llm.APIInstance:
         language = _language_key(llm_context.language or self.hass.config.language)
+        account = await _account_kind(self.hass, llm_context)
         tools = []
         for item in self.config.get("tools", []):
             app_tool = item.get("app_tool")
             if app_tool not in SCHEMAS or not isinstance(item.get("name"), str):
+                continue
+            if account == "user" and app_tool in ENTITY_TOOLS:
                 continue
             titles = item.get("title") if isinstance(item.get("title"), dict) else {}
             tools.append(ZeitarchivTool(

@@ -18,6 +18,12 @@
   Thread-Pool, und der Stand „zuletzt gesendet“ wird seltener geschrieben (schont
   SD-Karten).
 
+- **KI-Zugriff, Benutzerkonten**: Wer sich mit einem Konto ohne
+  Administratorrechte verbindet (zum Beispiel ein Familienkonto), bekommt die
+  Werkzeuge für einzelne Entitäten nicht mehr angeboten, wie bei der Karte.
+  Energieübersicht und Meldungen stehen weiter zur Verfügung. Administratoren
+  und der lokale Gesprächsagent von Home Assistant sind nicht betroffen.
+
 ---
 
 ### English
@@ -37,6 +43,12 @@
 - **Lower load**: State changes are filtered in the event loop instead of the
   thread pool, and the "last sent" state is written less often (easier on SD
   cards).
+
+- **AI access, user accounts**: Anyone connecting with an account without
+  administrator rights (for example a family account) is no longer offered the
+  tools for individual entities, as with the card. The energy overview and the
+  notices remain available. Administrators and Home Assistant's local
+  conversation agent are not affected.
 
 ## 1.3.2 - 2026-11-01
 

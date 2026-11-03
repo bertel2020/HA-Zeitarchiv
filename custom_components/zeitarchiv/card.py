@@ -11,7 +11,8 @@ Chart. Was ein Administrator in den Optionen unter "Karte freigeben" benennt, se
 auch andere Benutzer (Wandtablets, Familienkonten). Die Sparkline unter einer Kachelkarte
 dürfen alle Benutzer abrufen: wer eine Entität in Home Assistant sieht, kann ihren Verlauf
 dort ohnehin lesen (History-API, ohne Administratorrechte). Entitäten direkt bleiben
-Administratoren vorbehalten. Die Befehle nehmen deshalb ausschließlich eine ganzzahlige Chart-ID (und einen
+Administratoren vorbehalten (dieselbe Regel gilt für die LLM-API, siehe ai.py: Konten ohne Administratorrechte
+bekommen dort keine Werkzeuge für einzelne Entitäten). Die Befehle nehmen deshalb ausschließlich eine ganzzahlige Chart-ID (und einen
 Stichtag) an und bauen den Pfad selbst; nie reicht die Integration einen frei
 wählbaren Pfad oder Parameter an die App durch, sonst wäre sie ein Proxy an der
 Whitelist des Token-Ports vorbei.
