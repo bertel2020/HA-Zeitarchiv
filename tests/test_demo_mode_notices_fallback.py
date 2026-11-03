@@ -23,12 +23,13 @@ def test_coordinator_probes_demo_mode_instead_of_failing_on_auth_error() -> None
     assert '"unauthenticated": True' in source
 
 
-def test_coordinator_still_raises_update_failed_without_demo_signal() -> None:
-    """Ohne erkanntes Demo-Signal bleibt der bisherige Rückfall (UpdateFailed,
-    Entities werden "Nicht verfügbar") unverändert — nur der Demo-Modus-401
-    bekommt eine Sonderbehandlung, echte Verbindungs-/Tokenfehler nicht."""
+def test_coordinator_without_demo_signal_still_fails_the_update_or_asks_for_reauth() -> None:
+    """Ohne erkanntes Demo-Signal bleibt es bei einem fehlgeschlagenen Abruf (Entities werden "Nicht
+    verfügbar"): UpdateFailed bei Verbindungsfehlern, ConfigEntryAuthFailed bei einem abgelehnten Token, aus dem
+    Home Assistant den Reauth startet. Nur der Demo-Modus-401 bekommt eine Sonderbehandlung."""
     source = (INTEGRATION_DIR / "coordinator.py").read_text(encoding="utf-8")
     assert "raise UpdateFailed(str(err)) from err" in source
+    assert "raise ConfigEntryAuthFailed(str(err)) from err" in source
 
 
 def test_binary_sensor_shows_unknown_instead_of_off_when_unauthenticated() -> None:

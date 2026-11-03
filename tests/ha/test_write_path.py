@@ -63,10 +63,12 @@ async def test_watermark_skips_already_sent_values_after_reload(
     await _setup(hass, unload_after_test)
     await wait_for_events(hass, written, 1)
     key = f"{DOMAIN}_{unload_after_test.entry_id}_watermark"
-    assert SELECTED in hass_storage[key]["data"]
 
+    # Der Wasserstand wird verzögert geschrieben (siehe _WATERMARK_SAVE_DELAY), beim Entladen aber sofort —
+    # das Neuladen liest die Datei.
     assert await hass.config_entries.async_reload(unload_after_test.entry_id)
     await hass.async_block_till_done()
+    assert SELECTED in hass_storage[key]["data"]
 
     # Unveränderter Zustand seit dem letzten bestätigten Batch: kein Duplikat.
     assert len(written) == 1

@@ -463,3 +463,67 @@ def _run_all() -> None:
 
 if __name__ == "__main__":
     _run_all()
+
+
+# ---------------------------------------------------------------- drain_pending (Sichern beim Beenden)
+
+
+def _events(count: int) -> list[dict]:
+    return [{"entity_id": f"sensor.e{index}", "event_id": f"id{index}", "ts": float(index)} for index in range(count)]
+
+
+def test_drain_pending_returns_what_was_never_confirmed_in_order() -> None:
+    """Bei einer Störung der App bricht stop() nach der Drain-Phase ab. Offener Batch und Queue sind dann
+    weder gesendet noch verworfen und kommen in der Reihenfolge der Entstehung zurück."""
+    client = FakeClient(always_fail=True)
+    writer = ZeitarchivQueueWriter(client, batch_size=2, batch_timeout=0.01, retry_delays=(0.01,))
+    writer.start()
+    events = _events(5)
+    for event in events:
+        writer.enqueue(event)
+    deadline = time.monotonic() + 3
+    while not client.calls and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert client.calls, "der Worker hätte schon einen Sendeversuch machen müssen"
+
+    assert writer.stop(timeout=3, drain_timeout=0.05) is True
+    assert writer.drain_pending() == events
+    assert writer.drain_pending() == []  # nur einmal
+
+
+def test_drain_pending_is_empty_after_a_clean_stop() -> None:
+    client = FakeClient()
+    writer = ZeitarchivQueueWriter(client, batch_size=100, batch_timeout=5.0)
+    writer.start()
+    for event in _events(3):
+        writer.enqueue(event)
+    assert writer.stop(timeout=3) is True
+    assert [e["event_id"] for call in client.calls for e in call] == ["id0", "id1", "id2"]
+    assert writer.drain_pending() == []
+
+
+def test_drain_pending_leaves_the_data_to_a_running_worker() -> None:
+    client = FakeClient(always_fail=True)
+    writer = ZeitarchivQueueWriter(client, batch_size=1, batch_timeout=0.01, retry_delays=(0.05,))
+    writer.start()
+    try:
+        writer.enqueue(_events(1)[0])
+        time.sleep(0.1)
+        assert writer.drain_pending() == []
+    finally:
+        writer.stop(timeout=3, drain_timeout=0.05)
+
+
+def test_on_batch_sent_still_sees_the_whole_batch_after_the_writer_moved_on() -> None:
+    """Der Worker führt den offenen Batch jetzt als Attribut; die Liste, die on_batch_sent bekam, darf er danach
+    nicht mehr verändern (der Rückruf liest sie später im Event-Loop)."""
+    seen: list[list[dict]] = []
+    writer = ZeitarchivQueueWriter(FakeClient(), batch_size=2, batch_timeout=5.0, on_batch_sent=seen.append)
+    writer.start()
+    for event in _events(4):
+        writer.enqueue(event)
+    deadline = time.monotonic() + 3
+    while writer.sent_count < 4 and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert writer.stop(timeout=3) is True
+    assert [[e["event_id"] for e in batch] for batch in seen] == [["id0", "id1"], ["id2", "id3"]]

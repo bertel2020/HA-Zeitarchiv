@@ -80,6 +80,33 @@ def _entity_lines(entity_ids: list[str], remaining: int) -> tuple[list[str], int
     return lines, remaining - len(visible)
 
 
+def _named_items(listed: Any) -> dict[int, str]:
+    """ID → Name aus der Antwort der App. Einträge ohne ganzzahlige ID oder Namen werden übergangen, statt den
+    Schritt mit einem KeyError abzubrechen."""
+    items: dict[int, str] = {}
+    for item in listed if isinstance(listed, list) else []:
+        if not isinstance(item, dict) or "name" not in item:
+            continue
+        try:
+            items[int(item["id"])] = str(item["name"])
+        except (KeyError, TypeError, ValueError):
+            continue
+    return items
+
+
+def _known_ids(chosen: Any, known: dict[int, str]) -> list[int]:
+    """Nur IDs, die die App kennt. Ungültige Formularwerte fallen weg (statt mit ValueError zu enden)."""
+    result: set[int] = set()
+    for value in chosen if isinstance(chosen, (list, tuple, set)) else []:
+        try:
+            number = int(value)
+        except (TypeError, ValueError):
+            continue
+        if number in known:
+            result.add(number)
+    return sorted(result)
+
+
 def _build_filter_report(hass: Any, options: dict[str, Any]) -> dict[str, str]:
     """Erstellt die Vorschau der aktuell tatsächlich aufgelösten Entitäten."""
     # Laufzeitimport vermeidet einen Modulzyklus beim Laden des Config-Flows.
@@ -469,13 +496,13 @@ class ZeitarchivOptionsFlow(config_entries.OptionsFlow):
             listed = await self.hass.async_add_executor_job(runtime.client.get_card_items)
         except ZeitarchivApiError:
             return self.async_abort(reason="card_unavailable")
-        charts = {item["id"]: item["name"] for item in listed.get("items", [])}
-        tables = {item["id"]: item["name"] for item in listed.get("tables", [])}
+        charts = _named_items(listed.get("items"))
+        tables = _named_items(listed.get("tables"))
         options = self.config_entry.options
         if user_input is not None:
             # Nur IDs, die die App kennt: gelöschte Charts fallen beim Speichern weg.
-            chosen_charts = sorted(int(value) for value in user_input.get(CONF_CARD_SHARED_CHARTS, []) if int(value) in charts)
-            chosen_tables = sorted(int(value) for value in user_input.get(CONF_CARD_SHARED_TABLES, []) if int(value) in tables)
+            chosen_charts = _known_ids(user_input.get(CONF_CARD_SHARED_CHARTS, []), charts)
+            chosen_tables = _known_ids(user_input.get(CONF_CARD_SHARED_TABLES, []), tables)
             return self.async_create_entry(
                 title="",
                 data={

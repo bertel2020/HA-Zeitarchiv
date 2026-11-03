@@ -7,7 +7,7 @@ __init__.py (und damit den gesamten Schreibpfad) zu importieren.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 
 from homeassistant.config_entries import ConfigEntry
@@ -39,6 +39,9 @@ class ZeitarchivRuntimeData:
     # der Auswahl-Assistent sendet damit nach dem Label-Setzen den aktuellen
     # Zustand nach (selection_sync.py).
     enqueue_state: Callable[[State], bool] | None = None
+    # Beendet den Queue-Writer und sichert, was noch nicht gesendet wurde (siehe __init__.py). Liefert False, wenn
+    # der Worker nicht rechtzeitig endet. Dieselbe Funktion beim Entladen und beim Stopp von Home Assistant.
+    stop_writer: Callable[[], Awaitable[bool]] | None = None
 
 
 type ZeitarchivConfigEntry = ConfigEntry[ZeitarchivRuntimeData]

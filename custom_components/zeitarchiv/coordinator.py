@@ -15,6 +15,7 @@ from datetime import timedelta
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import ZeitarchivApiError, ZeitarchivAuthError, ZeitarchivClient
@@ -65,7 +66,11 @@ class ZeitarchivNoticesCoordinator(DataUpdateCoordinator[dict]):
                     "demo_mode": True,
                     "unauthenticated": True,
                 }
-            raise UpdateFailed(str(err)) from err
+            # Ein abgelehnter Token ist kein vorübergehender Fehler: Home Assistant startet daraus den Reauth.
+            # Sonst käme der Hinweis nur vom Queue-Writer, und der meldet sich erst, wenn ein Batch scheitert —
+            # bei engen Filtern (selten Änderungen) kann das lange dauern, die Health-Entitäten wären so lange
+            # nur "nicht verfügbar".
+            raise ConfigEntryAuthFailed(str(err)) from err
         except ZeitarchivApiError as err:
             raise UpdateFailed(str(err)) from err
 

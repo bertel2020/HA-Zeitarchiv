@@ -27,7 +27,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_HOST, CONF_PORT, EVENT_STATE_CHANGED
+from homeassistant.const import CONF_HOST, CONF_PORT, EVENT_HOMEASSISTANT_STOP, EVENT_STATE_CHANGED
 from homeassistant.core import (
     Event,
     EventStateChangedData,
@@ -80,6 +80,14 @@ PLATFORMS: list = ["sensor", "binary_sensor"]
 # dabei den dortigen Index-Lock so dicht besetzt hält, dass parallele
 # Anfragen mit 503 scheitern (an einer echten Installation beobachtet).
 _WATERMARK_STORAGE_VERSION = 1
+#: Sekunden, die ein geänderter Wasserstand wartet, bevor er in .storage geschrieben wird. Nach jedem Batch
+#: (alle paar Sekunden) die ganze Datei neu zu schreiben wären gut 17 000 Schreibvorgänge am Tag, auf einer
+#: SD-Karte spürbar. HA schreibt ausstehende Änderungen beim Herunterfahren selbst; beim Entladen schreibt der
+#: Eintrag sie sofort.
+_WATERMARK_SAVE_DELAY = 30
+# Was beim Beenden noch nicht an die App gesendet war (Queue und offener Batch) — wird beim nächsten Start
+# nachgesendet. Die App dedupliziert über die event_id, ein doppelt gesendetes Event schadet nicht.
+_PENDING_STORAGE_VERSION = 1
 #: Die Optionen (ohne Freigabe der Karte), mit denen der Eintrag geladen wurde, je Eintrag.
 _OPTIONS_SEEN = f"{DOMAIN}_options_seen"
 
@@ -150,8 +158,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
     # bereits ab dem ersten erfolgreichen Batch in dasselbe Dict.
     watermark_store = _watermark_store(hass, entry)
     watermark: dict[str, float] = await watermark_store.async_load() or {}
+    watermark_dirty = False
 
-    async def _persist_watermark(batch: list[dict]) -> None:
+    def _save_watermark_later() -> None:
+        nonlocal watermark_dirty
+        watermark_dirty = True
+        watermark_store.async_delay_save(lambda: dict(watermark), _WATERMARK_SAVE_DELAY)
+
+    @callback
+    def _persist_watermark(batch: list[dict]) -> None:
         changed = False
         for event in batch:
             entity_id = event.get("entity_id")
@@ -162,7 +177,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
                 watermark[entity_id] = ts
                 changed = True
         if changed:
-            await watermark_store.async_save(watermark)
+            _save_watermark_later()
+
+    async def _flush_watermark() -> None:
+        """Beim Entladen sofort schreiben: ein Neuladen liest die Datei, nicht den ausstehenden Zwischenspeicher."""
+        nonlocal watermark_dirty
+        if watermark_dirty:
+            watermark_dirty = False
+            await watermark_store.async_save(dict(watermark))
+
+    entry.async_on_unload(_flush_watermark)
 
     # on_auth_failed läuft im Hintergrund-Thread des Queue-Writers (siehe
     # dessen Docstring, kein homeassistant-Import dort) — hass.add_job statt
@@ -192,6 +216,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
         on_batch_sent=lambda batch: hass.add_job(_persist_watermark, batch),
     )
     queue_writer.start()
+    pending_store = _pending_store(hass, entry)
+    await _async_restore_pending(entry, pending_store, queue_writer)
+
+    async def _stop_writer(timeout: float = 15.0) -> bool:
+        """Beendet den Worker und sichert, was noch nicht gesendet ist. Mehrfach aufrufbar."""
+        stopped = await hass.async_add_executor_job(queue_writer.stop, timeout)
+        if not stopped:
+            return False
+        pending = queue_writer.drain_pending()
+        if pending:
+            await pending_store.async_save(pending)
+            _LOGGER.info(
+                "Zeitarchiv sichert %d noch nicht gesendete Events für den nächsten Start · Ziel=%s",
+                len(pending),
+                entry.title,
+            )
+        return True
+
+    async def _async_ha_stopping(_event: Event) -> None:
+        # Beim Herunterfahren entlädt Home Assistant die Einträge nicht: async_unload_entry läuft nie, und der
+        # Worker (ein Daemon-Thread) würde mit dem Prozess enden, samt Queue.
+        await _stop_writer(10.0)
+
+    entry.async_on_unload(hass.bus.async_listen(EVENT_HOMEASSISTANT_STOP, _async_ha_stopping))
     notices_coordinator = ZeitarchivNoticesCoordinator(hass, entry, client)
 
     filters = _resolve_filters(hass, entry.options)
@@ -217,11 +265,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
         async_dispatcher_send(hass, SIGNAL_TEXT_STATES.format(entry.entry_id))
 
     def _publish_text_states() -> None:
-        # hass.add_job statt eines direkten Aufrufs: state_changed-Listener
-        # ohne @callback laufen im Executor, Repair-Registry und Dispatcher
-        # brauchen den Event-Loop — erst das @callback oben bringt den Job
-        # dorthin (eine undekorierte Funktion schickte add_job wiederum in den
-        # Executor). Als Tupel übergeben, damit der Job eine stabile Kopie sieht.
+        # hass.add_job statt eines direkten Aufrufs: Repair-Registry und Dispatcher brauchen den Event-Loop, und
+        # der Aufrufer ist von dort nicht in jedem Fall garantiert (die Hilfsfunktionen sind thread-neutral
+        # geschrieben). Das @callback oben bringt den Job in den Event-Loop (eine undekorierte Funktion schickte
+        # add_job in den Executor). Als Tupel übergeben, damit der Job eine stabile Kopie sieht.
         hass.add_job(_async_text_states_changed, tuple(sorted(text_state_entities)))
 
     def _text_allowed(entity_id: str) -> bool:
@@ -286,7 +333,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
         queue_writer.enqueue(payload)
         return True
 
+    @callback
     def _handle_state_changed(event: Event[EventStateChangedData]) -> None:
+        # @callback: läuft im Event-Loop. Ohne die Markierung schickte Home Assistant jedes state_changed des
+        # ganzen Systems in den Executor, auch die, die der Filter gleich verwirft; zwei Änderungen derselben
+        # Entität konnten die Queue in falscher Reihenfolge erreichen, und text_state_entities wurde aus mehreren
+        # Threads verändert. Die Arbeit hier ist reine Speicherarbeit (Filter, Registry-Lesezugriffe,
+        # put_nowait) und blockiert nichts.
         new_state: State | None = event.data.get("new_state")
         if new_state is None:
             return
@@ -325,6 +378,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
     snapshot_done = True
     if text_state_entities:
         _publish_text_states()
+    if _prune_watermark(hass, watermark):
+        _save_watermark_later()
 
     # Nachsenden für den Auswahl-Assistenten und Registry-Ereignisse (ROADMAP
     # 1.33): derselbe Weg wie state_changed, aber mit Wasserstand-Schutz wie
@@ -357,6 +412,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
         notices_coordinator=notices_coordinator,
         text_states=text_states_view,
         enqueue_state=_enqueue_state,
+        stop_writer=_stop_writer,
     )
 
     def _sync_repairs() -> None:
@@ -480,6 +536,7 @@ async def async_remove_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) 
     """Löscht den Wasserstand einer entfernten Verbindung aus .storage —
     sonst bliebe je gelöschtem Entry eine verwaiste Datei zurück."""
     await _watermark_store(hass, entry).async_remove()
+    await _pending_store(hass, entry).async_remove()
     try:
         from .selection_sync import async_remove_store  # noqa: PLC0415
 
@@ -490,6 +547,47 @@ async def async_remove_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) 
 
 def _watermark_store(hass: HomeAssistant, entry: ConfigEntry) -> Store[dict[str, float]]:
     return Store(hass, _WATERMARK_STORAGE_VERSION, f"{DOMAIN}_{entry.entry_id}_watermark")
+
+
+def _pending_store(hass: HomeAssistant, entry: ConfigEntry) -> Store[list[dict[str, Any]]]:
+    return Store(hass, _PENDING_STORAGE_VERSION, f"{DOMAIN}_{entry.entry_id}_pending")
+
+
+async def _async_restore_pending(
+    entry: ConfigEntry, store: Store[list[dict[str, Any]]], queue_writer: ZeitarchivQueueWriter
+) -> None:
+    """Reiht die beim letzten Beenden gesicherten, noch nicht gesendeten Events wieder ein.
+
+    Vor dem Initial-Snapshot und dem Listener, damit sie vor den neueren Zuständen kommen. Die Datei wird
+    sofort gelöscht: Bleibt sie liegen, würde ein späterer Start dieselben Events noch einmal senden."""
+    pending = await store.async_load()
+    if not pending:
+        return
+    await store.async_remove()
+    events = [event for event in pending if isinstance(event, dict)]
+    for event in events:
+        queue_writer.enqueue(event)
+    _LOGGER.info(
+        "Zeitarchiv sendet %d beim letzten Beenden noch nicht übertragene Events nach · Ziel=%s",
+        len(events),
+        entry.title,
+    )
+
+
+def _prune_watermark(hass: HomeAssistant, watermark: dict[str, float]) -> bool:
+    """Entfernt Einträge von Entitäten, die es weder als Zustand noch in der Registry gibt.
+
+    Ohne das wüchse die Datei mit jeder je gesendeten Entität. Die Registry zählt mit, weil beim Start Entitäten
+    anderer Integrationen noch keinen Zustand haben, ihre Einträge aber bleiben sollen."""
+    registry = er.async_get(hass)
+    stale = [
+        entity_id
+        for entity_id in watermark
+        if hass.states.get(entity_id) is None and registry.async_get(entity_id) is None
+    ]
+    for entity_id in stale:
+        del watermark[entity_id]
+    return bool(stale)
 
 
 def _reload_relevant(entry: ZeitarchivConfigEntry) -> dict[str, Any]:
@@ -517,13 +615,18 @@ async def async_unload_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) 
         return False
     data = entry.runtime_data
     data.remove_listener()
-    # Sonst blieben Repair-Karten einer entfernten/neu geladenen Verbindung
-    # verwaist stehen, bis zufällig dieselbe Meldung erneut aktiv wird.
-    repairs_mod.async_clear_issues(hass, entry)
-    stopped = await hass.async_add_executor_job(data.queue_writer.stop)
+    # Erst den Worker beenden, dann die Repair-Karten räumen: In den Sekunden des Beendens kann er noch einen
+    # Reauth oder eine Demo-Modus-Karte für den gerade entladenen Eintrag auslösen.
+    if data.stop_writer is not None:
+        stopped = await data.stop_writer()
+    else:
+        stopped = await hass.async_add_executor_job(data.queue_writer.stop)
     if not stopped:
         _LOGGER.error("Zeitarchiv-Queue-Worker konnte nicht sauber beendet werden")
         return False
+    # Sonst blieben Repair-Karten einer entfernten/neu geladenen Verbindung
+    # verwaist stehen, bis zufällig dieselbe Meldung erneut aktiv wird.
+    repairs_mod.async_clear_issues(hass, entry)
     return True
 
 

@@ -83,6 +83,9 @@ class ZeitarchivQueueWriter:
         self._on_batch_sent = on_batch_sent
         self._demo_mode_paused = False
         self._queue: queue.Queue = queue.Queue(maxsize=max_queue_size)
+        # Der Batch, den der Worker gerade sammelt oder sendet. Als Attribut statt als lokale Variable von _run(),
+        # damit drain_pending() nach einem Abbruch sieht, was noch nicht bestätigt ist.
+        self._batch: list[dict[str, Any]] = []
         self._thread: threading.Thread | None = None
         self._shutdown_event = threading.Event()
         self._abort_event = threading.Event()
@@ -141,6 +144,25 @@ class ZeitarchivQueueWriter:
             self._thread.join(timeout=remaining)
         return not self._thread.is_alive()
 
+    def drain_pending(self) -> list[dict[str, Any]]:
+        """Holt alle Events heraus, die weder bestätigt noch verworfen wurden (offener Batch, dann Queue).
+
+        Für den Aufrufer, der sie beim Beenden sichern will, damit ein Neustart von Home Assistant oder ein
+        Neuladen des Eintrags sie nicht verliert. Nur nach stop(): Solange der Worker noch läuft, gehören ihm
+        die Daten, und die Liste bleibt leer."""
+        if self._thread is not None and self._thread.is_alive():
+            return []
+        pending = self._batch
+        self._batch = []
+        while True:
+            try:
+                item = self._queue.get_nowait()
+            except queue.Empty:
+                break
+            if item is not _STOP:
+                pending.append(item)
+        return pending
+
     def enqueue(self, event: dict[str, Any]) -> None:
         if not self._accepting and self._thread is not None:
             self._dropped_count += 1
@@ -181,7 +203,6 @@ class ZeitarchivQueueWriter:
         return self._last_error
 
     def _run(self) -> None:
-        batch: list[dict[str, Any]] = []
         deadline = time.monotonic() + self._batch_timeout
         while not self._abort_event.is_set():
             timeout = max(0.0, deadline - time.monotonic())
@@ -193,18 +214,19 @@ class ZeitarchivQueueWriter:
             if item is _STOP:
                 item = None
             elif item is not None:
-                batch.append(item)
+                self._batch.append(item)
 
-            batch_full = len(batch) >= self._batch_size
+            batch_full = len(self._batch) >= self._batch_size
             time_up = time.monotonic() >= deadline
             shutting_down = self._shutdown_event.is_set()
-            if batch and (batch_full or time_up or shutting_down):
-                if not self._flush(batch):
+            if self._batch and (batch_full or time_up or shutting_down):
+                if not self._flush(self._batch):
                     break
-                batch = []
+                # Neue Liste statt clear(): on_batch_sent() hat die alte weitergereicht und liest sie später.
+                self._batch = []
                 deadline = time.monotonic() + self._batch_timeout
 
-            if shutting_down and not batch and self._queue.empty():
+            if shutting_down and not self._batch and self._queue.empty():
                 break
 
     def _probe_demo_mode(self) -> bool | None:
