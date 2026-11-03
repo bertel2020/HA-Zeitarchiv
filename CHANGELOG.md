@@ -1,5 +1,43 @@
 # Changelog
 
+## Unreleased
+
+### Behoben
+
+- **Nichts geht beim Herunterfahren oder Neuladen verloren**: Waren Zustände
+  noch nicht an die App übertragen, etwa weil sie nicht erreichbar war, gingen
+  sie bei einem Neustart von Home Assistant oder beim Neuladen der Integration
+  verloren. Sie werden jetzt gesichert und beim nächsten Start nachgesendet.
+
+- **Reauth bei abgelehntem Token**: Der Hinweis zur erneuten Anmeldung erscheint
+  jetzt auch, wenn gerade nichts zu schreiben ist.
+
+### Geändert
+
+- **Geringere Last**: Zustandsänderungen werden im Event-Loop gefiltert statt im
+  Thread-Pool, und der Stand „zuletzt gesendet“ wird seltener geschrieben (schont
+  SD-Karten).
+
+---
+
+### English
+
+#### Fixed
+
+- **Nothing is lost on shutdown or reload**: If states had not yet been
+  delivered to the app, for example because it was unreachable, they were lost
+  when Home Assistant restarted or the integration was reloaded. They are now
+  saved and resent on the next start.
+
+- **Reauth for a rejected token**: The re-authentication notice now also
+  appears when there is currently nothing to write.
+
+#### Changed
+
+- **Lower load**: State changes are filtered in the event loop instead of the
+  thread pool, and the "last sent" state is written less often (easier on SD
+  cards).
+
 ## 1.3.2 - 2026-11-01
 
 ### Behoben
