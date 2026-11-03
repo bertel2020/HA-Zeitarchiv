@@ -78,7 +78,7 @@ async def test_a_chart_is_asked_for_by_whole_number_and_day_only(
     response = await _call(client, {"type": "zeitarchiv/card/chart", "chart_id": 7, "at": "2026-10-01"})
     assert response["success"] is True
     assert response["result"] == CHART
-    card_client.get_card_chart.assert_called_once_with(7, "2026-10-01", 0)
+    card_client.get_card_chart.assert_called_once_with(7, "2026-10-01", 0, None)
 
 
 @pytest.mark.parametrize(
@@ -394,13 +394,13 @@ async def test_the_width_of_the_card_is_rounded_up_and_part_of_the_cache_key(
 ) -> None:
     client = await hass_ws_client(hass)
     await _call(client, {"type": "zeitarchiv/card/chart", "chart_id": 7, "px": 431})
-    card_client.get_card_chart.assert_called_with(7, None, 500)
+    card_client.get_card_chart.assert_called_with(7, None, 500, None)
     await _call(client, {"type": "zeitarchiv/card/chart", "chart_id": 7, "px": 480})  # gleicher Schritt: aus dem Zwischenspeicher
     assert card_client.get_card_chart.call_count == 1
     await _call(client, {"type": "zeitarchiv/card/chart", "chart_id": 7, "px": 1000})
-    card_client.get_card_chart.assert_called_with(7, None, 1000)
+    card_client.get_card_chart.assert_called_with(7, None, 1000, None)
     await _call(client, {"type": "zeitarchiv/card/chart", "chart_id": 8, "px": 4000})
-    card_client.get_card_chart.assert_called_with(8, None, 4000)
+    card_client.get_card_chart.assert_called_with(8, None, 4000, None)
     for bad in (-1, 4001, "100", 1.5):
         response = await _call(client, {"type": "zeitarchiv/card/chart", "chart_id": 7, "px": bad})
         assert response["error"]["code"] == "invalid_format"
