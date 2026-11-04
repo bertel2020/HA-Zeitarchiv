@@ -24,6 +24,10 @@
 
 <p align="center"><em><a href="README.md">Deutsche Version</a></em></p>
 
+Zeitarchiv is a long-term archive for Home Assistant with time comparisons,
+energy and weather reports and CSV export, a simple alternative to
+InfluxDB/Grafana. This integration delivers the data for it.
+
 The Zeitarchiv integration watches selected state changes and transmits them
 in batches to the [Zeitarchiv app](https://github.com/bertel2020/HA-Apps/tree/main/zeitarchiv). It
 does not create copies of the archived entities in Home Assistant: the actual
