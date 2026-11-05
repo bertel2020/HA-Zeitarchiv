@@ -860,7 +860,9 @@ class ZeitarchivCard extends HTMLElement {
       if (name && !names.includes(name)) names.push(name);
     });
     const donut = series.some((entry) => entry.type === 'pie');
-    box.hidden = this._config.legend === false || donut || names.length < 2;
+    // Eine einzelne Serie braucht von sich aus keine Legende; wer "Legende anzeigen" ausdrücklich
+    // einschaltet (legend: true), bekommt sie trotzdem.
+    box.hidden = this._config.legend === false || donut || names.length < (this._config.legend === true ? 1 : 2);
     if (box.hidden) return;
     names.forEach((name) => {
       const index = series.findIndex((entry) => entry.name === name);
