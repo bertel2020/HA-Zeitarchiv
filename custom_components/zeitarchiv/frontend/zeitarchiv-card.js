@@ -1238,7 +1238,7 @@ class ZeitarchivCardEditor extends HTMLElement {
       if (chosen?.groups?.length) data.group = data.group || chosen.groups[0];
       if (chosen?.metrics?.length) data.metric = data.metric || chosen.metrics[0];
       if (chosen?.values?.length) {
-        data.values = Array.isArray(data.values) && data.values.length ? data.values : (chosen.key === 'energie.kennzahlen' ? chosen.values.map((item) => item.key) : []);
+        data.values = Array.isArray(data.values) && data.values.length ? data.values : chosen.values.filter((item) => item.default).map((item) => item.key);
         if (chosen.key === 'energie.kennzahlen') data.sparkline = data.sparkline !== false;
       }
       if (chosen?.sides?.length) data.side = data.side || chosen.sides[0];
@@ -1303,7 +1303,9 @@ class ZeitarchivCardEditor extends HTMLElement {
       if (next.band !== false) delete next.band;
       const chosenElement = (this._elements || []).find((item) => item.key === next.element);
       const allValues = (chosenElement?.values || []).map((item) => item.key);
-      const everything = chosenElement?.key === 'energie.kennzahlen' && Array.isArray(next.values) && next.values.length === allValues.length && allValues.every((key) => next.values.includes(key));
+      // Die Vorgabe ("default" in der Liste der App) steht nicht in der YAML.
+      const defaultValues = (chosenElement?.values || []).filter((item) => item.default).map((item) => item.key);
+      const everything = defaultValues.length > 0 && Array.isArray(next.values) && next.values.length === defaultValues.length && defaultValues.every((key) => next.values.includes(key));
       if (!Array.isArray(next.values) || !next.values.length || everything) delete next.values;
       if (!allValues.length || next.sparkline !== false) delete next.sparkline;
       if (!chosenElement?.sides?.length || next.side === chosenElement.sides[0]) delete next.side;

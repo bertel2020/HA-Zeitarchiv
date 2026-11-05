@@ -41,7 +41,7 @@
     if (pct == null && abs == null) return '';
     const change = pct != null ? pct : abs;
     const zero = Math.round(Math.abs(change) * 10) === 0;
-    const text = (zero ? '± ' : change > 0 ? '▲ +' : '▼ −') + (pct != null ? `${num(Math.abs(pct), 0)} %` : `${num(Math.abs(abs), 1)} ${item.unit || ''}`);
+    const text = (zero ? '± ' : change > 0 ? '▲ +' : '▼ −') + (pct != null ? `${num(Math.abs(pct), 0)} %` : `${num(Math.abs(abs), 1)} ${item.delta_unit || item.unit || ''}`);
     const good = !zero && item.better && (change > 0) === (item.better === 'up');
     const cls = zero || !item.better ? '' : (good ? ' kpi-good' : ' kpi-bad');
     return `<span class="kpi-delta${cls}">${escapeHtml(text)}${compareLabel ? ` <small>${escapeHtml(compareLabel)}</small>` : ''}</span>`;
@@ -59,10 +59,12 @@
     if (!items || !items.length) return `<div class="kpi-empty">${escapeHtml(t('Keine Spalte ausgewählt.'))}</div>`;
     const tiles = items.map((item) => {
       const change = delta(item, options.compareLabel);
+      // Zeilen unter dem Wert (Speicher: Ladestand, Ladung, Entladung); Beschriftung und Einheit kommen aus der App.
+      const lines = (item.lines || []).map((line) => `<div class="kpi-sub">${escapeHtml(line.label)} ${escapeHtml(num(line.value, Math.abs(line.value) < 100 ? 1 : 0))}\u00a0${escapeHtml(line.unit || '')}</div>`).join('');
       return tile(
         item.label,
         item.value == null ? '–' : `${escapeHtml(num(item.value, Math.abs(item.value) < 100 ? 1 : 0))}${unitHtml(item.unit)}`,
-        change ? `<div class="kpi-sub">${change}</div>` : '',
+        (change ? `<div class="kpi-sub">${change}</div>` : '') + lines,
         sparkline(item.spark),
       );
     });

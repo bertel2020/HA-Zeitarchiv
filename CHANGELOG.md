@@ -14,6 +14,8 @@
     Monatsvergleich Wert und Jahre, beim Wetter Gruppe oder Kennzahl, bei
     Anteilen, Lastprofil und Energie-Kennzahlen Zeitraum und Versatz, bei den
     Kennzahlen die Werte und den Verlauf wählen
+  - Die Energie-Kennzahlen bieten zusätzlich Autarkie und Eigenverbrauch an;
+    ohne Auswahl bleiben es die vier Energiemengen
   - Aus dem Langzeit der Energie kommen Rekorde, Kenntage je Jahr und „Was hat
     sich verändert?“ dazu; bei den Kenntagen wählt man Jahre und „bis heute“ oder
     ganze Jahre, bei den Veränderungen die Zahl der Verbraucher
@@ -50,6 +52,8 @@
     matrix and the monthly comparison the value and years, for weather the group
     or measure, for shares, load profile and energy key figures the period and
     offset, for the key figures the values and the trend
+  - The energy key figures also offer self-sufficiency and self-consumption;
+    without a choice they stay the four energy amounts
   - The energy long-term adds records, key days per year and "What has
     changed?"; for key days you choose the years and "until today" or whole
     years, for the changes the number of consumers
