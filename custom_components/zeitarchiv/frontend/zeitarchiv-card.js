@@ -338,6 +338,8 @@ const STYLE = `
   .kpi-delta.kpi-good { color: var(--success-color, #43a047); }
   .kpi-delta.kpi-bad { color: var(--error-color, #db4437); }
   .kpi-spark { display: block; width: 100%; height: 26px; margin-top: 4px; color: var(--primary-color); }
+  .stor-head { display: flex; align-items: center; gap: 14px; margin-bottom: 4px; }
+  .stor-batt { width: 52px; height: 24px; flex: none; color: var(--primary-color); }
   .kpi-empty { padding: 12px; color: var(--secondary-text-color); }
   [hidden] { display: none !important; }
   /* Variablen der App für die Tabelle, aus dem Thema von Home Assistant */
@@ -980,6 +982,7 @@ class ZeitarchivCard extends HTMLElement {
       'energie.kennzahlen': () => R.energyKpis(result.items, {compareLabel: result.compare_label}),
       'wetter.kennzahlen': () => R.weatherKpis(result.tiles),
       'energie.rekorde': () => R.energyRecords(result),
+      'energie.speicher': () => R.energyStorage(result),
     }[result.renderer];
     if (!html) { this._showNote('elementsOutdated'); return; }
     this._els.note.hidden = true;
@@ -1169,7 +1172,7 @@ class ZeitarchivCardEditor extends HTMLElement {
       if (chosen && chosen.values && chosen.values.length) {
         schema.push({name: 'values', selector: {select: {multiple: true, mode: 'list', options: chosen.values.map((item) => ({value: item.key, label: item.label || label(`role_${item.key}`)}))}}});
       }
-      if (chosen && chosen.key === 'energie.kennzahlen') schema.push({name: 'sparkline', selector: {boolean: {}}});
+      if (chosen && ['energie.kennzahlen', 'energie.speicher'].includes(chosen.key)) schema.push({name: 'sparkline', selector: {boolean: {}}});
       if (chosen && chosen.sides && chosen.sides.length) {
         schema.push(select('side', chosen.sides.map((value) => ({value, label: label(`side_${value}`)}))));
       }
@@ -1241,6 +1244,7 @@ class ZeitarchivCardEditor extends HTMLElement {
         data.values = Array.isArray(data.values) && data.values.length ? data.values : chosen.values.filter((item) => item.default).map((item) => item.key);
         if (chosen.key === 'energie.kennzahlen') data.sparkline = data.sparkline !== false;
       }
+      if (chosen?.key === 'energie.speicher') data.sparkline = data.sparkline !== false;
       if (chosen?.sides?.length) data.side = data.side || chosen.sides[0];
       if (chosen?.ranges?.length) {
         data.period = chosen.ranges.includes(data.period) ? data.period : (chosen.ranges.includes('month') ? 'month' : chosen.ranges[0]);
@@ -1307,7 +1311,7 @@ class ZeitarchivCardEditor extends HTMLElement {
       const defaultValues = (chosenElement?.values || []).filter((item) => item.default).map((item) => item.key);
       const everything = defaultValues.length > 0 && Array.isArray(next.values) && next.values.length === defaultValues.length && defaultValues.every((key) => next.values.includes(key));
       if (!Array.isArray(next.values) || !next.values.length || everything) delete next.values;
-      if (!allValues.length || next.sparkline !== false) delete next.sparkline;
+      if ((!allValues.length && chosenElement?.key !== 'energie.speicher') || next.sparkline !== false) delete next.sparkline;
       if (!chosenElement?.sides?.length || next.side === chosenElement.sides[0]) delete next.side;
       if (!chosenElement?.ranges?.length) { delete next.period; delete next.offset; delete next.follow_energy_date; }
       else {

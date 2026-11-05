@@ -16,6 +16,8 @@
     Kennzahlen die Werte und den Verlauf wählen
   - Die Energie-Kennzahlen bieten zusätzlich Autarkie, Eigenverbrauch und den
     Speicher an; ohne Auswahl bleiben es die vier Energiemengen
+  - Neu ist eine größere Speicher-Karte mit Batterie-Symbol und, bei einem Tag,
+    der Kurve des Ladestands
   - Aus dem Langzeit der Energie kommen Rekorde, Kenntage je Jahr und „Was hat
     sich verändert?“ dazu; bei den Kenntagen wählt man Jahre und „bis heute“ oder
     ganze Jahre, bei den Veränderungen die Zahl der Verbraucher
@@ -54,6 +56,8 @@
     offset, for the key figures the values and the trend
   - The energy key figures also offer self-sufficiency, self-consumption and the
     storage; without a choice they stay the four energy amounts
+  - A new, larger storage card shows a battery symbol and, for a day, the curve
+    of the state of charge
   - The energy long-term adds records, key days per year and "What has
     changed?"; for key days you choose the years and "until today" or whole
     years, for the changes the number of consumers

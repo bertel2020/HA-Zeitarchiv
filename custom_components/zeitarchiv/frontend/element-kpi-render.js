@@ -110,6 +110,20 @@
     return `<div class="kpi-grid">${html.join('')}</div>`;
   }
 
+  // Die größere Speicher-Karte: Batterie mit Füllstand, Saldo mit Veränderung, Zeilen und bei einem Tag die Kurve des Ladestands.
+  function energyStorage(data) {
+    const item = data.item || {};
+    const level = typeof data.level === 'number' ? Math.max(0, Math.min(100, data.level)) : null;
+    const fill = level == null ? '' : `<rect x="3" y="3" width="${(level * 0.42).toFixed(1)}" height="18" rx="2" fill="currentColor"/>`;
+    const battery = `<svg class="stor-batt" viewBox="0 0 52 24" aria-hidden="true"><rect x="1" y="1" width="46" height="22" rx="4" fill="none" stroke="currentColor" stroke-width="2"/>`
+      + `<rect x="48" y="8" width="3" height="8" rx="1" fill="currentColor"/>${fill}</svg>`;
+    const change = delta(item, data.compare_label);
+    const lines = (item.lines || []).map((line) => `<div class="kpi-sub">${escapeHtml(line.label)} ${escapeHtml(num(line.value, Math.abs(line.value) < 100 ? 1 : 0))}\u00a0${escapeHtml(line.unit || '')}</div>`).join('');
+    const value = item.value == null ? '–' : `${escapeHtml(num(item.value, Math.abs(item.value) < 100 ? 1 : 0))}${unitHtml(item.unit)}`;
+    return `<div class="stor"><div class="stor-head">${battery}<div><div class="kpi-label">${escapeHtml(item.label || '')}</div>`
+      + `<div class="kpi-value">${value}</div>${change ? `<div class="kpi-sub">${change}</div>` : ''}</div></div>${lines}${sparkline(data.soc)}</div>`;
+  }
+
   // Rekorde: je ein Kachel mit dem höchsten Tageswert und dem Datum. Sie gibt es erst nach einem Jahr Archiv (enough).
   function energyRecords(data) {
     const records = data.records || [];
@@ -123,5 +137,5 @@
     return `<div class="kpi-grid">${tiles.join('')}</div>`;
   }
 
-  window.ElementKpiRender = {energyKpis, weatherKpis, sparkline, energyRecords};
+  window.ElementKpiRender = {energyKpis, weatherKpis, sparkline, energyRecords, energyStorage};
 })();
