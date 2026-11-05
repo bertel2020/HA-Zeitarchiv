@@ -181,15 +181,15 @@ const fetchText = async (name) => {
 
 const loadSources = () => {
   sourcesPromise ||= (async () => {
-    const [echartsSource, render, numberFormat, tooltipHold, serverTime, htmlEscape, stateEntities, tableCompute, tableRender, elementTableRender, tableCss, catalog] = await Promise.all([
+    const [echartsSource, render, numberFormat, tooltipHold, serverTime, htmlEscape, stateEntities, tableCompute, tableRender, elementTableRender, legendRender, tableCss, catalog] = await Promise.all([
       fetchText('echarts.min.js'), fetchText('chart-tile-render.js'), fetchText('number-format.js'),
       fetchText('tooltip-hold.js'), fetchText('server-time.js'), fetchText('html-escape.js'),
-      fetchText('state-entities.js'), fetchText('table-compute.js'), fetchText('table-tile-render.js'), fetchText('element-table-render.js'),
+      fetchText('state-entities.js'), fetchText('table-compute.js'), fetchText('table-tile-render.js'), fetchText('element-table-render.js'), fetchText('legend-render.js'),
       fetchText('table.css'), fetchText('catalog.json'),
     ]);
     const module = {exports: {}};
     new Function('module', 'exports', `${echartsSource}\n//# sourceURL=zeitarchiv/echarts.min.js`).call(module.exports, module, module.exports);
-    return {echarts: module.exports, render, numberFormat, tooltipHold, serverTime, htmlEscape, stateEntities, tableCompute, tableRender, elementTableRender, tableCss, catalog: JSON.parse(catalog)};
+    return {echarts: module.exports, render, numberFormat, tooltipHold, serverTime, htmlEscape, stateEntities, tableCompute, tableRender, elementTableRender, legendRender, tableCss, catalog: JSON.parse(catalog)};
   })().catch((err) => { sourcesPromise = null; throw err; });
   return sourcesPromise;
 };
@@ -248,7 +248,12 @@ const buildRuntime = (sources, {timezone, language, dark}) => {
     `${sources.elementTableRender}\nreturn window.ElementTableRender;`,
     ['window', 't', 'escapeHtml', 'NumberFormat', 'ServerTime'], [win, t, win.escapeHtml, win.NumberFormat, win.ServerTime], 'element-table-render.js',
   );
-  return {render, setVars: (map) => Object.assign(vars, map), tables: {TableCompute: win.TableCompute, TableTileRender}, ElementTableRender};
+  // Legende mit Werten (Roadmap 1.49): dieselbe Datei wie die Kachel der App; braucht ChartTileRender im window.
+  const LegendRender = evaluate(
+    `${sources.legendRender}\nreturn window.LegendRender;`,
+    ['window', 't', 'escapeHtml', 'NumberFormat'], [win, t, win.escapeHtml, win.NumberFormat], 'legend-render.js',
+  );
+  return {render, setVars: (map) => Object.assign(vars, map), tables: {TableCompute: win.TableCompute, TableTileRender}, ElementTableRender, LegendRender};
 };
 
 const runtimeFor = async (settings) => {
