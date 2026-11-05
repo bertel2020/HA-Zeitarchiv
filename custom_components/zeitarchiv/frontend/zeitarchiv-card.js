@@ -63,6 +63,9 @@ const TEXTS = {
     style: 'Darstellung',
     period_saved: 'Wie im Chart gespeichert',
     legend: 'Legende anzeigen',
+    legend_style: 'Legenden-Stil', legendStyle_chart: 'Wie im Chart', legendStyle_chips: 'Chips', legendStyle_table: 'Tabelle',
+    legend_metrics: 'Kennzahlen der Legende (leer: wie im Chart)',
+    metric_last: 'Aktuell', metric_min: 'Min', metric_max: 'Max', metric_average: 'Durchschnitt', metric_sum: 'Summe',
     period_day: 'Heute',
     period_week: 'Diese Woche',
     period_month: 'Dieser Monat',
@@ -125,6 +128,9 @@ const TEXTS = {
     style: 'Display',
     period_saved: 'As saved in the chart',
     legend: 'Show legend',
+    legend_style: 'Legend style', legendStyle_chart: 'As in the chart', legendStyle_chips: 'Chips', legendStyle_table: 'Table',
+    legend_metrics: 'Legend values (empty: as in the chart)',
+    metric_last: 'Current', metric_min: 'Min', metric_max: 'Max', metric_average: 'Average', metric_sum: 'Total',
     period_day: 'Today',
     period_week: 'This week',
     period_month: 'This month',
@@ -968,7 +974,16 @@ class ZeitarchivCardEditor extends HTMLElement {
         select('period', ['saved', ...PERIODS].map((value) => ({value, label: label(`period_${value}`)}))),
       );
     }
-    if (this._source !== 'table' && this._source !== 'element') schema.push({name: 'legend', selector: {boolean: {}}});
+    if (this._source !== 'table' && this._source !== 'element') {
+      schema.push({name: 'legend', selector: {boolean: {}}});
+      // Stil und Kennzahlen der Legende mit Werten (Roadmap 1.49); leer = wie im Chart.
+      if (this._config.legend !== false) {
+        schema.push(
+          select('legend_style', ['chart', 'chips', 'table'].map((value) => ({value, label: label(`legendStyle_${value}`)}))),
+          {name: 'legend_metrics', selector: {select: {multiple: true, mode: 'list', options: LEGEND_KEYS.map((value) => ({value, label: label(`metric_${value}`)}))}}},
+        );
+      }
+    }
     schema.push(
       {name: 'title', selector: {text: {}}},
       {name: 'refresh', selector: {number: {min: 15, max: 3600, step: 15, mode: 'box', unit_of_measurement: 's'}}},
@@ -989,6 +1004,8 @@ class ZeitarchivCardEditor extends HTMLElement {
       data.period = data.period || 'saved';
     }
     data.legend = data.legend !== false;
+    data.legend_style = data.legend_style || 'chart';
+    data.legend_metrics = Array.isArray(data.legend_metrics) ? data.legend_metrics : [];
     if (this._source === 'element') {
       const chosen = (this._elements || []).find((item) => item.key === data.element);
       data.columns = Array.isArray(data.columns) && data.columns.length ? data.columns : (chosen?.columns || []);
@@ -1005,6 +1022,7 @@ class ZeitarchivCardEditor extends HTMLElement {
     if (source !== this._source) {
       this._source = source;
       delete next.chart_id; delete next.table_id; delete next.entities; delete next.period; delete next.style; delete next.legend;
+      delete next.legend_style; delete next.legend_metrics;
       delete next.element; delete next.columns; delete next.vorjahr; delete next.diff;
       if (source === 'entities') this._loadEntities();
       if (source === 'element') this._loadElements();
@@ -1018,6 +1036,9 @@ class ZeitarchivCardEditor extends HTMLElement {
     if (this._source !== 'entities') for (const key of ['entities', 'style']) delete next[key];
     if (this._source === 'table' || next.period === 'saved') delete next.period;
     if (next.legend !== false) delete next.legend;
+    // Vorgaben nicht in die YAML schreiben: "wie im Chart" ist kein Stil und keine Auswahl.
+    if (!['chips', 'table'].includes(next.legend_style) || next.legend === false || ['table', 'element'].includes(this._source)) delete next.legend_style;
+    if (!Array.isArray(next.legend_metrics) || !next.legend_metrics.length || next.legend === false || ['table', 'element'].includes(this._source)) delete next.legend_metrics;
     if (this._source !== 'chart') delete next.chart_id;
     if (this._source !== 'table') delete next.table_id;
     if (this._source !== 'element') for (const key of ['element', 'columns', 'vorjahr', 'diff']) delete next[key];
