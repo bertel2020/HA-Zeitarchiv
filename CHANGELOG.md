@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.4.1 - 2026-11-05
+
+### Behoben
+
+- **Karte: Legende bei einer einzelnen Serie**: „Legende anzeigen“ wirkt jetzt
+  auch bei einem Chart mit nur einer Entität. Ohne Angabe bleibt es wie bisher
+  ohne Legende
+
+---
+
+### English
+
+#### Fixed
+
+- **Card: legend with a single series**: "Show legend" now also works on a chart
+  with only one entity. Without a setting it stays as before, without a legend
+
 ## 1.4.0 - 2026-11-05
 
 ### Neu
