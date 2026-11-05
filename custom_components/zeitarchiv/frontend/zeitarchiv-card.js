@@ -511,7 +511,7 @@ class ZeitarchivCard extends HTMLElement {
       this._observer.observe(this);
     }
     if (typeof ResizeObserver !== 'undefined') {
-      this._resize = new ResizeObserver(() => this._chart && this._chart.resize());
+      this._resize = new ResizeObserver(() => { this._chart?.resize(); this._restyleLegend(); });
       this._resize.observe(this._els.chart);
     }
     if (this._hass && this._config) this._load();
@@ -694,10 +694,8 @@ class ZeitarchivCard extends HTMLElement {
     try { metrics = JSON.parse(raw.legendMetrics || '[]'); } catch (err) { /* ohne */ }
     const own = Array.isArray(this._config.legend_metrics) ? this._config.legend_metrics.filter((key) => LEGEND_KEYS.includes(key)) : [];
     if (own.length) metrics = own;
-    // "Wie das Chart" ist auf einer schmalen Karte (unter etwa 300 px) eine Chip-Reihe: eine Tabelle würde seitlich
-    // scrollen. Wer "Tabelle" ausdrücklich wählt, behält sie.
-    let style = this._config.legend_style || raw.legendStyle || 'chips';
-    if (!this._config.legend_style && style === 'table' && (this._els.card?.clientWidth || 1000) < NARROW_CARD_PX) style = 'chips';
+    this._chartLegendStyle = raw.legendStyle || 'chips';
+    const style = this._legendStyle(this._chartLegendStyle);
     this._legend = {
       items: runtime.LegendRender.buildLegendItems({series, data: result.data, spec, multiYear}),
       legendMetrics: Array.isArray(metrics) ? metrics : [], showStats: true, style,
@@ -705,6 +703,23 @@ class ZeitarchivCard extends HTMLElement {
     this._legendRender = runtime.LegendRender;
     box.className = 'legend values dtile-legend is-visible';
     box.hidden = false;
+    this._paintLegend();
+  }
+
+  // "Wie das Chart" ist auf einer schmalen Karte (unter etwa 300 px) eine Chip-Reihe: eine Tabelle würde seitlich
+  // scrollen. Wer "Tabelle" ausdrücklich wählt, behält sie.
+  _legendStyle(chartStyle) {
+    if (this._config.legend_style) return this._config.legend_style;
+    const narrow = (this._els.card?.clientWidth || 1000) < NARROW_CARD_PX;
+    return chartStyle === 'table' && narrow ? 'chips' : chartStyle;
+  }
+
+  // Ändert sich die Breite der Karte (Telefon gedreht, andere Spaltenzahl), gilt die Regel oben neu.
+  _restyleLegend() {
+    if (!this._legend || !this._legendRender || !this._els.legend.classList.contains('values')) return;
+    const style = this._legendStyle(this._chartLegendStyle);
+    if (style === this._legend.style) return;
+    this._legend.style = style;
     this._paintLegend();
   }
 
@@ -741,6 +756,7 @@ class ZeitarchivCard extends HTMLElement {
     const box = this._els.legend;
     box.replaceChildren();
     box.className = 'legend';
+    this._legend = null;
     const option = this._chart.getOption();
     const series = option.series || [];
     const names = [];
