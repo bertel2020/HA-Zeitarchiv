@@ -57,6 +57,8 @@ const TEXTS = {
     elementsNone: 'In der Zeitarchiv-App ist noch kein Baustein eingerichtet.',
     elementsOutdated: 'Die Integration kennt diesen Baustein nicht. Bitte die Integration aktualisieren.',
     elementAdminOnly: 'Dashboard-Bausteine sehen nur Administratoren.',
+    element_offset: 'Perioden zurück (0 = aktuell)', element_side: 'Seite', element_follow: 'Datumsauswahl der Energie von Home Assistant folgen',
+    side_verbrauch: 'Verbrauch', side_versorgung: 'Versorgung',
     element_metric: 'Kennzahl', element_band: 'Spanne der Jahre anzeigen',
     metric_temperature: 'Temperatur', metric_precip: 'Niederschlag', metric_sun: 'Sonnenstunden',
     metric_avg: 'Temperatur Ø', metric_max: 'Temperatur Max', metric_min: 'Temperatur Min',
@@ -129,6 +131,8 @@ const TEXTS = {
     elementsNone: 'No element is set up in the Zeitarchiv app yet.',
     elementsOutdated: 'The integration does not know this element. Please update the integration.',
     elementAdminOnly: 'Dashboard elements are visible to administrators only.',
+    element_offset: 'Periods back (0 = current)', element_side: 'Side', element_follow: 'Follow the date selection of the Home Assistant energy dashboard',
+    side_verbrauch: 'Consumption', side_versorgung: 'Supply',
     element_metric: 'Measure', element_band: 'Show range of years',
     metric_temperature: 'Temperature', metric_precip: 'Precipitation', metric_sun: 'Sunshine hours',
     metric_avg: 'Temperature avg.', metric_max: 'Temperature max.', metric_min: 'Temperature min.',
@@ -485,6 +489,7 @@ class ZeitarchivCard extends HTMLElement {
     this._failures = 0;
     this._generation += 1;
     this._applyAction();
+    this._followEnergy();
     if (this._hass) this._load();
     else this._showNote(this._hasSource() ? 'loading' : 'chooseChart');
   }
@@ -492,7 +497,7 @@ class ZeitarchivCard extends HTMLElement {
   set hass(hass) {
     const first = !this._hass;
     this._hass = hass;
-    if (first && this._config) { this._look = this._lookOf(hass); this._load(); return; }
+    if (first && this._config) { this._look = this._lookOf(hass); this._followEnergy(); this._load(); return; }
     // Hell/Dunkel, Thema oder Sprache gewechselt: neu zeichnen, statt bis zur nächsten Aktualisierung
     // (bis zu einer Stunde) mit den alten Farben stehen zu bleiben. Die Antwort kommt meist aus dem Cache.
     const look = this._lookOf(hass);
@@ -531,6 +536,8 @@ class ZeitarchivCard extends HTMLElement {
   disconnectedCallback() {
     clearTimeout(this._timer);
     this._timer = null;
+    this._unfollow?.();
+    this._unfollow = null;
     this._observer?.disconnect();
     window.removeEventListener('scroll', this._hideTableTip, true);
     this._hideTableTip();
@@ -557,6 +564,13 @@ class ZeitarchivCard extends HTMLElement {
       if (config.role) request.role = config.role;
       if (config.group) request.group = config.group;
       if (config.metric) request.metric = config.metric;
+      if (config.side) request.side = config.side;
+      if (config.period && ['day', 'week', 'month', 'year'].includes(config.period)) request.range = config.period;
+      if (Number(config.offset) < 0) request.offset = Math.max(-60, Math.round(Number(config.offset)));
+      // Optional: die Datumsauswahl der Energie von Home Assistant. Sie steht nur zur Verfügung, wenn schon eine Energie-Ansicht sie
+      // angelegt hat (hass.connection._energy); sonst gilt der feste Zeitraum der Karte.
+      const energy = config.follow_energy_date ? this._energyPeriod() : null;
+      if (energy) { request.range = energy.range; request.offset = energy.offset; }
       if (config.years != null) request.years = Number(config.years);
       return request;
     }
@@ -564,6 +578,49 @@ class ZeitarchivCard extends HTMLElement {
     const request = {type: 'zeitarchiv/card/chart', chart_id: config.chart_id, px};
     if (PERIODS.includes(config.period)) request.period = config.period;
     return request;
+  }
+
+  // Zeitraum der Datumsauswahl der Energie von Home Assistant als Bereich und Versatz in Perioden zurück, oder null.
+  // HA legt die Sammlung erst an, wenn eine Energie-Ansicht sie braucht; ihr Aufbau ist nicht dokumentiert (die Quelle nennt
+  // den Zugriff von Karten ausdrücklich), darum jeder Zugriff abgesichert.
+  _energyPeriod() {
+    try {
+      const collection = this._hass?.connection?._energy;
+      const start = collection?.start;
+      if (!(start instanceof Date)) return null;
+      const end = collection.end instanceof Date ? collection.end : new Date();
+      const days = (end - start) / 864e5;
+      const now = new Date();
+      const day = (date) => Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+      let range;
+      let offset;
+      if (days <= 1.5) { range = 'day'; offset = Math.round((day(start) - day(now)) / 864e5); }
+      else if (days <= 8) { range = 'week'; offset = Math.round((day(start) - day(now)) / (7 * 864e5)); }
+      else if (days <= 32) { range = 'month'; offset = (start.getFullYear() - now.getFullYear()) * 12 + start.getMonth() - now.getMonth(); }
+      else if (days <= 370) { range = 'year'; offset = start.getFullYear() - now.getFullYear(); }
+      else return null;
+      return {range, offset: Math.max(-60, Math.min(0, offset))};
+    } catch (err) {
+      return null;
+    }
+  }
+
+  // Wechselt die Datumsauswahl, lädt die Karte neu; abgemeldet wird beim Entfernen der Karte.
+  _followEnergy() {
+    this._unfollow?.();
+    this._unfollow = null;
+    const collection = this._hass?.connection?._energy;
+    if (!this._config?.follow_energy_date || typeof collection?.subscribe !== 'function') return;
+    try {
+      let first = true;
+      const stop = collection.subscribe(() => {
+        if (first) { first = false; return; }
+        this._load();
+      });
+      this._unfollow = typeof stop === 'function' ? stop : null;
+    } catch (err) {
+      this._unfollow = null;
+    }
   }
 
   _stale() {
@@ -895,6 +952,10 @@ class ZeitarchivCard extends HTMLElement {
       'energie.monatsvergleich': (R, colors, extra) => R.energyMonthly(result.months, result.months.roles[0], {colors, ...extra}),
       'wetter.monatsvergleich': (R, colors, extra) => R.weatherMonthly(result.monthly, {colors, ...extra}),
       'wetter.matrix': (R, colors, extra) => R.weatherMatrix(result.matrix, {colors, ...extra}),
+      'energie.anteile': (R, colors, extra, palette) => R.energyShares(result.items, {colorAt: (index) => palette[index % palette.length], surface: colors.surface}),
+      'energie.heatmap': (R, colors, extra) => (result.heatmap.rows?.length
+        ? R.energyHeatmap(result.heatmap, {colors: {ink: colors.ink, accent: colors.cur, surfaceAlt: vars['--surface-alt'], surface: colors.surface, mono: vars['--font-mono']}, font: extra.font})
+        : null),
     }[result.renderer];
     if (!make) { this._showNote('elementsOutdated'); return; }
     const vars = this._themeVars();
@@ -921,7 +982,8 @@ class ZeitarchivCard extends HTMLElement {
     this._els.legend.hidden = true;
     this._els.chart.hidden = false;
     if (!this._chart) this._chart = runtime.echarts.init(this._els.chart);
-    const option = make(runtime.ElementChartRender, colors, {band: this._config.band !== false, narrow: this._els.chart.clientWidth < 520});
+    const option = make(runtime.ElementChartRender, colors, {band: this._config.band !== false, narrow: this._els.chart.clientWidth < 520}, palette);
+    if (!option) { this._showNote('noData'); return; }
     this._chart.setOption(option, true);
     this._els.chart.setAttribute('aria-label', `${this._config.title || result.title || ''}`);
     this._applyAction();
@@ -1054,7 +1116,17 @@ class ZeitarchivCardEditor extends HTMLElement {
       if (chosen && chosen.metrics && chosen.metrics.length) {
         schema.push(select('metric', chosen.metrics.map((value) => ({value, label: label(`metric_${value}`)}))));
       }
-      if (chosen && chosen.kind === 'chart') schema.push({name: 'band', selector: {boolean: {}}});
+      if (chosen && /monatsvergleich$/.test(chosen.key)) schema.push({name: 'band', selector: {boolean: {}}});
+      if (chosen && chosen.sides && chosen.sides.length) {
+        schema.push(select('side', chosen.sides.map((value) => ({value, label: label(`side_${value}`)}))));
+      }
+      if (chosen && chosen.ranges && chosen.ranges.length) {
+        schema.push(
+          select('period', chosen.ranges.map((value) => ({value, label: label(`period_${value}`)}))),
+          {name: 'offset', selector: {number: {min: -60, max: 0, step: 1, mode: 'box'}}},
+          {name: 'follow_energy_date', selector: {boolean: {}}},
+        );
+      }
       if (chosen && chosen.groups && chosen.groups.length) {
         schema.push(select('group', chosen.groups.map((value) => ({value, label: label(`group_${value}`)}))));
       }
@@ -1112,7 +1184,13 @@ class ZeitarchivCardEditor extends HTMLElement {
       data.diff = data.diff !== false;
       if (chosen?.groups?.length) data.group = data.group || chosen.groups[0];
       if (chosen?.metrics?.length) data.metric = data.metric || chosen.metrics[0];
-      if (chosen?.kind === 'chart') data.band = data.band !== false;
+      if (chosen?.sides?.length) data.side = data.side || chosen.sides[0];
+      if (chosen?.ranges?.length) {
+        data.period = chosen.ranges.includes(data.period) ? data.period : (chosen.ranges.includes('month') ? 'month' : chosen.ranges[0]);
+        data.offset = Number(data.offset) || 0;
+        data.follow_energy_date = Boolean(data.follow_energy_date);
+      }
+      if (chosen && /monatsvergleich$/.test(chosen.key)) data.band = data.band !== false;
       if (chosen?.roles?.length) {
         data.role = data.role || chosen.roles[0];
         data.years = String(data.years ?? 10);
@@ -1129,7 +1207,7 @@ class ZeitarchivCardEditor extends HTMLElement {
       this._source = source;
       delete next.chart_id; delete next.table_id; delete next.entities; delete next.period; delete next.style; delete next.legend;
       delete next.legend_style; delete next.legend_metrics;
-      delete next.element; delete next.columns; delete next.vorjahr; delete next.diff; delete next.role; delete next.years; delete next.group; delete next.metric; delete next.band;
+      delete next.element; delete next.columns; delete next.vorjahr; delete next.diff; delete next.role; delete next.years; delete next.group; delete next.metric; delete next.band; delete next.side; delete next.offset; delete next.follow_energy_date;
       if (source === 'entities') this._loadEntities();
       if (source === 'element') this._loadElements();
     }
@@ -1147,7 +1225,7 @@ class ZeitarchivCardEditor extends HTMLElement {
     if (!Array.isArray(next.legend_metrics) || !next.legend_metrics.length || next.legend === false || ['table', 'element'].includes(this._source)) delete next.legend_metrics;
     if (this._source !== 'chart') delete next.chart_id;
     if (this._source !== 'table') delete next.table_id;
-    if (this._source !== 'element') for (const key of ['element', 'columns', 'vorjahr', 'diff', 'role', 'years', 'group', 'metric', 'band']) delete next[key];
+    if (this._source !== 'element') for (const key of ['element', 'columns', 'vorjahr', 'diff', 'role', 'years', 'group', 'metric', 'band', 'side', 'offset', 'follow_energy_date']) delete next[key];
     else {
       // Vorgaben nicht in die YAML schreiben: alle Spalten, mit Vorjahr, mit Differenz.
       const all = (this._elements || []).find((item) => item.key === next.element)?.columns || [];
@@ -1163,6 +1241,14 @@ class ZeitarchivCardEditor extends HTMLElement {
       const chosenMetrics = (this._elements || []).find((item) => item.key === next.element)?.metrics || [];
       if (!chosenMetrics.length || next.metric === chosenMetrics[0]) delete next.metric;
       if (next.band !== false) delete next.band;
+      const chosenElement = (this._elements || []).find((item) => item.key === next.element);
+      if (!chosenElement?.sides?.length || next.side === chosenElement.sides[0]) delete next.side;
+      if (!chosenElement?.ranges?.length) { delete next.period; delete next.offset; delete next.follow_energy_date; }
+      else {
+        if (next.period === (chosenElement.ranges.includes('month') ? 'month' : chosenElement.ranges[0])) delete next.period;
+        if (!Number(next.offset)) delete next.offset; else next.offset = Math.max(-60, Math.min(0, Math.round(Number(next.offset))));
+        if (!next.follow_energy_date) delete next.follow_energy_date;
+      }
     }
     this._config = {...next, type: 'custom:zeitarchiv-card'};
     this.dispatchEvent(new CustomEvent('config-changed', {detail: {config: this._config}, bubbles: true, composed: true}));

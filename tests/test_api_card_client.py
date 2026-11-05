@@ -198,7 +198,9 @@ def test_elements_go_to_fixed_paths_with_a_key_and_known_words() -> None:
     "arguments",
     [{"key": "../x"}, {"key": "a.b/c"}, {"key": "energie"}, {"key": "energie.zeitraeume", "columns": ["x"]},
      {"key": "energie.zeitraeume", "columns": "monat"}, {"key": "energie.zeitraeume", "mode": "y"},
-     {"key": "energie.matrix", "role": "gas"}, {"key": "energie.matrix", "years": 99}, {"key": "energie.matrix", "years": True}, {"key": "wetter.zeitraeume", "group": "x"}, {"key": "wetter.monatsvergleich", "metric": "x"}],
+     {"key": "energie.matrix", "role": "gas"}, {"key": "energie.matrix", "years": 99}, {"key": "energie.matrix", "years": True}, {"key": "wetter.zeitraeume", "group": "x"}, {"key": "wetter.monatsvergleich", "metric": "x"},
+     {"key": "energie.anteile", "range_key": "decade"}, {"key": "energie.anteile", "offset": 1}, {"key": "energie.anteile", "offset": True},
+     {"key": "energie.anteile", "offset": -61}, {"key": "energie.anteile", "side": "x"}],
 )
 def test_an_element_never_sends_anything_but_a_key_and_known_words(arguments: dict) -> None:
     client = ZeitarchivClient("h", 1, "t")
@@ -233,3 +235,14 @@ def test_a_monthly_comparison_sends_its_metric() -> None:
     with patch(GET, return_value=_Resp({})) as get:
         client.get_card_element("wetter.monatsvergleich", metric="precip")
         assert get.call_args.kwargs["params"] == {"key": "wetter.monatsvergleich", "vorjahr": "true", "mode": "bis_jetzt", "metric": "precip"}
+
+
+def test_a_period_element_sends_range_offset_and_side() -> None:
+    client = ZeitarchivClient("h", 1, "t")
+    with patch(GET, return_value=_Resp({})) as get:
+        client.get_card_element("energie.anteile", range_key="year", offset=-1, side="versorgung")
+        assert get.call_args.kwargs["params"] == {
+            "key": "energie.anteile", "vorjahr": "true", "mode": "bis_jetzt", "range": "year", "offset": -1, "side": "versorgung",
+        }
+        client.get_card_element("energie.heatmap", offset=0)
+        assert get.call_args.kwargs["params"]["offset"] == 0

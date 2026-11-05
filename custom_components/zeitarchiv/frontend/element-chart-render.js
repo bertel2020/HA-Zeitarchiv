@@ -265,5 +265,78 @@
     };
   }
 
-  window.ElementChartRender = {energyMonthly, weatherMonthly, weatherMatrix};
+  // Zahlenformat wie auf der Seite (NumberFormat der App).
+  const fmt = (value, decimals) => (value == null ? '—' : NumberFormat.fmt(value, decimals));
+
+  // ECharts-Optionen des Tageslastprofils (Wochentag/Tag × Stunde). data: Antwort von energiedashboard/heatmap.
+  // options: colors (ink, accent, surfaceAlt, surface, mono), font.
+  function energyHeatmap(data, options) {
+    const font = options.font || ((size) => size);
+    const {ink, accent, surfaceAlt, surface, mono} = options.colors;
+    const dayLabels = data.rows.map((row) => row.label);
+    const hourLabels = Array.from({length: 24}, (_, h) => String(h));
+    const cells = [];
+    data.rows.forEach((row, rIdx) => {
+      row.hours.forEach((value, hIdx) => {
+        if (value != null) cells.push([hIdx, rIdx, value]);
+      });
+    });
+    const fmtValue = (value) => fmt(value, value < 10 ? 2 : 1);
+    return {
+      tooltip: {
+        trigger: 'item',
+        formatter: (p) => `${p.marker}${dayLabels[p.value[1]]} ${p.value[0]}:00: <strong>${fmtValue(p.value[2])} kWh</strong>`,
+      },
+      grid: {containLabel: true, left: 4, right: 8, top: 8, bottom: 4},
+      xAxis: {
+        type: 'category', data: hourLabels, position: 'top',
+        splitArea: {show: false}, axisLine: {show: false}, axisTick: {show: false},
+        axisLabel: {
+          color: ink, fontFamily: mono, fontSize: font(9), interval: 2, margin: 4,
+          formatter: (value) => value + ':00',
+        },
+      },
+      yAxis: {
+        type: 'category', data: dayLabels, inverse: true,
+        axisLine: {show: false}, axisTick: {show: false},
+        axisLabel: {color: ink, fontSize: font(10.5)},
+      },
+      visualMap: {show: false, min: 0, max: data.max_value || 1, inRange: {color: [surfaceAlt, accent]}},
+      series: [{
+        type: 'heatmap',
+        data: cells,
+        itemStyle: {borderColor: surface, borderWidth: 1, borderRadius: 2},
+        emphasis: {itemStyle: {shadowBlur: 8, shadowColor: 'rgba(0,0,0,0.25)'}},
+      }],
+    };
+  }
+
+  // ECharts-Optionen des Rings der Anteile (Verbraucher oder Versorgung). items: [{name, value}], colorAt(index): Farbe
+  // des Eintrags, surface: Rand zwischen den Stücken.
+  function energyShares(items, options) {
+    const {colorAt, surface} = options;
+    return {
+      tooltip: {
+        trigger: 'item',
+        formatter: (p) => `${p.marker}${escapeHtml(p.name)}: <strong>${fmt(p.value, p.value < 10 ? 2 : 1)} kWh</strong> (${fmt(p.percent, 0)} %)`,
+      },
+      series: [{
+        type: 'pie',
+        radius: ['52%', '85%'],
+        center: ['50%', '50%'],
+        avoidLabelOverlap: true,
+        itemStyle: {borderColor: surface, borderWidth: 2},
+        label: {show: false},
+        labelLine: {show: false},
+        emphasis: {
+          scaleSize: 6,
+          itemStyle: {shadowBlur: 12, shadowColor: 'rgba(0,0,0,0.25)'},
+        },
+        data: items.map((item, idx) => ({name: item.name, value: item.value, itemStyle: {color: colorAt(idx)}})),
+      }],
+    };
+  }
+
+  window.ElementChartRender = {
+    energyHeatmap, energyShares,energyMonthly, weatherMonthly, weatherMatrix};
 })();
