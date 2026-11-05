@@ -57,6 +57,10 @@ const TEXTS = {
     elementsNone: 'In der Zeitarchiv-App ist noch kein Baustein eingerichtet.',
     elementsOutdated: 'Die Integration kennt diesen Baustein nicht. Bitte die Integration aktualisieren.',
     elementAdminOnly: 'Dashboard-Bausteine sehen nur Administratoren.',
+    element_role: 'Wert', element_years: 'Jahre', element_group: 'Gruppe',
+    group_basis: 'Übersicht', group_wind: 'Wind und Sonne', group_klima: 'Temperatur und Klima',
+    role_erzeugung: 'Erzeugung', role_einspeisung: 'Einspeisung', role_netzbezug: 'Netzbezug', role_verbrauch: 'Verbrauch',
+    years_5: 'Letzte 5', years_10: 'Letzte 10', years_0: 'Alle',
     chart_id: 'Chart aus dem Zeitarchiv',
     entities: 'Entitäten (nur archivierte)',
     period: 'Zeitraum',
@@ -122,6 +126,10 @@ const TEXTS = {
     elementsNone: 'No element is set up in the Zeitarchiv app yet.',
     elementsOutdated: 'The integration does not know this element. Please update the integration.',
     elementAdminOnly: 'Dashboard elements are visible to administrators only.',
+    element_role: 'Value', element_years: 'Years', element_group: 'Group',
+    group_basis: 'Overview', group_wind: 'Wind and sun', group_klima: 'Temperature and climate',
+    role_erzeugung: 'Generation', role_einspeisung: 'Feed-in', role_netzbezug: 'Grid import', role_verbrauch: 'Consumption',
+    years_5: 'Last 5', years_10: 'Last 10', years_0: 'All',
     chart_id: 'Chart from Zeitarchiv',
     entities: 'Entities (archived only)',
     period: 'Period',
@@ -535,6 +543,9 @@ class ZeitarchivCard extends HTMLElement {
       const request = {type: 'zeitarchiv/card/element', key: config.element};
       if (Array.isArray(config.columns) && config.columns.length) request.columns = config.columns;
       if (config.vorjahr === false) request.vorjahr = false;
+      if (config.role) request.role = config.role;
+      if (config.group) request.group = config.group;
+      if (config.years != null) request.years = Number(config.years);
       return request;
     }
     if (config.table_id && !config.chart_id) return {type: 'zeitarchiv/card/table', table_id: config.table_id};
@@ -830,7 +841,13 @@ class ZeitarchivCard extends HTMLElement {
       throw err;
     }
     if (!this.isConnected) return;
-    const draw = {'energie.zeitraeume': (renderer) => renderer.energyComparison(result.table, this._config.diff !== false)}[result.renderer];
+    // Die Farben der Matrix sind CSS-Ausdrücke: sie stehen in style="…" und lösen sich im Thema von Home Assistant auf.
+    const colors = {good: 'var(--success-color, #43a047)', bad: 'var(--error-color, #db4437)', base: 'var(--secondary-background-color, #f5f5f5)'};
+    const draw = {
+      'energie.zeitraeume': (R) => `<table class="dt wt-table">${R.energyComparison(result.table, this._config.diff !== false)}</table>`,
+      'wetter.zeitraeume': (R) => `<table class="dt wt-table">${R.weatherComparison(result.table, result.group || 'basis', this._config.diff !== false)}</table>`,
+      'energie.matrix': (R) => `<table class="dt wt-tm">${R.energyMatrix(result.months, result.months.roles[0], {colors, href: () => ''})}</table>`,
+    }[result.renderer];
     if (!draw) { this._showNote('elementsOutdated'); return; }
     if (this._els.tableCss.textContent !== runtime.tableCss) this._els.tableCss.textContent = runtime.tableCss;
     this._els.note.hidden = true;
@@ -838,7 +855,7 @@ class ZeitarchivCard extends HTMLElement {
     this._els.chart.removeAttribute('aria-label');
     this._els.table.hidden = false;
     this._els.table.style.maxHeight = this._explicitHeight ? `${Math.max(120, Number(this._config.height) || 260)}px` : '';
-    this._els.table.innerHTML = `<table class="dt wt-table">${draw(runtime.ElementTableRender)}</table>`;
+    this._els.table.innerHTML = draw(runtime.ElementTableRender);
     this._applyAction();
     this._shown = true;
   }
@@ -959,6 +976,15 @@ class ZeitarchivCardEditor extends HTMLElement {
       if (current && !listed.some((item) => item.key === current)) options.push({value: current, label: current});
       schema.push({...select('element', options), required: true});
       const chosen = listed.find((item) => item.key === current);
+      if (chosen && chosen.roles && chosen.roles.length) {
+        schema.push(
+          select('role', chosen.roles.map((value) => ({value, label: label(`role_${value}`)}))),
+          select('years', ['5', '10', '0'].map((value) => ({value, label: label(`years_${value}`)}))),
+        );
+      }
+      if (chosen && chosen.groups && chosen.groups.length) {
+        schema.push(select('group', chosen.groups.map((value) => ({value, label: label(`group_${value}`)}))));
+      }
       if (chosen && chosen.columns && chosen.columns.length) {
         schema.push(
           {name: 'columns', selector: {select: {multiple: true, mode: 'list', options: chosen.columns.map((value) => ({value, label: label(`column_${value}`)}))}}},
@@ -1011,6 +1037,11 @@ class ZeitarchivCardEditor extends HTMLElement {
       data.columns = Array.isArray(data.columns) && data.columns.length ? data.columns : (chosen?.columns || []);
       data.vorjahr = data.vorjahr !== false;
       data.diff = data.diff !== false;
+      if (chosen?.groups?.length) data.group = data.group || chosen.groups[0];
+      if (chosen?.roles?.length) {
+        data.role = data.role || chosen.roles[0];
+        data.years = String(data.years ?? 10);
+      }
     }
     return data;
   }
@@ -1023,7 +1054,7 @@ class ZeitarchivCardEditor extends HTMLElement {
       this._source = source;
       delete next.chart_id; delete next.table_id; delete next.entities; delete next.period; delete next.style; delete next.legend;
       delete next.legend_style; delete next.legend_metrics;
-      delete next.element; delete next.columns; delete next.vorjahr; delete next.diff;
+      delete next.element; delete next.columns; delete next.vorjahr; delete next.diff; delete next.role; delete next.years; delete next.group;
       if (source === 'entities') this._loadEntities();
       if (source === 'element') this._loadElements();
     }
@@ -1041,13 +1072,19 @@ class ZeitarchivCardEditor extends HTMLElement {
     if (!Array.isArray(next.legend_metrics) || !next.legend_metrics.length || next.legend === false || ['table', 'element'].includes(this._source)) delete next.legend_metrics;
     if (this._source !== 'chart') delete next.chart_id;
     if (this._source !== 'table') delete next.table_id;
-    if (this._source !== 'element') for (const key of ['element', 'columns', 'vorjahr', 'diff']) delete next[key];
+    if (this._source !== 'element') for (const key of ['element', 'columns', 'vorjahr', 'diff', 'role', 'years', 'group']) delete next[key];
     else {
       // Vorgaben nicht in die YAML schreiben: alle Spalten, mit Vorjahr, mit Differenz.
       const all = (this._elements || []).find((item) => item.key === next.element)?.columns || [];
       if (!Array.isArray(next.columns) || !next.columns.length || (next.columns.length === all.length && all.every((c) => next.columns.includes(c)))) delete next.columns;
       if (next.vorjahr !== false) delete next.vorjahr;
       if (next.diff !== false) delete next.diff;
+      const chosenRoles = (this._elements || []).find((item) => item.key === next.element)?.roles || [];
+      if (next.years !== undefined && next.years !== '') next.years = Number(next.years); else delete next.years;
+      if (!chosenRoles.length || next.role === chosenRoles[0]) delete next.role;
+      if (!chosenRoles.length || next.years === 10) delete next.years;
+      const chosenGroups = (this._elements || []).find((item) => item.key === next.element)?.groups || [];
+      if (!chosenGroups.length || next.group === chosenGroups[0]) delete next.group;
     }
     this._config = {...next, type: 'custom:zeitarchiv-card'};
     this.dispatchEvent(new CustomEvent('config-changed', {detail: {config: this._config}, bubbles: true, composed: true}));

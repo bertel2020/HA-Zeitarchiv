@@ -650,8 +650,8 @@ async def test_elements_are_passed_on_with_their_fixed_words(
     assert (await _call(client, {"type": "zeitarchiv/card/elements"}))["result"] == ELEMENTS
     response = await _call(client, {"type": "zeitarchiv/card/element", "key": "energie.zeitraeume", "columns": ["monat", "jahr"], "vorjahr": False, "mode": "komplett"})
     assert response["success"] is True and response["result"] == ELEMENT
-    element_client.get_card_element.assert_called_once_with("energie.zeitraeume", ["monat", "jahr"], False, "komplett", None)
-    for bad in ({}, {"key": "../x"}, {"key": "a.b", "columns": ["woche"]}, {"key": "a.b", "mode": "x"}, {"key": "a.b", "at": "gestern"}):
+    element_client.get_card_element.assert_called_once_with("energie.zeitraeume", ["monat", "jahr"], False, "komplett", None, None, None, None)
+    for bad in ({}, {"key": "../x"}, {"key": "a.b", "columns": ["woche"]}, {"key": "a.b", "mode": "x"}, {"key": "a.b", "at": "gestern"}, {"key": "a.b", "role": "gas"}, {"key": "a.b", "years": 99}, {"key": "a.b", "years": -1}, {"key": "a.b", "group": "x"}):
         assert (await _call(client, {"type": "zeitarchiv/card/element", **bad}))["error"]["code"] == "invalid_format"
     assert element_client.get_card_element.call_count == 1
 
@@ -673,3 +673,19 @@ async def test_an_element_that_is_not_set_up_gets_its_own_code(
     element_client.get_card_element.side_effect = ZeitarchivCardError("nein", 409)
     admin = await hass_ws_client(hass)
     assert (await _call(admin, {"type": "zeitarchiv/card/element", "key": "energie.zeitraeume"}))["error"]["code"] == "not_configured"
+
+
+async def test_a_matrix_element_passes_the_role_and_the_years_on(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, element_client: MagicMock, loaded_entry: MockConfigEntry
+) -> None:
+    admin = await hass_ws_client(hass)
+    await _call(admin, {"type": "zeitarchiv/card/element", "key": "energie.matrix", "role": "netzbezug", "years": 5})
+    element_client.get_card_element.assert_called_once_with("energie.matrix", None, True, "bis_jetzt", None, "netzbezug", 5, None)
+
+
+async def test_a_weather_table_passes_the_group_on(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, element_client: MagicMock, loaded_entry: MockConfigEntry
+) -> None:
+    admin = await hass_ws_client(hass)
+    await _call(admin, {"type": "zeitarchiv/card/element", "key": "wetter.zeitraeume", "columns": ["heute", "jahr"], "group": "wind"})
+    element_client.get_card_element.assert_called_once_with("wetter.zeitraeume", ["heute", "jahr"], True, "bis_jetzt", None, None, None, "wind")
