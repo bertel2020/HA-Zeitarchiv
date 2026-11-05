@@ -625,3 +625,51 @@ async def test_waiting_asks_survive_the_connection_being_unloaded(
     answers = [await admin.receive_json() for _ in range(count)]
     await unload
     assert all(answer["success"] or answer["error"]["code"] != "unknown_error" for answer in answers), answers
+
+
+ELEMENTS = {"spec_version": 1, "elements": [{"key": "energie.zeitraeume", "group": "energie", "kind": "table", "title": "Energie", "columns": ["monat"]}]}
+ELEMENT = {"spec_version": 1, "key": "energie.zeitraeume", "kind": "table", "renderer": "energie.zeitraeume", "table": {"columns": [], "rows": []}}
+
+
+@pytest.fixture
+def element_client(card_client: MagicMock) -> Generator[MagicMock]:
+    card_client.get_notices.return_value = {**NOTICES, "capabilities": ["cards", "card_elements"]}
+    card_client.get_card_elements.return_value = ELEMENTS
+    card_client.get_card_element.return_value = ELEMENT
+    with (
+        patch("custom_components.zeitarchiv.api.ZeitarchivClient.get_card_elements", card_client.get_card_elements),
+        patch("custom_components.zeitarchiv.api.ZeitarchivClient.get_card_element", card_client.get_card_element),
+    ):
+        yield card_client
+
+
+async def test_elements_are_passed_on_with_their_fixed_words(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, element_client: MagicMock, loaded_entry: MockConfigEntry
+) -> None:
+    client = await hass_ws_client(hass)
+    assert (await _call(client, {"type": "zeitarchiv/card/elements"}))["result"] == ELEMENTS
+    response = await _call(client, {"type": "zeitarchiv/card/element", "key": "energie.zeitraeume", "columns": ["monat", "jahr"], "vorjahr": False, "mode": "komplett"})
+    assert response["success"] is True and response["result"] == ELEMENT
+    element_client.get_card_element.assert_called_once_with("energie.zeitraeume", ["monat", "jahr"], False, "komplett", None)
+    for bad in ({}, {"key": "../x"}, {"key": "a.b", "columns": ["woche"]}, {"key": "a.b", "mode": "x"}, {"key": "a.b", "at": "gestern"}):
+        assert (await _call(client, {"type": "zeitarchiv/card/element", **bad}))["error"]["code"] == "invalid_format"
+    assert element_client.get_card_element.call_count == 1
+
+
+async def test_elements_are_for_administrators_only_and_need_an_app_that_knows_them(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, hass_read_only_access_token: str,
+    element_client: MagicMock, loaded_entry: MockConfigEntry,
+) -> None:
+    other = await hass_ws_client(hass, hass_read_only_access_token)
+    assert (await _call(other, {"type": "zeitarchiv/card/element", "key": "energie.zeitraeume"}))["error"]["code"] == "unauthorized"
+    loaded_entry.runtime_data.notices_coordinator.async_set_updated_data({**NOTICES, "capabilities": ["cards"]})
+    admin = await hass_ws_client(hass)
+    assert (await _call(admin, {"type": "zeitarchiv/card/elements"}))["error"]["code"] == "app_outdated"
+
+
+async def test_an_element_that_is_not_set_up_gets_its_own_code(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, element_client: MagicMock, loaded_entry: MockConfigEntry
+) -> None:
+    element_client.get_card_element.side_effect = ZeitarchivCardError("nein", 409)
+    admin = await hass_ws_client(hass)
+    assert (await _call(admin, {"type": "zeitarchiv/card/element", "key": "energie.zeitraeume"}))["error"]["code"] == "not_configured"

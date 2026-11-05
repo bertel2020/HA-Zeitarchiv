@@ -32,6 +32,10 @@ CARD_STYLES = ("auto", "stacked", "percent")
 CARD_MAX_ENTITIES = 10
 CARD_SPARK_RANGES = ("24h", "7d", "30d")
 CARD_MAX_PX = 4000  # Breite der Zeichenfläche, wie MAX_PX der App
+# Dashboard-Bausteine (card_elements.py der App): Schlüssel wie "energie.zeitraeume", dazu feste Wörter.
+CARD_ELEMENT_COLUMNS = ("heute", "gestern", "monat", "vormonat", "jahr")
+CARD_ELEMENT_MODES = ("bis_jetzt", "komplett")
+_ELEMENT_KEY = re.compile(r"^[a-z]+\.[a-z_]+$")
 _ENTITY_ID = re.compile(r"^[a-z0-9_]+\.[a-z0-9_]+$")
 
 
@@ -57,7 +61,7 @@ class ZeitarchivAuthError(ZeitarchivApiError):
 
 class ZeitarchivCardError(ZeitarchivApiError):
     """Die App hat eine Abfrage der Karte nicht beantwortet (400: sie lehnt die Angaben ab,
-    404: Chart oder Entität gibt es nicht mehr, 413: zu viele Datenpunkte für diesen Zeitraum,
+    404: Chart oder Entität gibt es nicht mehr, 409: Baustein nicht eingerichtet, 413: zu viele Datenpunkte für diesen Zeitraum,
     429: zu viele gleichzeitige Abfragen, 5xx: die App hat einen Fehler gemeldet).
     status trägt den Code, damit die Karte den Fall benennen kann. route_missing: eine 404
     ohne JSON-Antwort der App, also eine Route, die die App (oder ihr nginx) nicht kennt."""
@@ -248,7 +252,7 @@ class ZeitarchivClient:
         if response.status_code == 401:
             raise ZeitarchivAuthError("API-Token wurde von der App abgelehnt")
         body = _json_or_none(response)
-        if response.status_code in (400, 404, 413, 429) or 500 <= response.status_code < 600:
+        if response.status_code in (400, 404, 409, 413, 429) or 500 <= response.status_code < 600:
             raise ZeitarchivCardError(
                 f"App antwortete mit Status {response.status_code}",
                 response.status_code,
@@ -287,6 +291,28 @@ class ZeitarchivClient:
         if at:
             params["at"] = at
         return self._get_card("/api/card/table", params)
+
+    def get_card_elements(self) -> dict[str, Any]:
+        """Die in der App eingerichteten Dashboard-Bausteine (GET /api/card/elements, Fähigkeit "card_elements")."""
+        return self._get_card("/api/card/elements")
+
+    def get_card_element(
+        self, key: str, columns: list[str] | None = None, vorjahr: bool = True, mode: str = "bis_jetzt", at: str | None = None,
+    ) -> dict[str, Any]:
+        """Ein Dashboard-Baustein mit seinen Zahlen (GET /api/card/element). Nimmt nur einen Schlüssel der Form
+        "gruppe.name" und feste Wörter an, sonst ValueError; nie freien Text."""
+        if not isinstance(key, str) or not _ELEMENT_KEY.fullmatch(key):
+            raise ValueError("key")
+        if columns is not None and (not isinstance(columns, list) or any(item not in CARD_ELEMENT_COLUMNS for item in columns)):
+            raise ValueError("columns")
+        if mode not in CARD_ELEMENT_MODES:
+            raise ValueError("mode")
+        params: dict[str, Any] = {"key": key, "vorjahr": "true" if vorjahr else "false", "mode": mode}
+        if columns:
+            params["columns"] = ",".join(columns)
+        if at:
+            params["at"] = at
+        return self._get_card("/api/card/element", params)
 
     def get_card_entities(self) -> dict[str, Any]:
         """Archivierte Entitäten, die die Karte ohne gespeichertes Chart zeigen kann

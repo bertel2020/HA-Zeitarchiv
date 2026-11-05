@@ -41,6 +41,8 @@ from .api import (
     ZeitarchivApiError,
     ZeitarchivAuthError,
     ZeitarchivCardError,
+    CARD_ELEMENT_COLUMNS,
+    CARD_ELEMENT_MODES,
     CARD_MAX_ENTITIES,
     CARD_MAX_PX,
     CARD_PERIODS,
@@ -88,10 +90,12 @@ ERROR_UNREACHABLE = "unreachable"
 ERROR_INVALID = "invalid"
 ERROR_TOO_LARGE = "too_large"
 ERROR_APP_ERROR = "app_error"
+ERROR_NOT_CONFIGURED = "not_configured"
 
 _DAY = r"^[0-9]{4}-[0-9]{2}-[0-9]{2}\Z"
 _PX_STEP = 100
 _ENTITY = r"^[a-z0-9_]+\.[a-z0-9_]+\Z"
+_ELEMENT = r"^[a-z]+\.[a-z_]+\Z"
 
 
 def _px(msg: dict[str, Any]) -> int:
@@ -136,6 +140,8 @@ async def async_setup_card(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_card_series)
     websocket_api.async_register_command(hass, ws_card_spark)
     websocket_api.async_register_command(hass, ws_card_table)
+    websocket_api.async_register_command(hass, ws_card_elements)
+    websocket_api.async_register_command(hass, ws_card_element)
 
 
 def _entry(hass: HomeAssistant, entry_id: str | None):
@@ -292,6 +298,8 @@ async def _fetch(
                 connection.send_error(msg["id"], ERROR_BUSY, "Zeitarchiv ist gerade beschäftigt")
             elif err.status == 413:
                 connection.send_error(msg["id"], ERROR_TOO_LARGE, "Zu viele Datenpunkte für diesen Zeitraum")
+            elif err.status == 409:
+                connection.send_error(msg["id"], ERROR_NOT_CONFIGURED, "Der Baustein ist in der App nicht eingerichtet")
             elif err.status == 400:
                 connection.send_error(msg["id"], ERROR_INVALID, "Die Angaben der Karte hat die App abgelehnt")
             else:
@@ -415,4 +423,39 @@ async def ws_card_table(hass: HomeAssistant, connection, msg: dict[str, Any]) ->
     await _fetch(
         hass, connection, msg, ("table", table_id, at), lambda client: client.get_card_table(table_id, at),
         capability="card_table",
+    )
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {"type": "zeitarchiv/card/elements", probatio.Optional("entry_id"): str}
+)
+@websocket_api.async_response
+async def ws_card_elements(hass: HomeAssistant, connection, msg: dict[str, Any]) -> None:
+    """Die in der App eingerichteten Dashboard-Bausteine für die Auswahl im Editor (nur Administratoren)."""
+    await _fetch(
+        hass, connection, msg, ("elements",), lambda client: client.get_card_elements(), capability="card_elements",
+    )
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        "type": "zeitarchiv/card/element",
+        probatio.Required("key"): probatio.All(str, probatio.Match(_ELEMENT)),
+        probatio.Optional("columns"): [probatio.In(CARD_ELEMENT_COLUMNS)],
+        probatio.Optional("vorjahr", default=True): bool,
+        probatio.Optional("mode", default="bis_jetzt"): probatio.In(CARD_ELEMENT_MODES),
+        probatio.Optional("at"): probatio.All(str, probatio.Match(_DAY)),
+        probatio.Optional("entry_id"): str,
+    }
+)
+@websocket_api.async_response
+async def ws_card_element(hass: HomeAssistant, connection, msg: dict[str, Any]) -> None:
+    """Ein Dashboard-Baustein mit seinen Zahlen. Nur Administratoren: die Zahlen der Dashboards sind
+    nicht je Baustein freigebbar."""
+    key, columns, vorjahr, mode, at = msg["key"], msg.get("columns"), msg["vorjahr"], msg["mode"], msg.get("at")
+    await _fetch(
+        hass, connection, msg, ("element", key, tuple(columns or ()), vorjahr, mode, at),
+        lambda client: client.get_card_element(key, columns, vorjahr, mode, at), capability="card_elements",
     )

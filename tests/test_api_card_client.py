@@ -178,3 +178,36 @@ def test_a_chart_period_is_sent_only_when_known() -> None:
         assert get.call_args.kwargs["params"] == {"id": 7, "period": "30d"}
         with pytest.raises(ValueError):
             client.get_card_chart(7, None, 0, "x/../y")
+
+
+def test_elements_go_to_fixed_paths_with_a_key_and_known_words() -> None:
+    client = ZeitarchivClient("h", 1, "t")
+    with patch(GET, return_value=_Resp({"elements": []})) as get:
+        client.get_card_elements()
+        assert get.call_args.args[0] == "http://h:1/api/card/elements"
+        client.get_card_element("energie.zeitraeume")
+        assert get.call_args.args[0] == "http://h:1/api/card/element"
+        assert get.call_args.kwargs["params"] == {"key": "energie.zeitraeume", "vorjahr": "true", "mode": "bis_jetzt"}
+        client.get_card_element("energie.zeitraeume", ["monat", "jahr"], False, "komplett", "2026-11-01")
+        assert get.call_args.kwargs["params"] == {
+            "key": "energie.zeitraeume", "vorjahr": "false", "mode": "komplett", "columns": "monat,jahr", "at": "2026-11-01",
+        }
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [{"key": "../x"}, {"key": "a.b/c"}, {"key": "energie"}, {"key": "energie.zeitraeume", "columns": ["x"]},
+     {"key": "energie.zeitraeume", "columns": "monat"}, {"key": "energie.zeitraeume", "mode": "y"}],
+)
+def test_an_element_never_sends_anything_but_a_key_and_known_words(arguments: dict) -> None:
+    client = ZeitarchivClient("h", 1, "t")
+    with patch(GET) as get, pytest.raises(ValueError):
+        client.get_card_element(**arguments)
+    get.assert_not_called()
+
+
+def test_an_element_that_is_not_set_up_is_told_apart() -> None:
+    client = ZeitarchivClient("h", 1, "t")
+    with patch(GET, return_value=_Resp({"detail": "nein"}, 409)), pytest.raises(ZeitarchivCardError) as caught:
+        client.get_card_element("energie.zeitraeume")
+    assert caught.value.status == 409 and not caught.value.route_missing

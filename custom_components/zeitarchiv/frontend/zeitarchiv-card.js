@@ -22,7 +22,7 @@ const TEXTS = {
     loading: 'Lade …',
     chartLabel: 'Diagramm {title}', sum: 'Summe', last: 'zuletzt', more: 'und {n} weitere',
     noData: 'Keine Daten',
-    chooseChart: 'Bitte ein Chart, eine Tabelle oder Entitäten aus dem Zeitarchiv wählen.',
+    chooseChart: 'Bitte ein Chart, eine Tabelle, einen Baustein oder Entitäten aus dem Zeitarchiv wählen.',
     noVisible: 'Die Tabelle hat keine sichtbaren Zeilen oder Spalten.',
     unsupported: 'Diese Darstellung zeigt die Karte noch nicht.',
     stale: 'Stand vor {min} Min, Zeitarchiv nicht erreichbar',
@@ -47,6 +47,16 @@ const TEXTS = {
     sourceTable: 'Gespeicherte Tabelle',
     table_id: 'Tabelle aus dem Zeitarchiv',
     sourceEntities: 'Entitäten direkt',
+    sourceElement: 'Dashboard-Baustein',
+    element: 'Baustein',
+    element_columns: 'Spalten',
+    element_vorjahr: 'Mit Vorjahr vergleichen',
+    element_diff: 'Differenz anzeigen',
+    column_heute: 'Heute', column_gestern: 'Gestern', column_monat: 'Dieser Monat', column_vormonat: 'Letzter Monat', column_jahr: 'Dieses Jahr',
+    not_configured: 'Dieser Baustein ist in der Zeitarchiv-App nicht eingerichtet.',
+    elementsNone: 'In der Zeitarchiv-App ist noch kein Baustein eingerichtet.',
+    elementsOutdated: 'Die Integration kennt diesen Baustein nicht. Bitte die Integration aktualisieren.',
+    elementAdminOnly: 'Dashboard-Bausteine sehen nur Administratoren.',
     chart_id: 'Chart aus dem Zeitarchiv',
     entities: 'Entitäten (nur archivierte)',
     period: 'Zeitraum',
@@ -74,7 +84,7 @@ const TEXTS = {
     loading: 'Loading …',
     chartLabel: 'Chart {title}', sum: 'total', last: 'latest', more: 'and {n} more',
     noData: 'No data',
-    chooseChart: 'Please choose a chart, a table or entities from Zeitarchiv.',
+    chooseChart: 'Please choose a chart, a table, an element or entities from Zeitarchiv.',
     noVisible: 'The table has no visible rows or columns.',
     unsupported: 'The card cannot show this kind of chart yet.',
     stale: 'As of {min} min ago, Zeitarchiv not reachable',
@@ -99,6 +109,16 @@ const TEXTS = {
     sourceTable: 'Saved table',
     table_id: 'Table from Zeitarchiv',
     sourceEntities: 'Entities directly',
+    sourceElement: 'Dashboard element',
+    element: 'Element',
+    element_columns: 'Columns',
+    element_vorjahr: 'Compare with last year',
+    element_diff: 'Show difference',
+    column_heute: 'Today', column_gestern: 'Yesterday', column_monat: 'This month', column_vormonat: 'Last month', column_jahr: 'This year',
+    not_configured: 'This element is not set up in the Zeitarchiv app.',
+    elementsNone: 'No element is set up in the Zeitarchiv app yet.',
+    elementsOutdated: 'The integration does not know this element. Please update the integration.',
+    elementAdminOnly: 'Dashboard elements are visible to administrators only.',
     chart_id: 'Chart from Zeitarchiv',
     entities: 'Entities (archived only)',
     period: 'Period',
@@ -161,15 +181,15 @@ const fetchText = async (name) => {
 
 const loadSources = () => {
   sourcesPromise ||= (async () => {
-    const [echartsSource, render, numberFormat, tooltipHold, serverTime, htmlEscape, stateEntities, tableCompute, tableRender, tableCss, catalog] = await Promise.all([
+    const [echartsSource, render, numberFormat, tooltipHold, serverTime, htmlEscape, stateEntities, tableCompute, tableRender, elementTableRender, tableCss, catalog] = await Promise.all([
       fetchText('echarts.min.js'), fetchText('chart-tile-render.js'), fetchText('number-format.js'),
       fetchText('tooltip-hold.js'), fetchText('server-time.js'), fetchText('html-escape.js'),
-      fetchText('state-entities.js'), fetchText('table-compute.js'), fetchText('table-tile-render.js'),
+      fetchText('state-entities.js'), fetchText('table-compute.js'), fetchText('table-tile-render.js'), fetchText('element-table-render.js'),
       fetchText('table.css'), fetchText('catalog.json'),
     ]);
     const module = {exports: {}};
     new Function('module', 'exports', `${echartsSource}\n//# sourceURL=zeitarchiv/echarts.min.js`).call(module.exports, module, module.exports);
-    return {echarts: module.exports, render, numberFormat, tooltipHold, serverTime, htmlEscape, stateEntities, tableCompute, tableRender, tableCss, catalog: JSON.parse(catalog)};
+    return {echarts: module.exports, render, numberFormat, tooltipHold, serverTime, htmlEscape, stateEntities, tableCompute, tableRender, elementTableRender, tableCss, catalog: JSON.parse(catalog)};
   })().catch((err) => { sourcesPromise = null; throw err; });
   return sourcesPromise;
 };
@@ -223,7 +243,12 @@ const buildRuntime = (sources, {timezone, language, dark}) => {
     `${sources.tableRender}\nreturn window.TableTileRender;`,
     ['window', 't', 'escapeHtml', 'TableCompute'], [win, t, win.escapeHtml, win.TableCompute], 'table-tile-render.js',
   );
-  return {render, setVars: (map) => Object.assign(vars, map), tables: {TableCompute: win.TableCompute, TableTileRender}};
+  // Bausteine der Dashboards (Roadmap 1.48): dieselbe Datei zeichnet die Tabelle im Dashboard der App.
+  const ElementTableRender = evaluate(
+    `${sources.elementTableRender}\nreturn window.ElementTableRender;`,
+    ['window', 't', 'escapeHtml', 'NumberFormat', 'ServerTime'], [win, t, win.escapeHtml, win.NumberFormat, win.ServerTime], 'element-table-render.js',
+  );
+  return {render, setVars: (map) => Object.assign(vars, map), tables: {TableCompute: win.TableCompute, TableTileRender}, ElementTableRender};
 };
 
 const runtimeFor = async (settings) => {
@@ -264,6 +289,7 @@ const STYLE = `
     --danger-soft: rgba(219, 68, 55, .12); --warning-soft: rgba(255, 152, 0, .15); --shadow: none;
     --font-display: var(--ha-font-family-body, Roboto, sans-serif); --font-mono: var(--ha-font-family-body, Roboto, sans-serif);
     --bg: var(--card-background-color, #fff); --font-scale: 1;
+    --positive: var(--success-color, #43a047); --chart-1: var(--primary-color);
   }
 `;
 
@@ -476,7 +502,7 @@ class ZeitarchivCard extends HTMLElement {
   }
 
   _hasSource() {
-    return Boolean(this._config?.entities?.length || this._config?.chart_id || this._config?.table_id);
+    return Boolean(this._config?.entities?.length || this._config?.chart_id || this._config?.table_id || this._config?.element);
   }
 
   // Die Anfrage an Home Assistant: Entitäten direkt oder ein gespeichertes Chart.
@@ -486,6 +512,12 @@ class ZeitarchivCard extends HTMLElement {
     const px = Math.min(4000, Math.max(0, Math.round(this.getBoundingClientRect().width)));
     if (config.entities.length) {
       return {type: 'zeitarchiv/card/series', entity_ids: config.entities, period: config.period || 'month', style: config.style || 'auto', px};
+    }
+    if (config.element) {
+      const request = {type: 'zeitarchiv/card/element', key: config.element};
+      if (Array.isArray(config.columns) && config.columns.length) request.columns = config.columns;
+      if (config.vorjahr === false) request.vorjahr = false;
+      return request;
     }
     if (config.table_id && !config.chart_id) return {type: 'zeitarchiv/card/table', table_id: config.table_id};
     const request = {type: 'zeitarchiv/card/chart', chart_id: config.chart_id, px};
@@ -572,6 +604,7 @@ class ZeitarchivCard extends HTMLElement {
   async _draw(result) {
     if (!result || result.spec_version !== SPEC_VERSION) { const err = new Error('spec_version'); err.code = 'spec'; throw err; }
     this._setHeader(result.name);
+    if (result.renderer) { await this._drawElement(result); return; }
     if (result.table) { await this._drawTable(result); return; }
     this._els.table.hidden = true;
     this._els.legend.hidden = true;
@@ -709,6 +742,34 @@ class ZeitarchivCard extends HTMLElement {
     this._shown = true;
   }
 
+  // Dashboard-Baustein (Roadmap 1.48): die App liefert die Zahlen des Dashboards, gezeichnet wird mit derselben
+  // Datei (element-table-render.js) wie im Dashboard der App.
+  async _drawElement(result) {
+    let runtime;
+    try {
+      runtime = await runtimeFor({
+        timezone: result.env?.timezone || 'UTC',
+        language: this._hass.locale?.language || this._hass.language || 'en',
+        dark: Boolean(this._hass.themes?.darkMode),
+      });
+    } catch (err) {
+      err.script = true;
+      throw err;
+    }
+    if (!this.isConnected) return;
+    const draw = {'energie.zeitraeume': (renderer) => renderer.energyComparison(result.table, this._config.diff !== false)}[result.renderer];
+    if (!draw) { this._showNote('elementsOutdated'); return; }
+    if (this._els.tableCss.textContent !== runtime.tableCss) this._els.tableCss.textContent = runtime.tableCss;
+    this._els.note.hidden = true;
+    this._els.chart.hidden = true;
+    this._els.chart.removeAttribute('aria-label');
+    this._els.table.hidden = false;
+    this._els.table.style.maxHeight = this._explicitHeight ? `${Math.max(120, Number(this._config.height) || 260)}px` : '';
+    this._els.table.innerHTML = `<table class="dt wt-table">${draw(runtime.ElementTableRender)}</table>`;
+    this._applyAction();
+    this._shown = true;
+  }
+
   // Die Farben, die die Zeichenregeln aus dem CSS der App lesen, aus dem Thema von Home Assistant.
   _themeVars() {
     const css = getComputedStyle(this);
@@ -734,6 +795,7 @@ class ZeitarchivCardEditor extends HTMLElement {
     this._hass = null;
     this._items = null;
     this._tables = [];
+    this._elements = null;
     this._entities = null;
     this._source = 'chart';
     this._error = null;
@@ -744,6 +806,7 @@ class ZeitarchivCardEditor extends HTMLElement {
     this._config = config || {};
     const pickedEntities = Array.isArray(this._config.entities) && this._config.entities.length;
     if (pickedEntities) this._source = 'entities';
+    else if (this._config.element) this._source = 'element';
     else if (this._config.table_id && !this._config.chart_id) this._source = 'table';
     else if (this._config.chart_id) this._source = 'chart';
     this._render();
@@ -783,6 +846,17 @@ class ZeitarchivCardEditor extends HTMLElement {
     this._render();
   }
 
+  async _loadElements() {
+    if (this._elements) return;
+    this._elements = [];
+    try {
+      this._elements = (await this._hass.callWS({type: 'zeitarchiv/card/elements'})).elements || [];
+    } catch (err) {
+      this._error = this._failure(err);
+    }
+    this._render();
+  }
+
   _schema() {
     const label = (key) => text(this._hass, key);
     const chartOptions = (this._items || []).map((item) => ({
@@ -793,7 +867,7 @@ class ZeitarchivCardEditor extends HTMLElement {
     const tableOptions = this._tables.map((item) => ({value: String(item.id), label: item.name}));
     const schema = [select('source', [
       {value: 'chart', label: label('sourceChart')}, {value: 'table', label: label('sourceTable')},
-      {value: 'entities', label: label('sourceEntities')},
+      {value: 'element', label: label('sourceElement')}, {value: 'entities', label: label('sourceEntities')},
     ])];
     if (this._source === 'entities') {
       schema.push(
@@ -804,6 +878,21 @@ class ZeitarchivCardEditor extends HTMLElement {
         select('period', PERIODS.map((value) => ({value, label: label(`period_${value}`)}))),
         select('style', ['auto', 'stacked', 'percent'].map((value) => ({value, label: label(`style_${value}`)}))),
       );
+    } else if (this._source === 'element') {
+      // Die gewählte Fassung gehört immer in die Liste, auch solange die der App noch lädt.
+      const listed = this._elements || [];
+      const current = this._config.element;
+      const options = listed.map((item) => ({value: item.key, label: item.title}));
+      if (current && !listed.some((item) => item.key === current)) options.push({value: current, label: current});
+      schema.push({...select('element', options), required: true});
+      const chosen = listed.find((item) => item.key === current);
+      if (chosen && chosen.columns && chosen.columns.length) {
+        schema.push(
+          {name: 'columns', selector: {select: {multiple: true, mode: 'list', options: chosen.columns.map((value) => ({value, label: label(`column_${value}`)}))}}},
+          {name: 'vorjahr', selector: {boolean: {}}},
+          {name: 'diff', selector: {boolean: {}}},
+        );
+      }
     } else if (this._source === 'table') {
       schema.push({...select('table_id', tableOptions), required: true});
     } else {
@@ -812,7 +901,7 @@ class ZeitarchivCardEditor extends HTMLElement {
         select('period', ['saved', ...PERIODS].map((value) => ({value, label: label(`period_${value}`)}))),
       );
     }
-    if (this._source !== 'table') schema.push({name: 'legend', selector: {boolean: {}}});
+    if (this._source !== 'table' && this._source !== 'element') schema.push({name: 'legend', selector: {boolean: {}}});
     schema.push(
       {name: 'title', selector: {text: {}}},
       {name: 'refresh', selector: {number: {min: 15, max: 3600, step: 15, mode: 'box', unit_of_measurement: 's'}}},
@@ -833,6 +922,12 @@ class ZeitarchivCardEditor extends HTMLElement {
       data.period = data.period || 'saved';
     }
     data.legend = data.legend !== false;
+    if (this._source === 'element') {
+      const chosen = (this._elements || []).find((item) => item.key === data.element);
+      data.columns = Array.isArray(data.columns) && data.columns.length ? data.columns : (chosen?.columns || []);
+      data.vorjahr = data.vorjahr !== false;
+      data.diff = data.diff !== false;
+    }
     return data;
   }
 
@@ -843,7 +938,9 @@ class ZeitarchivCardEditor extends HTMLElement {
     if (source !== this._source) {
       this._source = source;
       delete next.chart_id; delete next.table_id; delete next.entities; delete next.period; delete next.style; delete next.legend;
+      delete next.element; delete next.columns; delete next.vorjahr; delete next.diff;
       if (source === 'entities') this._loadEntities();
+      if (source === 'element') this._loadElements();
     }
     for (const key of ['chart_id', 'table_id']) {
       if (next[key] !== undefined && next[key] !== '') next[key] = Number(next[key]);
@@ -856,6 +953,14 @@ class ZeitarchivCardEditor extends HTMLElement {
     if (next.legend !== false) delete next.legend;
     if (this._source !== 'chart') delete next.chart_id;
     if (this._source !== 'table') delete next.table_id;
+    if (this._source !== 'element') for (const key of ['element', 'columns', 'vorjahr', 'diff']) delete next[key];
+    else {
+      // Vorgaben nicht in die YAML schreiben: alle Spalten, mit Vorjahr, mit Differenz.
+      const all = (this._elements || []).find((item) => item.key === next.element)?.columns || [];
+      if (!Array.isArray(next.columns) || !next.columns.length || (next.columns.length === all.length && all.every((c) => next.columns.includes(c)))) delete next.columns;
+      if (next.vorjahr !== false) delete next.vorjahr;
+      if (next.diff !== false) delete next.diff;
+    }
     this._config = {...next, type: 'custom:zeitarchiv-card'};
     this.dispatchEvent(new CustomEvent('config-changed', {detail: {config: this._config}, bubbles: true, composed: true}));
     this._render();
@@ -872,6 +977,7 @@ class ZeitarchivCardEditor extends HTMLElement {
       this.replaceChildren(this._form, this._hint);
     }
     if (this._source === 'entities' && !this._entities) this._loadEntities();
+    if (this._source === 'element' && !this._elements) this._loadElements();
     this._form.hass = this._hass;
     this._form.schema = this._schema();
     this._form.data = this._data();
@@ -885,6 +991,7 @@ class ZeitarchivCardEditor extends HTMLElement {
   _hintKey() {
     const config = this._config || {};
     if (this._source === 'entities') return config.entities?.length ? 'entitiesAdminOnly' : null;
+    if (this._source === 'element') return config.element ? 'elementAdminOnly' : null;
     const [list, id] = this._source === 'table' ? [this._tables, config.table_id] : [this._items, config.chart_id];
     const item = id != null ? (list || []).find((entry) => String(entry.id) === String(id)) : null;
     return item && item.shared === false ? 'notShared' : null;
