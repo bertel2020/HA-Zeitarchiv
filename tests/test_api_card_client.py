@@ -200,7 +200,8 @@ def test_elements_go_to_fixed_paths_with_a_key_and_known_words() -> None:
      {"key": "energie.zeitraeume", "columns": "monat"}, {"key": "energie.zeitraeume", "mode": "y"},
      {"key": "energie.matrix", "role": "gas"}, {"key": "energie.matrix", "years": 99}, {"key": "energie.matrix", "years": True}, {"key": "wetter.zeitraeume", "group": "x"}, {"key": "wetter.monatsvergleich", "metric": "x"},
      {"key": "energie.anteile", "range_key": "decade"}, {"key": "energie.anteile", "offset": 1}, {"key": "energie.anteile", "offset": True},
-     {"key": "energie.anteile", "offset": -61}, {"key": "energie.anteile", "side": "x"}],
+     {"key": "energie.anteile", "offset": -61}, {"key": "energie.anteile", "side": "x"},
+     {"key": "energie.kennzahlen", "values": "erzeugung"}, {"key": "energie.kennzahlen", "values": ["A B"]}, {"key": "energie.kennzahlen", "values": ["a"] * 9}],
 )
 def test_an_element_never_sends_anything_but_a_key_and_known_words(arguments: dict) -> None:
     client = ZeitarchivClient("h", 1, "t")
@@ -246,3 +247,11 @@ def test_a_period_element_sends_range_offset_and_side() -> None:
         }
         client.get_card_element("energie.heatmap", offset=0)
         assert get.call_args.kwargs["params"]["offset"] == 0
+
+
+def test_key_figures_send_their_values_and_the_sparkline_flag() -> None:
+    client = ZeitarchivClient("h", 1, "t")
+    with patch(GET, return_value=_Resp({})) as get:
+        client.get_card_element("energie.kennzahlen", values=["erzeugung", "temperature:1"], sparkline=False)
+        params = get.call_args.kwargs["params"]
+        assert params["values"] == "erzeugung,temperature:1" and params["sparkline"] == "false"

@@ -45,6 +45,7 @@ from .api import (
     CARD_ELEMENT_GROUPS,
     CARD_ELEMENT_MAX_YEARS,
     CARD_ELEMENT_MAX_OFFSET,
+    CARD_ELEMENT_MAX_VALUES,
     CARD_ELEMENT_METRICS,
     CARD_ELEMENT_RANGES,
     CARD_ELEMENT_SIDES,
@@ -103,6 +104,7 @@ _DAY = r"^[0-9]{4}-[0-9]{2}-[0-9]{2}\Z"
 _PX_STEP = 100
 _ENTITY = r"^[a-z0-9_]+\.[a-z0-9_]+\Z"
 _ELEMENT = r"^[a-z]+\.[a-z_]+\Z"
+_VALUE = r"^[a-z0-9_:]{1,40}\Z"
 
 
 def _px(msg: dict[str, Any]) -> int:
@@ -460,6 +462,8 @@ async def ws_card_elements(hass: HomeAssistant, connection, msg: dict[str, Any])
         probatio.Optional("range"): probatio.In(CARD_ELEMENT_RANGES),
         probatio.Optional("offset"): probatio.All(int, probatio.Range(min=-CARD_ELEMENT_MAX_OFFSET, max=0)),
         probatio.Optional("side"): probatio.In(CARD_ELEMENT_SIDES),
+        probatio.Optional("values"): probatio.All([probatio.All(str, probatio.Match(_VALUE))], probatio.Length(max=CARD_ELEMENT_MAX_VALUES)),
+        probatio.Optional("sparkline"): bool,
         probatio.Optional("years"): probatio.All(int, probatio.Range(min=0, max=CARD_ELEMENT_MAX_YEARS)),
         probatio.Optional("entry_id"): str,
     }
@@ -471,7 +475,8 @@ async def ws_card_element(hass: HomeAssistant, connection, msg: dict[str, Any]) 
     key, columns, vorjahr, mode, at = msg["key"], msg.get("columns"), msg["vorjahr"], msg["mode"], msg.get("at")
     role, years, group, metric = msg.get("role"), msg.get("years"), msg.get("group"), msg.get("metric")
     range_key, offset, side = msg.get("range"), msg.get("offset"), msg.get("side")
+    values, sparkline = msg.get("values"), msg.get("sparkline")
     await _fetch(
-        hass, connection, msg, ("element", key, tuple(columns or ()), vorjahr, mode, at, role, years, group, metric, range_key, offset, side),
-        lambda client: client.get_card_element(key, columns, vorjahr, mode, at, role, years, group, metric, range_key, offset, side), capability="card_elements",
+        hass, connection, msg, ("element", key, tuple(columns or ()), vorjahr, mode, at, role, years, group, metric, range_key, offset, side, tuple(values or ()), sparkline),
+        lambda client: client.get_card_element(key, columns, vorjahr, mode, at, role, years, group, metric, range_key, offset, side, values, sparkline), capability="card_elements",
     )

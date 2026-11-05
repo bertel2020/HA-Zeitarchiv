@@ -41,6 +41,8 @@ CARD_ELEMENT_GROUPS = ("basis", "wind", "klima")
 CARD_ELEMENT_RANGES = ("day", "week", "month", "year")
 CARD_ELEMENT_SIDES = ("verbrauch", "versorgung")
 CARD_ELEMENT_MAX_OFFSET = 60
+CARD_ELEMENT_MAX_VALUES = 8
+_ELEMENT_VALUE = re.compile(r"^[a-z0-9_:]{1,40}$")
 CARD_ELEMENT_METRICS = ("temperature", "precip", "sun", "avg", "max", "min")
 _ELEMENT_KEY = re.compile(r"^[a-z]+\.[a-z_]+$")
 _ENTITY_ID = re.compile(r"^[a-z0-9_]+\.[a-z0-9_]+$")
@@ -307,6 +309,7 @@ class ZeitarchivClient:
         self, key: str, columns: list[str] | None = None, vorjahr: bool = True, mode: str = "bis_jetzt", at: str | None = None,
         role: str | None = None, years: int | None = None, group: str | None = None,
         metric: str | None = None, range_key: str | None = None, offset: int | None = None, side: str | None = None,
+        values: list[str] | None = None, sparkline: bool | None = None,
     ) -> dict[str, Any]:
         """Ein Dashboard-Baustein mit seinen Zahlen (GET /api/card/element). Nimmt nur einen Schlüssel der Form
         "gruppe.name" und feste Wörter an, sonst ValueError; nie freien Text."""
@@ -326,6 +329,11 @@ class ZeitarchivClient:
             raise ValueError("range")
         if side is not None and side not in CARD_ELEMENT_SIDES:
             raise ValueError("side")
+        if values is not None and (
+            not isinstance(values, list) or len(values) > CARD_ELEMENT_MAX_VALUES
+            or any(not isinstance(item, str) or not _ELEMENT_VALUE.fullmatch(item) for item in values)
+        ):
+            raise ValueError("values")
         if offset is not None and (not isinstance(offset, int) or isinstance(offset, bool) or not -CARD_ELEMENT_MAX_OFFSET <= offset <= 0):
             raise ValueError("offset")
         if years is not None and (not isinstance(years, int) or isinstance(years, bool) or not 0 <= years <= CARD_ELEMENT_MAX_YEARS):
@@ -349,6 +357,10 @@ class ZeitarchivClient:
             params["offset"] = offset
         if side:
             params["side"] = side
+        if values:
+            params["values"] = ",".join(values)
+        if sparkline is not None:
+            params["sparkline"] = "true" if sparkline else "false"
         return self._get_card("/api/card/element", params)
 
     def get_card_entities(self) -> dict[str, Any]:

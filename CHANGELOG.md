@@ -8,10 +8,12 @@
   Karten-Editor. Die Karte zeigt Zeiträume im Vergleich aus dem Energie- und dem
   Wetterdashboard, Jahre × Monate aus der Energie sowie den Monatsvergleich
   (Energie, Wetter), die Jahresübersicht des Wetters, die Anteile und das
-  Tageslastprofil der Energie als Diagramm, mit den Zahlen der App.
+  Tageslastprofil der Energie als Diagramm sowie Kennzahlen-Kacheln aus Energie
+  und Wetter, mit den Zahlen der App.
   - Im Editor lassen sich Spalten, Vorjahr und Differenz, bei der Matrix und dem
     Monatsvergleich Wert und Jahre, beim Wetter Gruppe oder Kennzahl, bei
-    Anteilen und Lastprofil Zeitraum und Versatz wählen
+    Anteilen, Lastprofil und Energie-Kennzahlen Zeitraum und Versatz, bei den
+    Kennzahlen die Werte und den Verlauf wählen
   - Optional folgen Anteile und Lastprofil der Datumsauswahl des
     Energie-Dashboards von Home Assistant; ohne sie gilt der Zeitraum der Karte
   - Nur Administratoren sehen Bausteine; ist ein Baustein in der App nicht
@@ -39,10 +41,12 @@
   editor. The card shows periods compared from the energy and weather dashboards,
   years × months from energy, as well as the monthly comparison (energy, weather)
   the weather year overview, the shares and the daily load profile from energy
-  as a chart, with the figures of the app.
+  as a chart, as well as key-figure tiles from energy and weather, with the
+  figures of the app.
   - In the editor, columns, previous year and difference can be chosen; for the
     matrix and the monthly comparison the value and years, for weather the group
-    or measure, for shares and load profile the period and offset
+    or measure, for shares, load profile and energy key figures the period and
+    offset, for the key figures the values and the trend
   - Optionally, shares and load profile follow the date selection of the Home
     Assistant energy dashboard; without it, the period of the card applies
   - Only administrators see elements; if an element is not set up in the app,

@@ -59,6 +59,7 @@ const TEXTS = {
     elementAdminOnly: 'Dashboard-Bausteine sehen nur Administratoren.',
     element_offset: 'Perioden zurück (0 = aktuell)', element_side: 'Seite', element_follow: 'Datumsauswahl der Energie von Home Assistant folgen',
     side_verbrauch: 'Verbrauch', side_versorgung: 'Versorgung',
+    element_values: 'Werte', element_sparkline: 'Verlauf anzeigen',
     element_metric: 'Kennzahl', element_band: 'Spanne der Jahre anzeigen',
     metric_temperature: 'Temperatur', metric_precip: 'Niederschlag', metric_sun: 'Sonnenstunden',
     metric_avg: 'Temperatur Ø', metric_max: 'Temperatur Max', metric_min: 'Temperatur Min',
@@ -133,6 +134,7 @@ const TEXTS = {
     elementAdminOnly: 'Dashboard elements are visible to administrators only.',
     element_offset: 'Periods back (0 = current)', element_side: 'Side', element_follow: 'Follow the date selection of the Home Assistant energy dashboard',
     side_verbrauch: 'Consumption', side_versorgung: 'Supply',
+    element_values: 'Values', element_sparkline: 'Show trend',
     element_metric: 'Measure', element_band: 'Show range of years',
     metric_temperature: 'Temperature', metric_precip: 'Precipitation', metric_sun: 'Sunshine hours',
     metric_avg: 'Temperature avg.', metric_max: 'Temperature max.', metric_min: 'Temperature min.',
@@ -205,15 +207,15 @@ const fetchText = async (name) => {
 
 const loadSources = () => {
   sourcesPromise ||= (async () => {
-    const [echartsSource, render, numberFormat, tooltipHold, serverTime, htmlEscape, stateEntities, tableCompute, tableRender, elementTableRender, elementChartRender, legendRender, tableCss, catalog] = await Promise.all([
+    const [echartsSource, render, numberFormat, tooltipHold, serverTime, htmlEscape, stateEntities, tableCompute, tableRender, elementTableRender, elementChartRender, elementKpiRender, legendRender, tableCss, catalog] = await Promise.all([
       fetchText('echarts.min.js'), fetchText('chart-tile-render.js'), fetchText('number-format.js'),
       fetchText('tooltip-hold.js'), fetchText('server-time.js'), fetchText('html-escape.js'),
-      fetchText('state-entities.js'), fetchText('table-compute.js'), fetchText('table-tile-render.js'), fetchText('element-table-render.js'), fetchText('element-chart-render.js'), fetchText('legend-render.js'),
+      fetchText('state-entities.js'), fetchText('table-compute.js'), fetchText('table-tile-render.js'), fetchText('element-table-render.js'), fetchText('element-chart-render.js'), fetchText('element-kpi-render.js'), fetchText('legend-render.js'),
       fetchText('table.css'), fetchText('catalog.json'),
     ]);
     const module = {exports: {}};
     new Function('module', 'exports', `${echartsSource}\n//# sourceURL=zeitarchiv/echarts.min.js`).call(module.exports, module, module.exports);
-    return {echarts: module.exports, render, numberFormat, tooltipHold, serverTime, htmlEscape, stateEntities, tableCompute, tableRender, elementTableRender, elementChartRender, legendRender, tableCss, catalog: JSON.parse(catalog)};
+    return {echarts: module.exports, render, numberFormat, tooltipHold, serverTime, htmlEscape, stateEntities, tableCompute, tableRender, elementTableRender, elementChartRender, elementKpiRender, legendRender, tableCss, catalog: JSON.parse(catalog)};
   })().catch((err) => { sourcesPromise = null; throw err; });
   return sourcesPromise;
 };
@@ -282,7 +284,12 @@ const buildRuntime = (sources, {timezone, language, dark}) => {
     `${sources.elementChartRender}\nreturn window.ElementChartRender;`,
     ['window', 't', 'escapeHtml', 'NumberFormat'], [win, t, win.escapeHtml, win.NumberFormat], 'element-chart-render.js',
   );
-  return {render, setVars: (map) => Object.assign(vars, map), tables: {TableCompute: win.TableCompute, TableTileRender}, ElementTableRender, ElementChartRender, LegendRender};
+  // Kennzahlen-Kacheln der Bausteine: HTML mit Verlauf als SVG, ohne ECharts.
+  const ElementKpiRender = evaluate(
+    `${sources.elementKpiRender}\nreturn window.ElementKpiRender;`,
+    ['window', 't', 'escapeHtml', 'NumberFormat'], [win, t, win.escapeHtml, win.NumberFormat], 'element-kpi-render.js',
+  );
+  return {render, setVars: (map) => Object.assign(vars, map), tables: {TableCompute: win.TableCompute, TableTileRender}, ElementTableRender, ElementChartRender, ElementKpiRender, LegendRender};
 };
 
 const runtimeFor = async (settings) => {
@@ -319,6 +326,17 @@ const STYLE = `
   .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
   .tablebox { overflow: auto; padding: 4px 8px 12px; color: var(--primary-text-color); }
   .tablebox table { margin: 0; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; padding: 4px 0; }
+  .kpi-tile { padding: 8px 10px; border-radius: 8px; background: var(--secondary-background-color, rgba(127, 127, 127, .08)); min-width: 0; }
+  .kpi-label { font-size: 12px; color: var(--secondary-text-color); }
+  .kpi-value { font-size: 22px; font-weight: 500; line-height: 1.25; color: var(--primary-text-color); }
+  .kpi-unit { font-size: 13px; font-weight: 400; margin-left: 3px; color: var(--secondary-text-color); }
+  .kpi-sub { font-size: 12px; color: var(--secondary-text-color); }
+  .kpi-sub small { font-size: 11px; opacity: .8; }
+  .kpi-delta.kpi-good { color: var(--success-color, #43a047); }
+  .kpi-delta.kpi-bad { color: var(--error-color, #db4437); }
+  .kpi-spark { display: block; width: 100%; height: 26px; margin-top: 4px; color: var(--primary-color); }
+  .kpi-empty { padding: 12px; color: var(--secondary-text-color); }
   [hidden] { display: none !important; }
   /* Variablen der App für die Tabelle, aus dem Thema von Home Assistant */
   :host {
@@ -565,6 +583,8 @@ class ZeitarchivCard extends HTMLElement {
       if (config.group) request.group = config.group;
       if (config.metric) request.metric = config.metric;
       if (config.side) request.side = config.side;
+      if (Array.isArray(config.values) && config.values.length) request.values = config.values;
+      if (config.sparkline === false) request.sparkline = false;
       if (config.period && ['day', 'week', 'month', 'year'].includes(config.period)) request.range = config.period;
       if (Number(config.offset) < 0) request.offset = Math.max(-60, Math.round(Number(config.offset)));
       // Optional: die Datumsauswahl der Energie von Home Assistant. Sie steht nur zur Verfügung, wenn schon eine Energie-Ansicht sie
@@ -927,6 +947,7 @@ class ZeitarchivCard extends HTMLElement {
     }
     if (!this.isConnected) return;
     if (result.kind === 'chart') { this._drawElementChart(result, runtime); return; }
+    if (result.kind === 'kpi') { this._drawElementKpi(result, runtime); return; }
     // Die Farben der Matrix sind CSS-Ausdrücke: sie stehen in style="…" und lösen sich im Thema von Home Assistant auf.
     const colors = {good: 'var(--success-color, #43a047)', bad: 'var(--error-color, #db4437)', base: 'var(--secondary-background-color, #f5f5f5)'};
     const draw = {
@@ -942,6 +963,25 @@ class ZeitarchivCard extends HTMLElement {
     this._els.table.hidden = false;
     this._els.table.style.maxHeight = this._explicitHeight ? `${Math.max(120, Number(this._config.height) || 260)}px` : '';
     this._els.table.innerHTML = draw(runtime.ElementTableRender);
+    this._applyAction();
+    this._shown = true;
+  }
+
+  // Kennzahlen-Baustein (Roadmap 1.48, P3): Kacheln mit Wert, Vorperiode und Verlauf.
+  _drawElementKpi(result, runtime) {
+    const R = runtime.ElementKpiRender;
+    const html = {
+      'energie.kennzahlen': () => R.energyKpis(result.items, {compareLabel: result.compare_label}),
+      'wetter.kennzahlen': () => R.weatherKpis(result.tiles),
+    }[result.renderer];
+    if (!html) { this._showNote('elementsOutdated'); return; }
+    this._els.note.hidden = true;
+    this._els.chart.hidden = true;
+    this._els.chart.removeAttribute('aria-label');
+    this._els.legend.hidden = true;
+    this._els.table.hidden = false;
+    this._els.table.style.maxHeight = this._explicitHeight ? `${Math.max(120, Number(this._config.height) || 260)}px` : '';
+    this._els.table.innerHTML = html();
     this._applyAction();
     this._shown = true;
   }
@@ -1117,6 +1157,10 @@ class ZeitarchivCardEditor extends HTMLElement {
         schema.push(select('metric', chosen.metrics.map((value) => ({value, label: label(`metric_${value}`)}))));
       }
       if (chosen && /monatsvergleich$/.test(chosen.key)) schema.push({name: 'band', selector: {boolean: {}}});
+      if (chosen && chosen.values && chosen.values.length) {
+        schema.push({name: 'values', selector: {select: {multiple: true, mode: 'list', options: chosen.values.map((item) => ({value: item.key, label: item.label || label(`role_${item.key}`)}))}}});
+      }
+      if (chosen && chosen.key === 'energie.kennzahlen') schema.push({name: 'sparkline', selector: {boolean: {}}});
       if (chosen && chosen.sides && chosen.sides.length) {
         schema.push(select('side', chosen.sides.map((value) => ({value, label: label(`side_${value}`)}))));
       }
@@ -1184,6 +1228,10 @@ class ZeitarchivCardEditor extends HTMLElement {
       data.diff = data.diff !== false;
       if (chosen?.groups?.length) data.group = data.group || chosen.groups[0];
       if (chosen?.metrics?.length) data.metric = data.metric || chosen.metrics[0];
+      if (chosen?.values?.length) {
+        data.values = Array.isArray(data.values) && data.values.length ? data.values : (chosen.key === 'energie.kennzahlen' ? chosen.values.map((item) => item.key) : []);
+        if (chosen.key === 'energie.kennzahlen') data.sparkline = data.sparkline !== false;
+      }
       if (chosen?.sides?.length) data.side = data.side || chosen.sides[0];
       if (chosen?.ranges?.length) {
         data.period = chosen.ranges.includes(data.period) ? data.period : (chosen.ranges.includes('month') ? 'month' : chosen.ranges[0]);
@@ -1207,7 +1255,7 @@ class ZeitarchivCardEditor extends HTMLElement {
       this._source = source;
       delete next.chart_id; delete next.table_id; delete next.entities; delete next.period; delete next.style; delete next.legend;
       delete next.legend_style; delete next.legend_metrics;
-      delete next.element; delete next.columns; delete next.vorjahr; delete next.diff; delete next.role; delete next.years; delete next.group; delete next.metric; delete next.band; delete next.side; delete next.offset; delete next.follow_energy_date;
+      delete next.element; delete next.columns; delete next.vorjahr; delete next.diff; delete next.role; delete next.years; delete next.group; delete next.metric; delete next.band; delete next.side; delete next.offset; delete next.follow_energy_date; delete next.values; delete next.sparkline;
       if (source === 'entities') this._loadEntities();
       if (source === 'element') this._loadElements();
     }
@@ -1225,7 +1273,7 @@ class ZeitarchivCardEditor extends HTMLElement {
     if (!Array.isArray(next.legend_metrics) || !next.legend_metrics.length || next.legend === false || ['table', 'element'].includes(this._source)) delete next.legend_metrics;
     if (this._source !== 'chart') delete next.chart_id;
     if (this._source !== 'table') delete next.table_id;
-    if (this._source !== 'element') for (const key of ['element', 'columns', 'vorjahr', 'diff', 'role', 'years', 'group', 'metric', 'band', 'side', 'offset', 'follow_energy_date']) delete next[key];
+    if (this._source !== 'element') for (const key of ['element', 'columns', 'vorjahr', 'diff', 'role', 'years', 'group', 'metric', 'band', 'side', 'offset', 'follow_energy_date', 'values', 'sparkline']) delete next[key];
     else {
       // Vorgaben nicht in die YAML schreiben: alle Spalten, mit Vorjahr, mit Differenz.
       const all = (this._elements || []).find((item) => item.key === next.element)?.columns || [];
@@ -1242,6 +1290,10 @@ class ZeitarchivCardEditor extends HTMLElement {
       if (!chosenMetrics.length || next.metric === chosenMetrics[0]) delete next.metric;
       if (next.band !== false) delete next.band;
       const chosenElement = (this._elements || []).find((item) => item.key === next.element);
+      const allValues = (chosenElement?.values || []).map((item) => item.key);
+      const everything = chosenElement?.key === 'energie.kennzahlen' && Array.isArray(next.values) && next.values.length === allValues.length && allValues.every((key) => next.values.includes(key));
+      if (!Array.isArray(next.values) || !next.values.length || everything) delete next.values;
+      if (!allValues.length || next.sparkline !== false) delete next.sparkline;
       if (!chosenElement?.sides?.length || next.side === chosenElement.sides[0]) delete next.side;
       if (!chosenElement?.ranges?.length) { delete next.period; delete next.offset; delete next.follow_energy_date; }
       else {
