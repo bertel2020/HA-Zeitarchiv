@@ -15,6 +15,12 @@
     eingeklappt, bei allen Quellen der Karte; Aktualisierung und Höhe nennen
     ihren Standard, wenn das Feld leer ist
 
+### Behoben
+
+- **Karte: Legende mit Werten bei einem Chart**: Die Chips standen ohne Abstände
+  und Rahmen hintereinander („WirkleistungAktuell 574,8 WMin …“), wenn die Karte
+  nur ein Chart zeigte. Jetzt sehen sie aus wie auf der Kachel der App
+
 ---
 
 ### English
@@ -30,6 +36,12 @@
   - Refresh, height and tap action sit collapsed under "More settings", for all
     sources of the card; refresh and height name their default when the field is
     empty
+
+#### Fixed
+
+- **Card: legend with values on a chart**: The chips ran together without
+  spacing or borders ("WirkleistungAktuell 574,8 WMin …") when the card showed
+  only a chart. They now look like on the tile in the app
 
 ## 1.4.1 - 2026-11-05
 

@@ -810,6 +810,9 @@ class ZeitarchivCard extends HTMLElement {
     try { metrics = JSON.parse(raw.legendMetrics || '[]'); } catch (err) { /* ohne */ }
     const own = Array.isArray(this._config.legend_metrics) ? this._config.legend_metrics.filter((key) => LEGEND_KEYS.includes(key)) : [];
     if (own.length) metrics = own;
+    // Die Chips und die Tabelle der Legende tragen die Klassen der App; ihr Aussehen steht in table.css, das bisher nur
+    // Tabellen und Bausteine luden. Ein Chart allein zeigte die Legende darum ohne Abstände und Rahmen.
+    if (this._els.tableCss.textContent !== runtime.tableCss) this._els.tableCss.textContent = runtime.tableCss;
     this._chartLegendStyle = raw.legendStyle || 'chips';
     const style = this._legendStyle(this._chartLegendStyle);
     this._legend = {
