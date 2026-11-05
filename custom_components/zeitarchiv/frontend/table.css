@@ -1,8 +1,41 @@
 /* Erzeugt von scripts/build_card_table_css.py aus den Stylesheets der App, nicht von Hand ändern. */
 /* css/app.css */
+.chart-legend {display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;}
+.chart-legend-item {display:flex;flex-wrap:wrap;align-items:baseline;gap:9px;max-width:100%;
+  padding:6px 13px;border-radius:20px;border:1px solid var(--border);
+  background:var(--surface-alt);cursor:pointer;font:inherit;color:inherit;
+  transition:opacity .15s ease,border-color .15s ease;}
+.chart-legend-item .compare-row {flex-basis:100%;display:flex;align-items:baseline;gap:9px;}
+.chart-legend-item .compare-row .dot {opacity:.55;}
+.chart-legend-item .compare-row .compare-label {color:var(--ink-faint);white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;max-width:180px;font-size:calc(11px * var(--font-scale, 1));}
+.chart-legend-item .compare-row .values {color:var(--ink-faint);}
+.chart-legend-item .compare-row .compare-cut {color:var(--accent-line);background:var(--accent-line-soft);border-radius:8px;padding:0 7px;white-space:nowrap;}
+.chart-legend-table td .legend-compare-value.compare-cut {color:var(--accent-line);}
+.chart-legend-item:hover {border-color:var(--accent-line);}
+.chart-legend-item.inactive {opacity:.4;}
+.chart-legend-item[tabindex]:focus-visible {outline:2px solid var(--accent-line);outline-offset:2px;}
+.chart-legend-item .dot {width:9px;height:9px;border-radius:999px;flex:none;}
+.chart-legend-item .name {font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;max-width:180px;font-size:calc(12.5px * var(--font-scale, 1));}
+.chart-legend-item .values {display:flex;gap:9px;flex:none;font-family:var(--font-mono);color:var(--ink-muted);
+  white-space:nowrap;font-size:calc(11px * var(--font-scale, 1));}
+.chart-legend-item.static {cursor:default;}
+.chart-legend-item.static:hover {border-color:var(--border);}
+.chart-legend-table th:not(.legend-name-col), .chart-legend-table td:not(.legend-name-col) {text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+@media (max-width:640px) {
+.chart-legend-table .legend-name-col {width:14rem;min-width:14rem;max-width:14rem;}
+}
+.chart-legend-table td.legend-name-col {font-weight:600;color:var(--ink);}
+.chart-legend-table .legend-name-cell {display:inline-flex;align-items:center;gap:8px;}
+.chart-legend-table .legend-name-cell .dot {width:9px;height:9px;border-radius:999px;flex:none;}
+.chart-legend-table-row {cursor:pointer;}
+.chart-legend-table-row.static {cursor:default;}
+.chart-legend-table-row.inactive {opacity:.4;}
+.chart-legend-table-row[tabindex]:focus-visible {outline:2px solid var(--accent-line);outline-offset:-2px;}
+.chart-legend-table .legend-compare-label, .chart-legend-table td .legend-compare-value {display:block;color:var(--ink-faint);font-size:calc(10.5px * var(--font-scale, 1));}
 .tbl-wrap {max-width:100%;min-width:0;overflow-x:auto;-webkit-overflow-scrolling:touch;
   border:1px solid var(--border);border-radius:12px;background:var(--surface);
-  
   background-repeat:no-repeat;
   background-attachment:local,local,scroll,scroll;}
 .tbl-wrap.is-scrollable {background-image:
@@ -11,7 +44,6 @@
     linear-gradient(to right,var(--border-strong),transparent 85%),
     linear-gradient(to left,var(--border-strong),transparent 85%);
   background-position:0 0,100% 0,0 0,100% 0;
-  
   background-size:14px 100%,14px 100%,10px 100%,10px 100%;}
 table.dt {width:100%;border-collapse:collapse;font-family:var(--font-display);font-size:calc(13.5px * var(--font-scale, 1));}
 table.dt th {text-align:left;padding:8px 14px;font-size:calc(12.5px * var(--font-scale, 1));font-weight:600;color:var(--ink-faint);
@@ -57,7 +89,6 @@ table.dt.dt-cards tbody tr.flag td {background:transparent;}
 table.dt.dt-cards tbody tr.tbl-zebra-alt td {background:transparent;}
 table.dt.dt-cards td {display:flex;flex-wrap:wrap;gap:0 14px;align-items:baseline;justify-content:space-between;
     padding:3px 0;border:0;text-align:right;white-space:normal;
-    
     min-width:0;overflow-wrap:anywhere;}
 table.dt.dt-cards tbody tr.dt-card-collapsible:not(.is-open) td:not(.dt-card-title):not(.dt-card-lead):not(.dt-card-pre) {display:none;}
 table.dt.dt-cards tbody tr:has(> td.dt-card-pre), table.dt.dt-cards tbody tr.dt-card-collapsible {position:relative;}
@@ -87,6 +118,13 @@ table.dt.dt-cards tr.has-pending-purge td, table.dt.dt-cards tbody tr.has-pendin
 }
 .tbl-wrap {box-shadow:var(--shadow);}
 .card .tbl-wrap, .settings-section .tbl-wrap, .detail-dialog .tbl-wrap {box-shadow:none;}
+.state-dot {display:inline-block;width:10px;height:10px;border-radius:3px;flex:none;vertical-align:-1px;}
+.state-legend-values {display:inline-flex;flex-wrap:wrap;gap:4px 12px;}
+.state-legend-values > span {white-space:nowrap;}
+.state-legend-values > .state-pick {cursor:pointer;border-radius:4px;padding:0 3px;margin:0 -3px;}
+.state-legend-values > .state-pick:hover {background:var(--surface-alt);}
+.state-legend-values > .is-picked {font-weight:600;}
+.state-legend-values > .is-unpicked {opacity:.55;}
 .wt-table td.wt-loading {text-align:left;color:var(--ink-faint);padding:18px 12px;}
 .wt-table-wrap {margin-top:10px;}
 .wt-table.wt-table-full {width:100%;}
@@ -120,7 +158,11 @@ table.dt.dt-cards tr.has-pending-purge td, table.dt.dt-cards tbody tr.has-pendin
 .wt-table td .wt-dl.wt-dl-good {color:var(--positive);}
 .wt-table td .wt-dl.wt-dl-bad {color:var(--danger);}
 /* css/pages/dashboard_detail.css */
+.dtile-legend {display:none;flex-wrap:wrap;gap:8px;padding-top:10px;flex:none;}
+.dtile-legend.is-visible {display:flex;}
 .dtile-legend .tbl-wrap {width:100%;}
+.dtile-legend .dash {width:14px;height:0;border-top:2px dashed;flex:none;align-self:center;}
+.dtile-legend .chart-legend-item.is-more {background:transparent;border-style:dashed;color:var(--ink-muted);cursor:default;}
 .dtile-table-preview {height:auto;min-height:160px;flex:1;overflow:auto;}
 .dtile-table-preview .tbl-period-hint {display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;
     border-radius:999px;margin:0 0 1px 5px;vertical-align:middle;pointer-events:none;

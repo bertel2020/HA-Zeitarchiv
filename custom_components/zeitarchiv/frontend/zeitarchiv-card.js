@@ -265,6 +265,11 @@ const runtimeFor = async (settings) => {
 
 // --- Karte -----------------------------------------------------------------------------
 
+// Reihenfolge der Kennzahlen wie in legend-render.js; unbekannte Schlüssel aus der Konfiguration fallen weg.
+const LEGEND_KEYS = ['last', 'min', 'max', 'average', 'sum'];
+// Unterhalb dieser Kartenbreite zeigt "wie das Chart" statt einer Tabelle Chips.
+const NARROW_CARD_PX = 300;
+
 const STYLE = `
   :host { display: block; }
   ha-card { overflow: hidden; }
@@ -281,6 +286,7 @@ const STYLE = `
   .legend-item { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; background: none; border: 0; padding: 2px 0;
                  font: inherit; color: inherit; }
   .legend-item.inactive { opacity: .45; text-decoration: line-through; }
+  .legend.values { display: block; padding: 4px 8px 0; }
   .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
   .tablebox { overflow: auto; padding: 4px 8px 12px; color: var(--primary-text-color); }
   .tablebox table { margin: 0; }
@@ -337,6 +343,7 @@ class ZeitarchivCard extends HTMLElement {
     this._els.card = this.shadowRoot.querySelector('ha-card');
     this._wireTableTips();
     this._wireAction();
+    this._wireLegend();
   }
 
   // Tippen: die Standard-Aktion von Home Assistant (tap_action). Die Karte löst nur das Ereignis aus,
@@ -650,18 +657,73 @@ class ZeitarchivCard extends HTMLElement {
     R.draw(this._chart, {
       spec, data: result.data, series, viewType: R.viewTypeFor(spec, series), multiYear, hiddenSet: this._hidden, style,
     });
-    this._renderLegend();
+    this._renderLegend(runtime, result, spec, series, multiYear);
     this._els.chart.setAttribute('aria-label', this._describe(this._config.title || result.name, series, result.spec));
     this._applyAction();
     this._chart.resize();
     this._shown = true;
   }
 
+  // Legende mit Werten (Roadmap 1.49): dieselbe Datei und dieselben Klassen wie auf der Kachel der App.
+  // Sie gilt, wenn die App die Legenden-Einstellungen des Charts mitschickt (spec.chartStats) und dort Werte
+  // an sind; sonst, bei einer älteren App, ohne Werte, beim Donut und bei "legend: false" bleibt die Namensliste.
+  // Einstellbar an der Karte: legend_style ('' = wie das Chart, 'chips', 'table') und legend_metrics (leer = wie das Chart).
+  _renderLegend(runtime, result, spec, series, multiYear) {
+    const raw = result.spec || {};
+    const donut = (this._chart.getOption().series || []).some((entry) => entry.type === 'pie');
+    if (raw.chartStats !== 'true' || donut || this._config.legend === false) { this._renderNameLegend(); return; }
+    const box = this._els.legend;
+    let metrics = [];
+    try { metrics = JSON.parse(raw.legendMetrics || '[]'); } catch (err) { /* ohne */ }
+    const own = Array.isArray(this._config.legend_metrics) ? this._config.legend_metrics.filter((key) => LEGEND_KEYS.includes(key)) : [];
+    if (own.length) metrics = own;
+    // "Wie das Chart" ist auf einer schmalen Karte (unter etwa 300 px) eine Chip-Reihe: eine Tabelle würde seitlich
+    // scrollen. Wer "Tabelle" ausdrücklich wählt, behält sie.
+    let style = this._config.legend_style || raw.legendStyle || 'chips';
+    if (!this._config.legend_style && style === 'table' && (this._els.card?.clientWidth || 1000) < NARROW_CARD_PX) style = 'chips';
+    this._legend = {
+      items: runtime.LegendRender.buildLegendItems({series, data: result.data, spec, multiYear}),
+      legendMetrics: Array.isArray(metrics) ? metrics : [], showStats: true, style,
+    };
+    this._legendRender = runtime.LegendRender;
+    box.className = 'legend values dtile-legend is-visible';
+    box.hidden = false;
+    this._paintLegend();
+  }
+
+  _paintLegend() {
+    if (!this._legend) return;
+    this._els.legend.innerHTML = this._legendRender.renderLegendHtml(this._legend, this._hidden);
+  }
+
+  // Ein Klick-Verteiler für die ganze Legende (Chips und Tabellenzeilen), wie auf der Kachel: blendet die Serie
+  // ein oder aus und löst die tap_action der Karte nicht aus.
+  _wireLegend() {
+    const box = this._els.legend;
+    const toggle = (event) => {
+      if (!box.classList.contains('values')) return;
+      event.stopPropagation();
+      const item = event.target.closest?.('[data-series]');
+      if (!item || !box.contains(item)) return;
+      if (event.type === 'keydown') {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+      }
+      const name = item.dataset.series;
+      if (this._hidden.has(name)) this._hidden.delete(name); else this._hidden.add(name);
+      this._chart?.dispatchAction({type: 'legendToggleSelect', name});
+      this._paintLegend();
+    };
+    box.addEventListener('click', toggle);
+    box.addEventListener('keydown', toggle);
+  }
+
   // Legende unter dem Chart: ein Eintrag je Serie (Name und Farbe wie im Chart), ein Klick blendet die Serie
   // ein oder aus. Bei nur einer Serie und beim Donut entfällt sie (Titel bzw. Beschriftung nennen alles).
-  _renderLegend() {
+  _renderNameLegend() {
     const box = this._els.legend;
     box.replaceChildren();
+    box.className = 'legend';
     const option = this._chart.getOption();
     const series = option.series || [];
     const names = [];

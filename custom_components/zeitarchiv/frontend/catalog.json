@@ -1,6 +1,7 @@
 {
   "en": {
     "(bis {cutoff})": "(until {cutoff})",
+    "+{n} Jahre": "+{n} years",
     "1 Beginn": "1 start",
     "1 Beobachtung": "1 observation",
     "Aktuell": "Current",

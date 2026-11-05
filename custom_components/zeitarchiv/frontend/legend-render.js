@@ -2,12 +2,13 @@
 // Aus dashboard-tiles.js herausgelöst (ROADMAP 1.49), damit dieselbe Legende
 // auch die Lovelace-Karte zeichnen kann. Die Aufteilung:
 //   buildStatsItem(s, points, name, color, ctx)   Kennzahlen einer Serie (Aktuell/Min/Max/Ø/Σ)
+//   buildLegendItems({series, data, spec, multiYear})   alle Einträge eines Charts
 //   renderLegendHtml(legend, hiddenSet)           Chips oder Tabelle als HTML-Text
 // Nichts davon liest oder verändert DOM; Klick-Verdrahtung und Zwischenspeicher
 // bleiben bei der jeweiligen Hülle (Kachel bzw. Karte).
 // Braucht vorher: html-escape.js, number-format.js, i18n.js, chart-tile-render.js.
 (() => {
-  const {fmtCompactNumber, stateRows, switchOnDuration} = window.ChartTileRender;
+  const {fmtCompactNumber, stateRows, switchOnDuration, withOpacity} = window.ChartTileRender;
 
   // "Ø"/"Σ" statt Text — dieselben Symbole wie chart_editor.js/entity_detail.js
   // (LEGEND_METRIC_OPTIONS dort), nur "Ø" stand hier schon vorher so; t("Summe")
@@ -131,5 +132,47 @@
       : renderLegendChips(items, legendMetrics, showStats, hiddenSet);
   }
 
-  window.LegendRender = {buildStatsItem, renderLegendHtml};
+  // Die Legenden-Einträge eines Charts: je Serie einen, bei der Langzeit-Kachel das angezeigte Jahr und den Ø
+  // (die übrigen Jahre als "+N Jahre"), beim Jahresvergleich je Entität das Jahr und das Vorjahr. Eine
+  // Funktion für Kachel und Karte, damit beide dieselben Zeilen zeigen.
+  // spec = readSpec(...) (Namen, Farben, Vergleich, Nachkommastellen), multiYear = tileMultiYear(...) oder null.
+  function buildLegendItems({series, data, spec, multiYear}) {
+    const {entityNames, colorFor, timeline, effectiveDecimals, compare} = spec;
+    const ctx = {windowEnd: data.window_end, timeline, effectiveDecimals};
+    const statsItem = (s, points, name, color) => buildStatsItem(s, points, name, color, ctx);
+    if (multiYear) {
+      // Entschieden: nur das angezeigte Jahr und der Ø, die übrigen Jahre als
+      // "+N Jahre" (die Tabellen-Legende zeigt nur die beiden Zeilen).
+      const s = series[0];
+      const items = [statsItem(s, s.points, multiYear.series[0].name, multiYear.series[0].color)];
+      if (multiYear.averageSeries) {
+        items.push({
+          ...statsItem(s, multiYear.averageSeries.monthly.filter(v => v != null).map(v => ({value: v})),
+            multiYear.averageSeries.name, multiYear.averageSeries.color),
+          dash: true,
+        });
+      }
+      if (multiYear.hiddenYears > 0) items.push({more: t('+{n} Jahre', {n: multiYear.hiddenYears})});
+      return items;
+    }
+    if (compare?.yearsCompare) {
+      // Wie die Balkenpaare: je Entität angezeigtes Jahr und Vorjahr, die
+      // Soll-Entität als eigene Zeile — Namen wie die Serien, damit das
+      // Umschalten per Legende greift.
+      const currentYear = data.window_start ? new Date(data.window_start * 1000).getFullYear() : new Date().getFullYear();
+      const items = [];
+      series.forEach(s => {
+        if (!s.compare_points) return;
+        const color = colorFor(s.entity_id);
+        const displayName = entityNames[s.entity_id] || s.friendly_name;
+        if (s.entity_id === compare.target) { items.push(statsItem(s, s.points, displayName, color)); return; }
+        items.push(statsItem(s, s.points, `${displayName} (${currentYear})`, color));
+        items.push(statsItem(s, s.compare_points, `${displayName} (${currentYear - 1})`, withOpacity(color, 0.55)));
+      });
+      return items;
+    }
+    return series.map(s => statsItem(s, s.points, entityNames[s.entity_id] || s.friendly_name, colorFor(s.entity_id)));
+  }
+
+  window.LegendRender = {buildStatsItem, buildLegendItems, renderLegendHtml};
 })();
