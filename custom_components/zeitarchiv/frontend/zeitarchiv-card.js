@@ -88,6 +88,12 @@ const TEXTS = {
     style_stacked: 'Gestapelte Balken',
     style_percent: 'Anteile in Prozent',
     title: 'Titel (leer: Name des Charts)',
+    title_element: 'Titel (leer: Name des Bausteins)',
+    moreSettings: 'Weitere Einstellungen',
+    help_vorjahr: 'Zeigt zu jeder Spalte daneben den Wert des Vorjahres.',
+    help_diff: 'Zeigt unter dem Wert die Veränderung zum Vorjahr. Braucht „Mit Vorjahr vergleichen“.',
+    help_offset: '0 ist der aktuelle Zeitraum, −1 der davor.',
+    help_follow: 'Zeitraum und Versatz folgen dann der Datumsauswahl im Energie-Dashboard von Home Assistant.',
     refresh: 'Aktualisierung (Sekunden)',
     height: 'Höhe (Pixel)',
     tap_action: 'Beim Tippen',
@@ -164,6 +170,12 @@ const TEXTS = {
     style_stacked: 'Stacked bars',
     style_percent: 'Shares in percent',
     title: 'Title (empty: chart name)',
+    title_element: 'Title (empty: element name)',
+    moreSettings: 'More settings',
+    help_vorjahr: 'Shows the value of the previous year next to each column.',
+    help_diff: 'Shows the change from the previous year below the value. Needs "Compare with last year".',
+    help_offset: '0 is the current period, −1 the one before.',
+    help_follow: 'Period and offset then follow the date selection of the Home Assistant energy dashboard.',
     refresh: 'Refresh (seconds)',
     height: 'Height (pixels)',
     tap_action: 'On tap',
@@ -171,6 +183,9 @@ const TEXTS = {
     description: 'Shows a saved chart or entities from Zeitarchiv.',
   },
 };
+
+// Felder der Bausteine im Editor-Schema; ihre Beschriftungen heißen element_<Name> (siehe _fieldLabel).
+const ELEMENT_FIELDS = new Set(['role', 'years', 'mode', 'limit', 'metric', 'band', 'values', 'sparkline', 'side', 'offset', 'group', 'columns', 'vorjahr', 'diff']);
 
 // Die Fassung des Vertrags mit der App (card_routes.SPEC_VERSION).
 const SPEC_VERSION = 1;
@@ -1213,11 +1228,17 @@ class ZeitarchivCardEditor extends HTMLElement {
         );
       }
     }
+    // Der Titel bleibt sichtbar; Aktualisierung, Höhe und Tippen sind selten nötig und stehen eingeklappt.
     schema.push(
       {name: 'title', selector: {text: {}}},
-      {name: 'refresh', selector: {number: {min: 15, max: 3600, step: 15, mode: 'box', unit_of_measurement: 's'}}},
-      {name: 'height', selector: {number: {min: 120, max: 800, step: 10, mode: 'box', unit_of_measurement: 'px'}}},
-      {name: 'tap_action', selector: {ui_action: {default_action: 'none'}}},
+      {
+        type: 'expandable', name: '', title: label('moreSettings'),
+        schema: [
+          {name: 'refresh', selector: {number: {min: 15, max: 3600, step: 15, mode: 'box', unit_of_measurement: 's'}}},
+          {name: 'height', selector: {number: {min: 120, max: 800, step: 10, mode: 'box', unit_of_measurement: 'px'}}},
+          {name: 'tap_action', selector: {ui_action: {default_action: 'none'}}},
+        ],
+      },
     );
     return schema;
   }
@@ -1327,11 +1348,31 @@ class ZeitarchivCardEditor extends HTMLElement {
     this._render();
   }
 
+  // Felder eines Dashboard-Bausteins heißen im Schema kurz (columns, vorjahr, …); ihre Texte tragen das Vorwort element_.
+  _fieldLabel(schema) {
+    const name = schema.name;
+    if (!name) return undefined;
+    if (this._source === 'element') {
+      if (name === 'title') return text(this._hass, 'title_element');
+      if (name === 'follow_energy_date') return text(this._hass, 'element_follow');
+      if (ELEMENT_FIELDS.has(name)) return text(this._hass, `element_${name}`);
+    }
+    return text(this._hass, name);
+  }
+
+  // Kurzer Hinweis unter einem Feld; nur dort, wo die Bezeichnung allein nicht sagt, was passiert.
+  _fieldHelp(schema) {
+    if (this._source !== 'element') return undefined;
+    const key = {vorjahr: 'help_vorjahr', diff: 'help_diff', offset: 'help_offset', follow_energy_date: 'help_follow'}[schema.name];
+    return key ? text(this._hass, key) : undefined;
+  }
+
   _render() {
     if (!this._hass) return;
     if (!this._form) {
       this._form = document.createElement('ha-form');
-      this._form.computeLabel = (schema) => text(this._hass, schema.name);
+      this._form.computeLabel = (schema) => this._fieldLabel(schema);
+      this._form.computeHelper = (schema) => this._fieldHelp(schema);
       this._form.addEventListener('value-changed', (event) => this._changed(event.detail.value));
       this._hint = document.createElement('div');
       this._hint.style.cssText = 'color: var(--secondary-text-color); font-size: 13px; padding: 4px 0 8px;';
