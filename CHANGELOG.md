@@ -6,9 +6,11 @@
 
 - **Karte: Dashboard-Bausteine**: Neue Quelle „Dashboard-Baustein“ im
   Karten-Editor. Die Karte zeigt Zeiträume im Vergleich aus dem Energie- und dem
-  Wetterdashboard sowie Jahre × Monate aus der Energie, mit den Zahlen der App.
-  - Im Editor lassen sich Spalten, Vorjahr und Differenz, bei der Matrix Wert und
-    Jahre, beim Wetter die Gruppe wählen
+  Wetterdashboard, Jahre × Monate aus der Energie sowie den Monatsvergleich
+  (Energie, Wetter) und die Jahresübersicht des Wetters als Diagramm, mit den
+  Zahlen der App.
+  - Im Editor lassen sich Spalten, Vorjahr und Differenz, bei der Matrix und dem
+    Monatsvergleich Wert und Jahre, beim Wetter Gruppe oder Kennzahl wählen
   - Nur Administratoren sehen Bausteine; ist ein Baustein in der App nicht
     eingerichtet, sagt die Karte es
   - Braucht die aktuelle App; mit einer älteren meldet die Karte, dass die App
@@ -31,10 +33,12 @@
 #### New
 
 - **Card: dashboard elements**: New source "Dashboard element" in the card
-  editor. The card shows periods compared from the energy and weather dashboards
-  and years × months from energy, with the figures of the app.
+  editor. The card shows periods compared from the energy and weather dashboards,
+  years × months from energy, as well as the monthly comparison (energy, weather)
+  and the weather year overview as a chart, with the figures of the app.
   - In the editor, columns, previous year and difference can be chosen; for the
-    matrix the value and years, for weather the group
+    matrix and the monthly comparison the value and years, for weather the group
+    or measure
   - Only administrators see elements; if an element is not set up in the app,
     the card says so
   - Needs the current app; with an older one the card reports that the app is

@@ -44,6 +44,7 @@ from .api import (
     CARD_ELEMENT_COLUMNS,
     CARD_ELEMENT_GROUPS,
     CARD_ELEMENT_MAX_YEARS,
+    CARD_ELEMENT_METRICS,
     CARD_ELEMENT_MODES,
     CARD_ELEMENT_ROLES,
     CARD_MAX_ENTITIES,
@@ -452,6 +453,7 @@ async def ws_card_elements(hass: HomeAssistant, connection, msg: dict[str, Any])
         probatio.Optional("at"): probatio.All(str, probatio.Match(_DAY)),
         probatio.Optional("role"): probatio.In(CARD_ELEMENT_ROLES),
         probatio.Optional("group"): probatio.In(CARD_ELEMENT_GROUPS),
+        probatio.Optional("metric"): probatio.In(CARD_ELEMENT_METRICS),
         probatio.Optional("years"): probatio.All(int, probatio.Range(min=0, max=CARD_ELEMENT_MAX_YEARS)),
         probatio.Optional("entry_id"): str,
     }
@@ -461,8 +463,8 @@ async def ws_card_element(hass: HomeAssistant, connection, msg: dict[str, Any]) 
     """Ein Dashboard-Baustein mit seinen Zahlen. Nur Administratoren: die Zahlen der Dashboards sind
     nicht je Baustein freigebbar."""
     key, columns, vorjahr, mode, at = msg["key"], msg.get("columns"), msg["vorjahr"], msg["mode"], msg.get("at")
-    role, years, group = msg.get("role"), msg.get("years"), msg.get("group")
+    role, years, group, metric = msg.get("role"), msg.get("years"), msg.get("group"), msg.get("metric")
     await _fetch(
-        hass, connection, msg, ("element", key, tuple(columns or ()), vorjahr, mode, at, role, years, group),
-        lambda client: client.get_card_element(key, columns, vorjahr, mode, at, role, years, group), capability="card_elements",
+        hass, connection, msg, ("element", key, tuple(columns or ()), vorjahr, mode, at, role, years, group, metric),
+        lambda client: client.get_card_element(key, columns, vorjahr, mode, at, role, years, group, metric), capability="card_elements",
     )

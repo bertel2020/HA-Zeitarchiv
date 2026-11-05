@@ -198,7 +198,7 @@ def test_elements_go_to_fixed_paths_with_a_key_and_known_words() -> None:
     "arguments",
     [{"key": "../x"}, {"key": "a.b/c"}, {"key": "energie"}, {"key": "energie.zeitraeume", "columns": ["x"]},
      {"key": "energie.zeitraeume", "columns": "monat"}, {"key": "energie.zeitraeume", "mode": "y"},
-     {"key": "energie.matrix", "role": "gas"}, {"key": "energie.matrix", "years": 99}, {"key": "energie.matrix", "years": True}, {"key": "wetter.zeitraeume", "group": "x"}],
+     {"key": "energie.matrix", "role": "gas"}, {"key": "energie.matrix", "years": 99}, {"key": "energie.matrix", "years": True}, {"key": "wetter.zeitraeume", "group": "x"}, {"key": "wetter.monatsvergleich", "metric": "x"}],
 )
 def test_an_element_never_sends_anything_but_a_key_and_known_words(arguments: dict) -> None:
     client = ZeitarchivClient("h", 1, "t")
@@ -226,3 +226,10 @@ def test_a_weather_table_sends_its_group() -> None:
     with patch(GET, return_value=_Resp({})) as get:
         client.get_card_element("wetter.zeitraeume", ["heute"], group="wind")
         assert get.call_args.kwargs["params"] == {"key": "wetter.zeitraeume", "vorjahr": "true", "mode": "bis_jetzt", "columns": "heute", "group": "wind"}
+
+
+def test_a_monthly_comparison_sends_its_metric() -> None:
+    client = ZeitarchivClient("h", 1, "t")
+    with patch(GET, return_value=_Resp({})) as get:
+        client.get_card_element("wetter.monatsvergleich", metric="precip")
+        assert get.call_args.kwargs["params"] == {"key": "wetter.monatsvergleich", "vorjahr": "true", "mode": "bis_jetzt", "metric": "precip"}

@@ -38,6 +38,7 @@ CARD_ELEMENT_MODES = ("bis_jetzt", "komplett")
 CARD_ELEMENT_ROLES = ("erzeugung", "einspeisung", "netzbezug", "verbrauch")
 CARD_ELEMENT_MAX_YEARS = 50
 CARD_ELEMENT_GROUPS = ("basis", "wind", "klima")
+CARD_ELEMENT_METRICS = ("temperature", "precip", "sun", "avg", "max", "min")
 _ELEMENT_KEY = re.compile(r"^[a-z]+\.[a-z_]+$")
 _ENTITY_ID = re.compile(r"^[a-z0-9_]+\.[a-z0-9_]+$")
 
@@ -302,6 +303,7 @@ class ZeitarchivClient:
     def get_card_element(
         self, key: str, columns: list[str] | None = None, vorjahr: bool = True, mode: str = "bis_jetzt", at: str | None = None,
         role: str | None = None, years: int | None = None, group: str | None = None,
+        metric: str | None = None,
     ) -> dict[str, Any]:
         """Ein Dashboard-Baustein mit seinen Zahlen (GET /api/card/element). Nimmt nur einen Schlüssel der Form
         "gruppe.name" und feste Wörter an, sonst ValueError; nie freien Text."""
@@ -315,6 +317,8 @@ class ZeitarchivClient:
             raise ValueError("role")
         if group is not None and group not in CARD_ELEMENT_GROUPS:
             raise ValueError("group")
+        if metric is not None and metric not in CARD_ELEMENT_METRICS:
+            raise ValueError("metric")
         if years is not None and (not isinstance(years, int) or isinstance(years, bool) or not 0 <= years <= CARD_ELEMENT_MAX_YEARS):
             raise ValueError("years")
         params: dict[str, Any] = {"key": key, "vorjahr": "true" if vorjahr else "false", "mode": mode}
@@ -328,6 +332,8 @@ class ZeitarchivClient:
             params["years"] = years
         if group:
             params["group"] = group
+        if metric:
+            params["metric"] = metric
         return self._get_card("/api/card/element", params)
 
     def get_card_entities(self) -> dict[str, Any]:

@@ -57,6 +57,9 @@ const TEXTS = {
     elementsNone: 'In der Zeitarchiv-App ist noch kein Baustein eingerichtet.',
     elementsOutdated: 'Die Integration kennt diesen Baustein nicht. Bitte die Integration aktualisieren.',
     elementAdminOnly: 'Dashboard-Bausteine sehen nur Administratoren.',
+    element_metric: 'Kennzahl', element_band: 'Spanne der Jahre anzeigen',
+    metric_temperature: 'Temperatur', metric_precip: 'Niederschlag', metric_sun: 'Sonnenstunden',
+    metric_avg: 'Temperatur Ø', metric_max: 'Temperatur Max', metric_min: 'Temperatur Min',
     element_role: 'Wert', element_years: 'Jahre', element_group: 'Gruppe',
     group_basis: 'Übersicht', group_wind: 'Wind und Sonne', group_klima: 'Temperatur und Klima',
     role_erzeugung: 'Erzeugung', role_einspeisung: 'Einspeisung', role_netzbezug: 'Netzbezug', role_verbrauch: 'Verbrauch',
@@ -126,6 +129,9 @@ const TEXTS = {
     elementsNone: 'No element is set up in the Zeitarchiv app yet.',
     elementsOutdated: 'The integration does not know this element. Please update the integration.',
     elementAdminOnly: 'Dashboard elements are visible to administrators only.',
+    element_metric: 'Measure', element_band: 'Show range of years',
+    metric_temperature: 'Temperature', metric_precip: 'Precipitation', metric_sun: 'Sunshine hours',
+    metric_avg: 'Temperature avg.', metric_max: 'Temperature max.', metric_min: 'Temperature min.',
     element_role: 'Value', element_years: 'Years', element_group: 'Group',
     group_basis: 'Overview', group_wind: 'Wind and sun', group_klima: 'Temperature and climate',
     role_erzeugung: 'Generation', role_einspeisung: 'Feed-in', role_netzbezug: 'Grid import', role_verbrauch: 'Consumption',
@@ -195,15 +201,15 @@ const fetchText = async (name) => {
 
 const loadSources = () => {
   sourcesPromise ||= (async () => {
-    const [echartsSource, render, numberFormat, tooltipHold, serverTime, htmlEscape, stateEntities, tableCompute, tableRender, elementTableRender, legendRender, tableCss, catalog] = await Promise.all([
+    const [echartsSource, render, numberFormat, tooltipHold, serverTime, htmlEscape, stateEntities, tableCompute, tableRender, elementTableRender, elementChartRender, legendRender, tableCss, catalog] = await Promise.all([
       fetchText('echarts.min.js'), fetchText('chart-tile-render.js'), fetchText('number-format.js'),
       fetchText('tooltip-hold.js'), fetchText('server-time.js'), fetchText('html-escape.js'),
-      fetchText('state-entities.js'), fetchText('table-compute.js'), fetchText('table-tile-render.js'), fetchText('element-table-render.js'), fetchText('legend-render.js'),
+      fetchText('state-entities.js'), fetchText('table-compute.js'), fetchText('table-tile-render.js'), fetchText('element-table-render.js'), fetchText('element-chart-render.js'), fetchText('legend-render.js'),
       fetchText('table.css'), fetchText('catalog.json'),
     ]);
     const module = {exports: {}};
     new Function('module', 'exports', `${echartsSource}\n//# sourceURL=zeitarchiv/echarts.min.js`).call(module.exports, module, module.exports);
-    return {echarts: module.exports, render, numberFormat, tooltipHold, serverTime, htmlEscape, stateEntities, tableCompute, tableRender, elementTableRender, legendRender, tableCss, catalog: JSON.parse(catalog)};
+    return {echarts: module.exports, render, numberFormat, tooltipHold, serverTime, htmlEscape, stateEntities, tableCompute, tableRender, elementTableRender, elementChartRender, legendRender, tableCss, catalog: JSON.parse(catalog)};
   })().catch((err) => { sourcesPromise = null; throw err; });
   return sourcesPromise;
 };
@@ -267,7 +273,12 @@ const buildRuntime = (sources, {timezone, language, dark}) => {
     `${sources.legendRender}\nreturn window.LegendRender;`,
     ['window', 't', 'escapeHtml', 'NumberFormat'], [win, t, win.escapeHtml, win.NumberFormat], 'legend-render.js',
   );
-  return {render, setVars: (map) => Object.assign(vars, map), tables: {TableCompute: win.TableCompute, TableTileRender}, ElementTableRender, LegendRender};
+  // Diagramme der Bausteine: liefern nur die ECharts-Optionen; Instanz und Farben stellt die Karte.
+  const ElementChartRender = evaluate(
+    `${sources.elementChartRender}\nreturn window.ElementChartRender;`,
+    ['window', 't', 'escapeHtml', 'NumberFormat'], [win, t, win.escapeHtml, win.NumberFormat], 'element-chart-render.js',
+  );
+  return {render, setVars: (map) => Object.assign(vars, map), tables: {TableCompute: win.TableCompute, TableTileRender}, ElementTableRender, ElementChartRender, LegendRender};
 };
 
 const runtimeFor = async (settings) => {
@@ -545,6 +556,7 @@ class ZeitarchivCard extends HTMLElement {
       if (config.vorjahr === false) request.vorjahr = false;
       if (config.role) request.role = config.role;
       if (config.group) request.group = config.group;
+      if (config.metric) request.metric = config.metric;
       if (config.years != null) request.years = Number(config.years);
       return request;
     }
@@ -857,6 +869,7 @@ class ZeitarchivCard extends HTMLElement {
       throw err;
     }
     if (!this.isConnected) return;
+    if (result.kind === 'chart') { this._drawElementChart(result, runtime); return; }
     // Die Farben der Matrix sind CSS-Ausdrücke: sie stehen in style="…" und lösen sich im Thema von Home Assistant auf.
     const colors = {good: 'var(--success-color, #43a047)', bad: 'var(--error-color, #db4437)', base: 'var(--secondary-background-color, #f5f5f5)'};
     const draw = {
@@ -873,6 +886,46 @@ class ZeitarchivCard extends HTMLElement {
     this._els.table.style.maxHeight = this._explicitHeight ? `${Math.max(120, Number(this._config.height) || 260)}px` : '';
     this._els.table.innerHTML = draw(runtime.ElementTableRender);
     this._applyAction();
+    this._shown = true;
+  }
+
+  // Diagramm-Baustein: die App liefert die Zahlen, element-chart-render.js die ECharts-Optionen (dieselben wie im Dashboard).
+  _drawElementChart(result, runtime) {
+    const make = {
+      'energie.monatsvergleich': (R, colors, extra) => R.energyMonthly(result.months, result.months.roles[0], {colors, ...extra}),
+      'wetter.monatsvergleich': (R, colors, extra) => R.weatherMonthly(result.monthly, {colors, ...extra}),
+      'wetter.matrix': (R, colors, extra) => R.weatherMatrix(result.matrix, {colors, ...extra}),
+    }[result.renderer];
+    if (!make) { this._showNote('elementsOutdated'); return; }
+    const vars = this._themeVars();
+    runtime.setVars(vars);
+    const palette = this._hass.themes?.darkMode ? PALETTES.dark : PALETTES.light;
+    // ECharts versteht kein color-mix(): die Töne der Sonnenklassen werden hier gemischt.
+    const mix = (a, b, share) => {
+      const parse = (value) => {
+        const hex = /^#([0-9a-f]{6})$/i.exec(String(value).trim());
+        if (hex) return [0, 2, 4].map((i) => parseInt(hex[1].slice(i, i + 2), 16));
+        const rgb = /rgba?\(([^)]+)\)/.exec(String(value));
+        return rgb ? rgb[1].split(',').slice(0, 3).map((n) => Number(n)) : [255, 255, 255];
+      };
+      const [x, y] = [parse(a), parse(b)];
+      return `rgb(${x.map((v, i) => Math.round(v * share + y[i] * (1 - share))).join(',')})`;
+    };
+    const colors = {
+      cur: palette[0], prev: palette[1], cold: palette[2], text: vars['--ink-faint'], faint: vars['--ink-faint'], grid: vars['--border'],
+      ink: vars['--ink'], surface: vars['--surface'],
+      sun: mix(palette[6], vars['--surface'], 0.7), sunSoft: mix(palette[6], vars['--surface'], 0.3), overcast: mix(vars['--ink-faint'], vars['--surface'], 0.4),
+    };
+    this._els.note.hidden = true;
+    this._els.table.hidden = true;
+    this._els.legend.hidden = true;
+    this._els.chart.hidden = false;
+    if (!this._chart) this._chart = runtime.echarts.init(this._els.chart);
+    const option = make(runtime.ElementChartRender, colors, {band: this._config.band !== false, narrow: this._els.chart.clientWidth < 520});
+    this._chart.setOption(option, true);
+    this._els.chart.setAttribute('aria-label', `${this._config.title || result.title || ''}`);
+    this._applyAction();
+    this._chart.resize();
     this._shown = true;
   }
 
@@ -998,6 +1051,10 @@ class ZeitarchivCardEditor extends HTMLElement {
           select('years', ['5', '10', '0'].map((value) => ({value, label: label(`years_${value}`)}))),
         );
       }
+      if (chosen && chosen.metrics && chosen.metrics.length) {
+        schema.push(select('metric', chosen.metrics.map((value) => ({value, label: label(`metric_${value}`)}))));
+      }
+      if (chosen && chosen.kind === 'chart') schema.push({name: 'band', selector: {boolean: {}}});
       if (chosen && chosen.groups && chosen.groups.length) {
         schema.push(select('group', chosen.groups.map((value) => ({value, label: label(`group_${value}`)}))));
       }
@@ -1054,6 +1111,8 @@ class ZeitarchivCardEditor extends HTMLElement {
       data.vorjahr = data.vorjahr !== false;
       data.diff = data.diff !== false;
       if (chosen?.groups?.length) data.group = data.group || chosen.groups[0];
+      if (chosen?.metrics?.length) data.metric = data.metric || chosen.metrics[0];
+      if (chosen?.kind === 'chart') data.band = data.band !== false;
       if (chosen?.roles?.length) {
         data.role = data.role || chosen.roles[0];
         data.years = String(data.years ?? 10);
@@ -1070,7 +1129,7 @@ class ZeitarchivCardEditor extends HTMLElement {
       this._source = source;
       delete next.chart_id; delete next.table_id; delete next.entities; delete next.period; delete next.style; delete next.legend;
       delete next.legend_style; delete next.legend_metrics;
-      delete next.element; delete next.columns; delete next.vorjahr; delete next.diff; delete next.role; delete next.years; delete next.group;
+      delete next.element; delete next.columns; delete next.vorjahr; delete next.diff; delete next.role; delete next.years; delete next.group; delete next.metric; delete next.band;
       if (source === 'entities') this._loadEntities();
       if (source === 'element') this._loadElements();
     }
@@ -1088,7 +1147,7 @@ class ZeitarchivCardEditor extends HTMLElement {
     if (!Array.isArray(next.legend_metrics) || !next.legend_metrics.length || next.legend === false || ['table', 'element'].includes(this._source)) delete next.legend_metrics;
     if (this._source !== 'chart') delete next.chart_id;
     if (this._source !== 'table') delete next.table_id;
-    if (this._source !== 'element') for (const key of ['element', 'columns', 'vorjahr', 'diff', 'role', 'years', 'group']) delete next[key];
+    if (this._source !== 'element') for (const key of ['element', 'columns', 'vorjahr', 'diff', 'role', 'years', 'group', 'metric', 'band']) delete next[key];
     else {
       // Vorgaben nicht in die YAML schreiben: alle Spalten, mit Vorjahr, mit Differenz.
       const all = (this._elements || []).find((item) => item.key === next.element)?.columns || [];
@@ -1101,6 +1160,9 @@ class ZeitarchivCardEditor extends HTMLElement {
       if (!chosenRoles.length || next.years === 10) delete next.years;
       const chosenGroups = (this._elements || []).find((item) => item.key === next.element)?.groups || [];
       if (!chosenGroups.length || next.group === chosenGroups[0]) delete next.group;
+      const chosenMetrics = (this._elements || []).find((item) => item.key === next.element)?.metrics || [];
+      if (!chosenMetrics.length || next.metric === chosenMetrics[0]) delete next.metric;
+      if (next.band !== false) delete next.band;
     }
     this._config = {...next, type: 'custom:zeitarchiv-card'};
     this.dispatchEvent(new CustomEvent('config-changed', {detail: {config: this._config}, bubbles: true, composed: true}));
