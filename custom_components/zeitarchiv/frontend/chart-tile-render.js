@@ -995,13 +995,18 @@
         // undefined min/max — "Dynamische Y-Achse" hätte sonst keine
         // sichtbare Wirkung.
         scale: isPercentAxis ? false : axisDynamic,
+        // Einheit am Achsennamen (oben an der Achse) wie auf der Chart-Seite — die Beschriftung bleibt kurz, damit
+        // der Rand der kleinen Kachel nicht wächst.
+        name: isPercentAxis ? '%' : (isDuration ? '' : (u || '')),
+        nameLocation: 'end',
+        nameTextStyle: {fontSize: scaledFont(10), color: inkFaint, align: i % 2 === 0 ? 'left' : 'right'},
         axisLabel: {
           fontSize: scaledFont(10), color: inkFaint,
           formatter: v => isPercentAxis ? `${fmtCompactNumber(v, 0)} %` : (isDuration ? NumberFormat.fmtDuration(v) : fmtCompactNumber(v, decimals)),
         },
         axisLine: {show: false},
         axisTick: {show: false},
-        splitLine: {lineStyle: {color: borderColor, type: 'dashed'}},
+        splitLine: {show: i === 0, lineStyle: {color: borderColor, type: 'dashed'}},
       };
     });
     // "Ausrichtung: Horizontal" tauscht Kategorie- und Werte-Achse — dasselbe
@@ -1307,7 +1312,10 @@
       grid: {
         left: 6,
         right: showValues && horizontalActive ? 36 : 6,
-        top: showValues && !horizontalActive && !stackedActive ? 10 + scaledFont(10) + 6 : 10,
+        // Mit Einheit am Achsennamen braucht der Kopf Platz für diese Zeile (bei "Werte anzeigen" teilen sie sich ihn).
+        top: Math.max(
+          showValues && !horizontalActive && !stackedActive ? 10 + scaledFont(10) + 6 : 10,
+          yAxis.some(a => a.name) && !horizontalActive ? 10 + scaledFont(10) + 4 : 10),
         bottom: 20,
         containLabel: true,
       },
