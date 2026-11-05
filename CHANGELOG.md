@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased
+
+### Neu
+
+- **Karte: Legende mit Werten**: Die Karte zeigt unter dem Chart wie die
+  Dashboard-Kachel der App Chips oder eine Tabelle mit Aktuell, Min, Max,
+  Durchschnitt und Summe. Ein Klick auf einen Eintrag blendet die Serie ein oder
+  aus.
+  - Im Karten-Editor lassen sich Stil und Kennzahlen unter „Legende anzeigen“
+    wählen; leer heißt wie im Chart
+  - Auf einer schmalen Karte zeigt „Wie im Chart“ Chips statt einer Tabelle
+  - Die Legende mit Werten braucht die aktuelle App; mit einer älteren bleibt es
+    bei der Legende mit Namen
+
+---
+
+### English
+
+#### New
+
+- **Card: legend with values**: Below the chart, the card shows chips or a table
+  with current, min, max, average and total, like the dashboard tile in the app.
+  Clicking an entry shows or hides the series.
+  - In the card editor, style and values can be chosen under "Show legend"; empty
+    means as in the chart
+  - On a narrow card, "As in the chart" shows chips instead of a table
+  - The legend with values needs the current app; with an older one, the legend
+    with names stays
+
 ## 1.3.3 - 2026-11-03
 
 ### Behoben
