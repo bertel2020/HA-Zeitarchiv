@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.4.1 - 2026-11-05
 
 ### Geändert
 
@@ -23,6 +23,9 @@
 
 ### Behoben
 
+- **Karte: Legende bei einer einzelnen Serie**: „Legende anzeigen“ wirkt jetzt
+  auch bei einem Chart mit nur einer Entität. Ohne Angabe bleibt es wie bisher
+  ohne Legende
 - **Karte: Legende mit Werten bei einem Chart**: Die Chips standen ohne Abstände
   und Rahmen hintereinander („WirkleistungAktuell 574,8 WMin …“), wenn die Karte
   nur ein Chart zeigte. Jetzt sehen sie aus wie auf der Kachel der App
@@ -51,26 +54,11 @@
 
 #### Fixed
 
+- **Card: legend with a single series**: "Show legend" now also works on a chart
+  with only one entity. Without a setting it stays as before, without a legend
 - **Card: legend with values on a chart**: The chips ran together without
   spacing or borders ("WirkleistungAktuell 574,8 WMin …") when the card showed
   only a chart. They now look like on the tile in the app
-
-## 1.4.1 - 2026-11-05
-
-### Behoben
-
-- **Karte: Legende bei einer einzelnen Serie**: „Legende anzeigen“ wirkt jetzt
-  auch bei einem Chart mit nur einer Entität. Ohne Angabe bleibt es wie bisher
-  ohne Legende
-
----
-
-### English
-
-#### Fixed
-
-- **Card: legend with a single series**: "Show legend" now also works on a chart
-  with only one entity. Without a setting it stays as before, without a legend
 
 ## 1.4.0 - 2026-11-05
 
