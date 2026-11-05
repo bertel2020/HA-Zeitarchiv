@@ -9,7 +9,8 @@
   statt „columns“, „vorjahr“ und „diff“
   - Kurze Hinweise erklären, was Vorjahr, Differenz, Perioden zurück und die
     Datumsauswahl der Energie bewirken
-  - Der Titel nennt als Vorgabe den Namen des Bausteins
+  - Der Titel nennt als Vorgabe den Namen des Bausteins, bei einer Tabelle den
+    der Tabelle
   - Aktualisierung, Höhe und Tippen stehen unter „Weitere Einstellungen“
     eingeklappt, bei allen Quellen der Karte; Aktualisierung und Höhe nennen
     ihren Standard, wenn das Feld leer ist
@@ -25,7 +26,7 @@
   instead of "columns", "vorjahr" and "diff"
   - Short hints explain what previous year, difference, periods back and the
     date selection of the energy dashboard do
-  - The title names the element as its default
+  - The title names the element as its default, for a table the table
   - Refresh, height and tap action sit collapsed under "More settings", for all
     sources of the card; refresh and height name their default when the field is
     empty

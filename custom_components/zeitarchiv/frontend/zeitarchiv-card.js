@@ -89,6 +89,7 @@ const TEXTS = {
     style_percent: 'Anteile in Prozent',
     title: 'Titel (leer: Name des Charts)',
     title_element: 'Titel (leer: Name des Bausteins)',
+    title_table: 'Titel (leer: Name der Tabelle)',
     moreSettings: 'Weitere Einstellungen',
     help_vorjahr: 'Zeigt zu jeder Spalte daneben den Wert des Vorjahres.',
     help_diff: 'Zeigt unter dem Wert die Veränderung zum Vorjahr. Braucht „Mit Vorjahr vergleichen“.',
@@ -173,6 +174,7 @@ const TEXTS = {
     style_percent: 'Shares in percent',
     title: 'Title (empty: chart name)',
     title_element: 'Title (empty: element name)',
+    title_table: 'Title (empty: table name)',
     moreSettings: 'More settings',
     help_vorjahr: 'Shows the value of the previous year next to each column.',
     help_diff: 'Shows the change from the previous year below the value. Needs "Compare with last year".',
@@ -1356,8 +1358,8 @@ class ZeitarchivCardEditor extends HTMLElement {
   _fieldLabel(schema) {
     const name = schema.name;
     if (!name) return undefined;
+    if (name === 'title' && (this._source === 'element' || this._source === 'table')) return text(this._hass, `title_${this._source}`);
     if (this._source === 'element') {
-      if (name === 'title') return text(this._hass, 'title_element');
       if (name === 'follow_energy_date') return text(this._hass, 'element_follow');
       if (ELEMENT_FIELDS.has(name)) return text(this._hass, `element_${name}`);
     }
