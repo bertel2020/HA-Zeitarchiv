@@ -650,8 +650,8 @@ async def test_elements_are_passed_on_with_their_fixed_words(
     assert (await _call(client, {"type": "zeitarchiv/card/elements"}))["result"] == ELEMENTS
     response = await _call(client, {"type": "zeitarchiv/card/element", "key": "energie.zeitraeume", "columns": ["monat", "jahr"], "vorjahr": False, "mode": "komplett"})
     assert response["success"] is True and response["result"] == ELEMENT
-    element_client.get_card_element.assert_called_once_with("energie.zeitraeume", ["monat", "jahr"], False, "komplett", None, None, None, None, None, None, None, None, None, None)
-    for bad in ({}, {"key": "../x"}, {"key": "a.b", "columns": ["woche"]}, {"key": "a.b", "mode": "x"}, {"key": "a.b", "at": "gestern"}, {"key": "a.b", "role": "gas"}, {"key": "a.b", "years": 99}, {"key": "a.b", "years": -1}, {"key": "a.b", "group": "x"}, {"key": "a.b", "metric": "x"}, {"key": "a.b", "range": "decade"}, {"key": "a.b", "offset": 1}, {"key": "a.b", "offset": -61}, {"key": "a.b", "side": "x"}, {"key": "a.b", "values": ["A B"]}, {"key": "a.b", "values": ["a"] * 9}, {"key": "a.b", "sparkline": "ja"}):
+    element_client.get_card_element.assert_called_once_with("energie.zeitraeume", ["monat", "jahr"], False, "komplett", None, None, None, None, None, None, None, None, None, None, None)
+    for bad in ({}, {"key": "../x"}, {"key": "a.b", "columns": ["woche"]}, {"key": "a.b", "mode": "x"}, {"key": "a.b", "at": "gestern"}, {"key": "a.b", "role": "gas"}, {"key": "a.b", "years": 99}, {"key": "a.b", "years": -1}, {"key": "a.b", "group": "x"}, {"key": "a.b", "metric": "x"}, {"key": "a.b", "range": "decade"}, {"key": "a.b", "offset": 1}, {"key": "a.b", "offset": -61}, {"key": "a.b", "side": "x"}, {"key": "a.b", "values": ["A B"]}, {"key": "a.b", "values": ["a"] * 9}, {"key": "a.b", "sparkline": "ja"}, {"key": "a.b", "limit": 0}, {"key": "a.b", "limit": 21}):
         assert (await _call(client, {"type": "zeitarchiv/card/element", **bad}))["error"]["code"] == "invalid_format"
     assert element_client.get_card_element.call_count == 1
 
@@ -680,7 +680,7 @@ async def test_a_matrix_element_passes_the_role_and_the_years_on(
 ) -> None:
     admin = await hass_ws_client(hass)
     await _call(admin, {"type": "zeitarchiv/card/element", "key": "energie.matrix", "role": "netzbezug", "years": 5})
-    element_client.get_card_element.assert_called_once_with("energie.matrix", None, True, "bis_jetzt", None, "netzbezug", 5, None, None, None, None, None, None, None)
+    element_client.get_card_element.assert_called_once_with("energie.matrix", None, True, "bis_jetzt", None, "netzbezug", 5, None, None, None, None, None, None, None, None)
 
 
 async def test_a_weather_table_passes_the_group_on(
@@ -688,7 +688,7 @@ async def test_a_weather_table_passes_the_group_on(
 ) -> None:
     admin = await hass_ws_client(hass)
     await _call(admin, {"type": "zeitarchiv/card/element", "key": "wetter.zeitraeume", "columns": ["heute", "jahr"], "group": "wind"})
-    element_client.get_card_element.assert_called_once_with("wetter.zeitraeume", ["heute", "jahr"], True, "bis_jetzt", None, None, None, "wind", None, None, None, None, None, None)
+    element_client.get_card_element.assert_called_once_with("wetter.zeitraeume", ["heute", "jahr"], True, "bis_jetzt", None, None, None, "wind", None, None, None, None, None, None, None)
 
 
 async def test_a_weather_monthly_comparison_passes_the_metric_on(
@@ -696,7 +696,7 @@ async def test_a_weather_monthly_comparison_passes_the_metric_on(
 ) -> None:
     admin = await hass_ws_client(hass)
     await _call(admin, {"type": "zeitarchiv/card/element", "key": "wetter.monatsvergleich", "metric": "precip"})
-    element_client.get_card_element.assert_called_once_with("wetter.monatsvergleich", None, True, "bis_jetzt", None, None, None, None, "precip", None, None, None, None, None)
+    element_client.get_card_element.assert_called_once_with("wetter.monatsvergleich", None, True, "bis_jetzt", None, None, None, None, "precip", None, None, None, None, None, None)
 
 
 async def test_a_period_element_passes_range_offset_and_side_on(
@@ -704,7 +704,7 @@ async def test_a_period_element_passes_range_offset_and_side_on(
 ) -> None:
     admin = await hass_ws_client(hass)
     await _call(admin, {"type": "zeitarchiv/card/element", "key": "energie.anteile", "range": "year", "offset": -1, "side": "versorgung"})
-    element_client.get_card_element.assert_called_once_with("energie.anteile", None, True, "bis_jetzt", None, None, None, None, None, "year", -1, "versorgung", None, None)
+    element_client.get_card_element.assert_called_once_with("energie.anteile", None, True, "bis_jetzt", None, None, None, None, None, "year", -1, "versorgung", None, None, None)
 
 
 async def test_key_figures_pass_their_values_and_the_sparkline_flag_on(
@@ -713,5 +713,15 @@ async def test_key_figures_pass_their_values_and_the_sparkline_flag_on(
     admin = await hass_ws_client(hass)
     await _call(admin, {"type": "zeitarchiv/card/element", "key": "energie.kennzahlen", "values": ["erzeugung", "netzbezug"], "sparkline": False})
     element_client.get_card_element.assert_called_once_with(
-        "energie.kennzahlen", None, True, "bis_jetzt", None, None, None, None, None, None, None, None, ["erzeugung", "netzbezug"], False,
+        "energie.kennzahlen", None, True, "bis_jetzt", None, None, None, None, None, None, None, None, ["erzeugung", "netzbezug"], False, None,
+    )
+
+
+async def test_the_number_of_rows_of_the_changes_is_passed_on(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, element_client: MagicMock, loaded_entry: MockConfigEntry
+) -> None:
+    admin = await hass_ws_client(hass)
+    await _call(admin, {"type": "zeitarchiv/card/element", "key": "energie.veraenderungen", "mode": "komplett", "limit": 5})
+    element_client.get_card_element.assert_called_once_with(
+        "energie.veraenderungen", None, True, "komplett", None, None, None, None, None, None, None, None, None, None, 5,
     )

@@ -67,6 +67,7 @@ const TEXTS = {
     group_basis: 'Übersicht', group_wind: 'Wind und Sonne', group_klima: 'Temperatur und Klima',
     role_erzeugung: 'Erzeugung', role_einspeisung: 'Einspeisung', role_netzbezug: 'Netzbezug', role_verbrauch: 'Verbrauch',
     years_5: 'Letzte 5', years_10: 'Letzte 10', years_0: 'Alle',
+    element_mode: 'Zählung', mode_bis_jetzt: 'Bis heute', mode_komplett: 'Ganze Zeiträume', element_limit: 'Anzahl',
     chart_id: 'Chart aus dem Zeitarchiv',
     entities: 'Entitäten (nur archivierte)',
     period: 'Zeitraum',
@@ -142,6 +143,7 @@ const TEXTS = {
     group_basis: 'Overview', group_wind: 'Wind and sun', group_klima: 'Temperature and climate',
     role_erzeugung: 'Generation', role_einspeisung: 'Feed-in', role_netzbezug: 'Grid import', role_verbrauch: 'Consumption',
     years_5: 'Last 5', years_10: 'Last 10', years_0: 'All',
+    element_mode: 'Counting', mode_bis_jetzt: 'Until today', mode_komplett: 'Complete periods', element_limit: 'Number',
     chart_id: 'Chart from Zeitarchiv',
     entities: 'Entities (archived only)',
     period: 'Period',
@@ -592,6 +594,8 @@ class ZeitarchivCard extends HTMLElement {
       const energy = config.follow_energy_date ? this._energyPeriod() : null;
       if (energy) { request.range = energy.range; request.offset = energy.offset; }
       if (config.years != null) request.years = Number(config.years);
+      if (config.mode === 'komplett') request.mode = 'komplett';
+      if (config.limit != null) request.limit = Number(config.limit);
       return request;
     }
     if (config.table_id && !config.chart_id) return {type: 'zeitarchiv/card/table', table_id: config.table_id};
@@ -954,6 +958,8 @@ class ZeitarchivCard extends HTMLElement {
       'energie.zeitraeume': (R) => `<table class="dt wt-table">${R.energyComparison(result.table, this._config.diff !== false)}</table>`,
       'wetter.zeitraeume': (R) => `<table class="dt wt-table">${R.weatherComparison(result.table, result.group || 'basis', this._config.diff !== false)}</table>`,
       'energie.matrix': (R) => `<table class="dt wt-tm">${R.energyMatrix(result.months, result.months.roles[0], {colors, href: () => ''})}</table>`,
+      'energie.kenntage': (R) => R.energyKenntageBlock(result.kenntage, result.ytd),
+      'energie.veraenderungen': (R) => R.energyChangesBlock(result.changes),
     }[result.renderer];
     if (!draw) { this._showNote('elementsOutdated'); return; }
     if (this._els.tableCss.textContent !== runtime.tableCss) this._els.tableCss.textContent = runtime.tableCss;
@@ -973,6 +979,7 @@ class ZeitarchivCard extends HTMLElement {
     const html = {
       'energie.kennzahlen': () => R.energyKpis(result.items, {compareLabel: result.compare_label}),
       'wetter.kennzahlen': () => R.weatherKpis(result.tiles),
+      'energie.rekorde': () => R.energyRecords(result),
     }[result.renderer];
     if (!html) { this._showNote('elementsOutdated'); return; }
     this._els.note.hidden = true;
@@ -1148,11 +1155,13 @@ class ZeitarchivCardEditor extends HTMLElement {
       schema.push({...select('element', options), required: true});
       const chosen = listed.find((item) => item.key === current);
       if (chosen && chosen.roles && chosen.roles.length) {
-        schema.push(
-          select('role', chosen.roles.map((value) => ({value, label: label(`role_${value}`)}))),
-          select('years', ['5', '10', '0'].map((value) => ({value, label: label(`years_${value}`)}))),
-        );
+        schema.push(select('role', chosen.roles.map((value) => ({value, label: label(`role_${value}`)}))));
       }
+      if (chosen && ((chosen.roles && chosen.roles.length) || chosen.year_limit)) {
+        schema.push(select('years', ['5', '10', '0'].map((value) => ({value, label: label(`years_${value}`)}))));
+      }
+      if (chosen && chosen.modes) schema.push(select('mode', ['bis_jetzt', 'komplett'].map((value) => ({value, label: label(`mode_${value}`)}))));
+      if (chosen && chosen.limit) schema.push({name: 'limit', selector: {number: {min: 1, max: 20, step: 1, mode: 'box'}}});
       if (chosen && chosen.metrics && chosen.metrics.length) {
         schema.push(select('metric', chosen.metrics.map((value) => ({value, label: label(`metric_${value}`)}))));
       }
@@ -1239,10 +1248,10 @@ class ZeitarchivCardEditor extends HTMLElement {
         data.follow_energy_date = Boolean(data.follow_energy_date);
       }
       if (chosen && /monatsvergleich$/.test(chosen.key)) data.band = data.band !== false;
-      if (chosen?.roles?.length) {
-        data.role = data.role || chosen.roles[0];
-        data.years = String(data.years ?? 10);
-      }
+      if (chosen?.roles?.length) data.role = data.role || chosen.roles[0];
+      if (chosen?.roles?.length || chosen?.year_limit) data.years = String(data.years ?? 10);
+      if (chosen?.modes) data.mode = data.mode === 'komplett' ? 'komplett' : 'bis_jetzt';
+      if (chosen?.limit) data.limit = Number(data.limit) || 8;
     }
     return data;
   }
@@ -1255,7 +1264,7 @@ class ZeitarchivCardEditor extends HTMLElement {
       this._source = source;
       delete next.chart_id; delete next.table_id; delete next.entities; delete next.period; delete next.style; delete next.legend;
       delete next.legend_style; delete next.legend_metrics;
-      delete next.element; delete next.columns; delete next.vorjahr; delete next.diff; delete next.role; delete next.years; delete next.group; delete next.metric; delete next.band; delete next.side; delete next.offset; delete next.follow_energy_date; delete next.values; delete next.sparkline;
+      delete next.element; delete next.columns; delete next.vorjahr; delete next.diff; delete next.role; delete next.years; delete next.group; delete next.metric; delete next.band; delete next.side; delete next.offset; delete next.follow_energy_date; delete next.values; delete next.sparkline; delete next.mode; delete next.limit;
       if (source === 'entities') this._loadEntities();
       if (source === 'element') this._loadElements();
     }
@@ -1273,7 +1282,7 @@ class ZeitarchivCardEditor extends HTMLElement {
     if (!Array.isArray(next.legend_metrics) || !next.legend_metrics.length || next.legend === false || ['table', 'element'].includes(this._source)) delete next.legend_metrics;
     if (this._source !== 'chart') delete next.chart_id;
     if (this._source !== 'table') delete next.table_id;
-    if (this._source !== 'element') for (const key of ['element', 'columns', 'vorjahr', 'diff', 'role', 'years', 'group', 'metric', 'band', 'side', 'offset', 'follow_energy_date', 'values', 'sparkline']) delete next[key];
+    if (this._source !== 'element') for (const key of ['element', 'columns', 'vorjahr', 'diff', 'role', 'years', 'group', 'metric', 'band', 'side', 'offset', 'follow_energy_date', 'values', 'sparkline', 'mode', 'limit']) delete next[key];
     else {
       // Vorgaben nicht in die YAML schreiben: alle Spalten, mit Vorjahr, mit Differenz.
       const all = (this._elements || []).find((item) => item.key === next.element)?.columns || [];
@@ -1283,7 +1292,10 @@ class ZeitarchivCardEditor extends HTMLElement {
       const chosenRoles = (this._elements || []).find((item) => item.key === next.element)?.roles || [];
       if (next.years !== undefined && next.years !== '') next.years = Number(next.years); else delete next.years;
       if (!chosenRoles.length || next.role === chosenRoles[0]) delete next.role;
-      if (!chosenRoles.length || next.years === 10) delete next.years;
+      const chosenForYears = (this._elements || []).find((item) => item.key === next.element);
+      if (!(chosenRoles.length || chosenForYears?.year_limit) || next.years === 10) delete next.years;
+      if (!chosenForYears?.modes || next.mode !== 'komplett') delete next.mode;
+      if (!chosenForYears?.limit || Number(next.limit) === 8 || !Number(next.limit)) delete next.limit; else next.limit = Math.max(1, Math.min(20, Math.round(Number(next.limit))));
       const chosenGroups = (this._elements || []).find((item) => item.key === next.element)?.groups || [];
       if (!chosenGroups.length || next.group === chosenGroups[0]) delete next.group;
       const chosenMetrics = (this._elements || []).find((item) => item.key === next.element)?.metrics || [];

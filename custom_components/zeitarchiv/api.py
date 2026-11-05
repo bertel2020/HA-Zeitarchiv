@@ -42,6 +42,7 @@ CARD_ELEMENT_RANGES = ("day", "week", "month", "year")
 CARD_ELEMENT_SIDES = ("verbrauch", "versorgung")
 CARD_ELEMENT_MAX_OFFSET = 60
 CARD_ELEMENT_MAX_VALUES = 8
+CARD_ELEMENT_MAX_LIMIT = 20
 _ELEMENT_VALUE = re.compile(r"^[a-z0-9_:]{1,40}$")
 CARD_ELEMENT_METRICS = ("temperature", "precip", "sun", "avg", "max", "min")
 _ELEMENT_KEY = re.compile(r"^[a-z]+\.[a-z_]+$")
@@ -309,7 +310,7 @@ class ZeitarchivClient:
         self, key: str, columns: list[str] | None = None, vorjahr: bool = True, mode: str = "bis_jetzt", at: str | None = None,
         role: str | None = None, years: int | None = None, group: str | None = None,
         metric: str | None = None, range_key: str | None = None, offset: int | None = None, side: str | None = None,
-        values: list[str] | None = None, sparkline: bool | None = None,
+        values: list[str] | None = None, sparkline: bool | None = None, limit: int | None = None,
     ) -> dict[str, Any]:
         """Ein Dashboard-Baustein mit seinen Zahlen (GET /api/card/element). Nimmt nur einen Schlüssel der Form
         "gruppe.name" und feste Wörter an, sonst ValueError; nie freien Text."""
@@ -338,6 +339,8 @@ class ZeitarchivClient:
             raise ValueError("offset")
         if years is not None and (not isinstance(years, int) or isinstance(years, bool) or not 0 <= years <= CARD_ELEMENT_MAX_YEARS):
             raise ValueError("years")
+        if limit is not None and (not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= CARD_ELEMENT_MAX_LIMIT):
+            raise ValueError("limit")
         params: dict[str, Any] = {"key": key, "vorjahr": "true" if vorjahr else "false", "mode": mode}
         if columns:
             params["columns"] = ",".join(columns)
@@ -361,6 +364,8 @@ class ZeitarchivClient:
             params["values"] = ",".join(values)
         if sparkline is not None:
             params["sparkline"] = "true" if sparkline else "false"
+        if limit is not None:
+            params["limit"] = limit
         return self._get_card("/api/card/element", params)
 
     def get_card_entities(self) -> dict[str, Any]:

@@ -368,9 +368,109 @@
     return html + '</tbody>';
   }
 
+  // ---- Kenntage je Jahr und „Was hat sich verändert?“ (Energie, Langzeit) -------------------------
+  // Kenntage: Beschriftung, Regel und die Zeile je Jahr. Die Schwellen kommen aus dem Setup der App.
+  const KENNTAG_GROUPS = () => ({eigenversorgung: t('Eigenversorgung'), erzeugung: t('Erzeugung'), speicher: t('Speicher')});
+  const KENNTAG_LABELS = () => ({
+    fast_autark: t('Fast autark'), ueberschuss: t('Überschusstage'), sonnig: t('Sonnentage'), truebe: t('Trübe Tage'),
+    speicher_stark: t('Speicher stark genutzt'), speicher_schwach: t('Speicher kaum genutzt'),
+  });
+
+  const KENNTAG_RULES = {
+    fast_autark: (th) => t('Autarkie ab {value} %', {value: num(th.autark, 0)}),
+    ueberschuss: () => t('mehr Einspeisung als Verbrauch'),
+    sonnig: (th) => t('ab {value} kWh je kWp', {value: num(th.sonnig, 1)}),
+    truebe: (th) => t('unter {value} % des Tagesmittels', {value: num(th.truebe, 0)}),
+    speicher_stark: (th) => t('ab {value} % der Kapazität', {value: num(th.speicher_stark, 0)}),
+    speicher_schwach: (th) => t('unter {value} % der Kapazität', {value: num(th.speicher_schwach, 0)}),
+  };
+
+  const kenntagRule = (key, th) => (KENNTAG_RULES[key] || KENNTAG_RULES.speicher_schwach)(th);
+
+  // Ein Feld je Kenntag, darin ein Balken je Jahr (Länge = Anteil an den ausgewerteten Tagen, Maßstab je Feld).
+  // interactive: die Zeilen sind Schaltflächen (Jahreskalender im Dashboard); die Karte zeichnet reine Zeilen.
+  function energyKenntage(kt, {ytd, years, current, interactive}) {
+    const shownYears = years ? kt.years.slice(0, years) : kt.years;
+    const groups = KENNTAG_GROUPS();
+    const labels = KENNTAG_LABELS();
+    const tag = interactive ? 'button type="button"' : 'div';
+    const close = interactive ? 'button' : 'div';
+    let html = '';
+    let lastGroup = null;
+    for (const key of kt.available) {
+      const group = kt.groups[key];
+      if (group !== lastGroup) html += `<div class="wt-kt-group">${escapeHtml(groups[group])}</div>`;
+      lastGroup = group;
+      const rows = shownYears.map((entry) => {
+        const f = entry.fields[key];
+        const days = ytd ? f.days_ytd : f.days;
+        const hit = ytd ? f.hit_ytd : f.hit;
+        return {year: entry.year, days, hit, pct: days ? hit / days * 100 : 0};
+      }).filter((row) => row.days > 0);
+      const top = Math.max(0, ...rows.map((row) => row.pct));
+      html += `<div class="wt-kt-col"><h3 class="wt-kt-title">${escapeHtml(labels[key])}</h3>`
+        + `<p class="wt-kt-rule">${escapeHtml(kenntagRule(key, kt.thresholds))}</p>`;
+      for (const row of rows) {
+        const pct = row.hit > 0 && row.pct < 1 ? '< 1 %' : `${num(row.pct, 0)} %`;
+        const tip = `${t('Ausgewertete Tage')}: ${num(row.days, 0)}`;
+        const data = interactive ? ` data-field="${key}" data-year="${row.year}"` : '';
+        html += `<${tag} class="wt-kt-row"${data} data-tooltip-fixed="${escapeHtml(tip)}">`
+          + `<span class="wt-kt-year">${row.year}${row.year === current ? '*' : ''}</span>`
+          + `<span class="wt-kt-bar"><i style="width:${top > 0 ? (row.pct / top * 100).toFixed(1) : 0}%"></i></span>`
+          + `<span class="wt-kt-val"><b>${escapeHtml(num(row.hit, 0))}</b> ${escapeHtml(t('Tage'))} · ${escapeHtml(pct)}</span></${close}>`;
+      }
+      html += '</div>';
+    }
+    return html;
+  }
+
+  // „Was hat sich verändert?“: Balken nach links (weniger) und rechts (mehr) von der Mitte, rot ist mehr Verbrauch.
+  // links: die Verbraucher werden zu Verweisen auf ihre Entität (nur in der App).
+  function energyChanges(c, {links}) {
+    const peak = Math.max(...c.items.map((item) => Math.abs(item.diff)), 0.0001);
+    return c.items.map((item) => {
+      const more = item.diff > 0;
+      const width = Math.max(1, Math.round(Math.abs(item.diff) / peak * 48));
+      const side = more ? `left:50%;width:${width}%` : `right:50%;width:${width}%`;
+      const color = more ? 'var(--danger)' : 'var(--positive)';
+      const percent = item.percent == null ? '' : ` (${item.percent > 0 ? '+' : '−'}${num(Math.abs(item.percent), 0)} %)`;
+      const text = (more ? '▲ +' : '▼ −') + energy(Math.abs(item.diff)) + percent;
+      const name = links && item.entity_id
+        ? `<a href="entities/${encodeURIComponent(item.entity_id)}">${escapeHtml(item.name)}</a>` : escapeHtml(item.name);
+      return `<div class="wt-chg-row"><span class="wt-chg-name">${name}</span>`
+        + `<div class="wt-chg-bar"><i style="${side};background:${color}"></i></div>`
+        + `<span class="wt-chg-val" style="color:${color}">${escapeHtml(text)}</span></div>`;
+    }).join('');
+  }
+
+  // „01.01. – 05.11.2026 gegen 01.01. – 05.11.2025“
+  function changesRange(c) {
+    return `${rangeText(c.cur.start, c.cur.end)} ${t('gegen')} ${rangeText(c.vj.start, c.vj.end)}`;
+  }
+
+  // Der Zeitraum der Kenntage in einem Satz (ganze Jahre oder alle nur bis zum Kalendertag von heute).
+  function kenntageRange(kt, ytd) {
+    if (!ytd) return t('Ganze Kalenderjahre. Das laufende Jahr (*) zählt bis heute.');
+    const date = fmtDate(formats.dmy, Date.parse(kt.today + 'T12:00:00Z') / 1000);
+    return t('Alle Jahre nur bis {date} gezählt, damit das laufende Jahr (*) vergleichbar ist.', {date});
+  }
+
+  // Der ganze Baustein der Karte: Satz zum Zeitraum darüber, die Felder darunter (ohne Schaltflächen).
+  function energyKenntageBlock(kt, ytd) {
+    return `<div class="kpi-sub">${escapeHtml(kenntageRange(kt, ytd))}</div>`
+      + `<div class="wt-kt">${energyKenntage(kt, {ytd, years: 0, current: new Date().getFullYear(), interactive: false})}</div>`;
+  }
+
+  // Der ganze Baustein der Karte: Zeitraum darüber, die Zeilen darunter; ohne Verbraucher ein Hinweis.
+  function energyChangesBlock(c) {
+    if (!c.items.length) return `<div class="kpi-empty">${escapeHtml(t('Keine Veränderungen zum Vorjahr gefunden.'))}</div>`;
+    return `<div class="kpi-sub">${escapeHtml(changesRange(c))}</div><div class="wt-chg">${energyChanges(c, {links: false})}</div>`;
+  }
+
   window.ElementTableRender = {
     weatherComparison, WIND_KEYS, groupOf, inGroup,
     formats, fmtDate, rangeText, energy, columnName, energyComparison: renderTable,
     monthName, mean, present, monthKey, isPartialStart, monthStats, yearSum, energyMatrix,
+    kenntagRule, kenntagLabels: KENNTAG_LABELS, energyKenntage, energyChanges, changesRange, kenntageRange, energyKenntageBlock, energyChangesBlock,
   };
 })();

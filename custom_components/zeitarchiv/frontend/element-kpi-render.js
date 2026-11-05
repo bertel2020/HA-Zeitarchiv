@@ -108,5 +108,18 @@
     return `<div class="kpi-grid">${html.join('')}</div>`;
   }
 
-  window.ElementKpiRender = {energyKpis, weatherKpis, sparkline};
+  // Rekorde: je ein Kachel mit dem höchsten Tageswert und dem Datum. Sie gibt es erst nach einem Jahr Archiv (enough).
+  function energyRecords(data) {
+    const records = data.records || [];
+    if (!data.enough || !records.length) return `<div class="kpi-empty">${escapeHtml(t('Rekorde erscheinen, sobald ein Jahr Daten vorliegt.'))}</div>`;
+    const {formats, fmtDate} = window.ElementTableRender;
+    const tiles = records.map((record) => {
+      const date = fmtDate(formats.dmy, Date.parse(`${record.date}T12:00:00Z`) / 1000);
+      return tile(record.label, `${escapeHtml(num(record.value, record.value < 100 ? 1 : 0))}${unitHtml(data.unit)}`,
+        `<div class="kpi-sub">${escapeHtml(date)}</div>`, '');
+    });
+    return `<div class="kpi-grid">${tiles.join('')}</div>`;
+  }
+
+  window.ElementKpiRender = {energyKpis, weatherKpis, sparkline, energyRecords};
 })();

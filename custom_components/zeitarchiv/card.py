@@ -45,6 +45,7 @@ from .api import (
     CARD_ELEMENT_GROUPS,
     CARD_ELEMENT_MAX_YEARS,
     CARD_ELEMENT_MAX_OFFSET,
+    CARD_ELEMENT_MAX_LIMIT,
     CARD_ELEMENT_MAX_VALUES,
     CARD_ELEMENT_METRICS,
     CARD_ELEMENT_RANGES,
@@ -465,6 +466,7 @@ async def ws_card_elements(hass: HomeAssistant, connection, msg: dict[str, Any])
         probatio.Optional("values"): probatio.All([probatio.All(str, probatio.Match(_VALUE))], probatio.Length(max=CARD_ELEMENT_MAX_VALUES)),
         probatio.Optional("sparkline"): bool,
         probatio.Optional("years"): probatio.All(int, probatio.Range(min=0, max=CARD_ELEMENT_MAX_YEARS)),
+        probatio.Optional("limit"): probatio.All(int, probatio.Range(min=1, max=CARD_ELEMENT_MAX_LIMIT)),
         probatio.Optional("entry_id"): str,
     }
 )
@@ -475,8 +477,8 @@ async def ws_card_element(hass: HomeAssistant, connection, msg: dict[str, Any]) 
     key, columns, vorjahr, mode, at = msg["key"], msg.get("columns"), msg["vorjahr"], msg["mode"], msg.get("at")
     role, years, group, metric = msg.get("role"), msg.get("years"), msg.get("group"), msg.get("metric")
     range_key, offset, side = msg.get("range"), msg.get("offset"), msg.get("side")
-    values, sparkline = msg.get("values"), msg.get("sparkline")
+    values, sparkline, limit = msg.get("values"), msg.get("sparkline"), msg.get("limit")
     await _fetch(
-        hass, connection, msg, ("element", key, tuple(columns or ()), vorjahr, mode, at, role, years, group, metric, range_key, offset, side, tuple(values or ()), sparkline),
-        lambda client: client.get_card_element(key, columns, vorjahr, mode, at, role, years, group, metric, range_key, offset, side, values, sparkline), capability="card_elements",
+        hass, connection, msg, ("element", key, tuple(columns or ()), vorjahr, mode, at, role, years, group, metric, range_key, offset, side, tuple(values or ()), sparkline, limit),
+        lambda client: client.get_card_element(key, columns, vorjahr, mode, at, role, years, group, metric, range_key, offset, side, values, sparkline, limit), capability="card_elements",
     )

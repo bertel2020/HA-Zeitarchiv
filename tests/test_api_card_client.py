@@ -201,7 +201,8 @@ def test_elements_go_to_fixed_paths_with_a_key_and_known_words() -> None:
      {"key": "energie.matrix", "role": "gas"}, {"key": "energie.matrix", "years": 99}, {"key": "energie.matrix", "years": True}, {"key": "wetter.zeitraeume", "group": "x"}, {"key": "wetter.monatsvergleich", "metric": "x"},
      {"key": "energie.anteile", "range_key": "decade"}, {"key": "energie.anteile", "offset": 1}, {"key": "energie.anteile", "offset": True},
      {"key": "energie.anteile", "offset": -61}, {"key": "energie.anteile", "side": "x"},
-     {"key": "energie.kennzahlen", "values": "erzeugung"}, {"key": "energie.kennzahlen", "values": ["A B"]}, {"key": "energie.kennzahlen", "values": ["a"] * 9}],
+     {"key": "energie.kennzahlen", "values": "erzeugung"}, {"key": "energie.kennzahlen", "values": ["A B"]}, {"key": "energie.kennzahlen", "values": ["a"] * 9},
+     {"key": "energie.veraenderungen", "limit": 0}, {"key": "energie.veraenderungen", "limit": 21}, {"key": "energie.veraenderungen", "limit": True}],
 )
 def test_an_element_never_sends_anything_but_a_key_and_known_words(arguments: dict) -> None:
     client = ZeitarchivClient("h", 1, "t")
@@ -255,3 +256,13 @@ def test_key_figures_send_their_values_and_the_sparkline_flag() -> None:
         client.get_card_element("energie.kennzahlen", values=["erzeugung", "temperature:1"], sparkline=False)
         params = get.call_args.kwargs["params"]
         assert params["values"] == "erzeugung,temperature:1" and params["sparkline"] == "false"
+
+
+def test_the_changes_send_their_number_of_rows() -> None:
+    client = ZeitarchivClient("h", 1, "t")
+    with patch(GET, return_value=_Resp({})) as get:
+        client.get_card_element("energie.veraenderungen", mode="komplett", limit=5)
+        params = get.call_args.kwargs["params"]
+        assert params["limit"] == 5 and params["mode"] == "komplett"
+        client.get_card_element("energie.veraenderungen")
+        assert "limit" not in get.call_args.kwargs["params"]
