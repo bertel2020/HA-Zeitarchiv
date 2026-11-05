@@ -71,7 +71,7 @@ can find the API token there under **Settings → Connection**.
 App and integration are versioned independently; no particular minimum
 version is required — newer features (e.g. the operating mode sensor) are
 simply left unused against an older counterpart instead of disrupting the
-connection. The dashboard card needs app version 1.12.0 or later; with an older
+connection. The dashboard card needs app version 1.12.0 or later, the dashboard elements 1.30.0; with an older
 app it shows “App too old”.
 
 #### 2. Copy the custom integration
@@ -468,6 +468,37 @@ style: stacked       # auto (per entity), stacked, percent (shares in percent)
   changes and heatmap. Tooltips, light and dark theme. The period saved with the chart applies. Saved comparison tables are shown with the same cells, formulas and
   styles as in the tile (source "Saved table", `table_id`).
 - If the app is unreachable, the last image stays and the card shows its age.
+
+### Dashboard elements
+
+With the source **Dashboard element** the card shows ready-made parts of the app's energy and weather dashboards, with
+their figures. Roles, formulas and entities stay set up in the app; an element the app has not set up is missing from
+the choice. This needs app version 1.30.0 (capability "card_elements") and an administrator account.
+
+```yaml
+type: custom:zeitarchiv-card
+element: energie.kennzahlen
+values: [erzeugung, autarkie, speicher]   # only deviations from the default appear in the YAML
+period: month                             # day, week, month, year
+offset: -1                                # periods back, 0 = current
+```
+
+| Element | Shows | Options |
+|---|---|---|
+| `energie.zeitraeume`, `wetter.zeitraeume` | Periods compared (table) | `columns`, `vorjahr`, `diff`, for weather `group` |
+| `energie.matrix`, `wetter.matrix` | Years × months (energy) or year overview (weather) | `role` or `metric`, `years` |
+| `energie.monatsvergleich`, `wetter.monatsvergleich` | Years as lines with average and range | `role` or `metric`, `years`, `band` |
+| `energie.anteile` | Consumption or supply shares (ring) | `side`, `period`, `offset` |
+| `energie.heatmap` | Daily load profile | `period`, `offset` |
+| `energie.kennzahlen`, `wetter.kennzahlen` | Tiles with value, change and trend; energy also self-sufficiency, self-consumption and storage | `values`, `sparkline`, `period`, `offset` |
+| `energie.speicher` | Storage with battery, balance, charge, discharge and the state-of-charge curve (day) | `period`, `offset`, `sparkline` |
+| `energie.rekorde` | Record days as tiles (after a year of data) | – |
+| `energie.kenntage` | Key days per year | `years`, `mode` (`komplett` = whole years, otherwise until today) |
+| `energie.veraenderungen` | Consumers with the biggest change from last year | `mode`, `limit` (1 to 20) |
+
+With `follow_energy_date: true`, shares, load profile, key figures and storage follow the date selection of the Home
+Assistant energy dashboard; it is only available once an energy view has created it, otherwise the period of the card
+applies. The card draws with the same functions as the app's dashboards.
 
 ### History under a tile card
 

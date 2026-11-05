@@ -74,7 +74,7 @@ App und Integration versionieren unabhängig voneinander, keine bestimmte
 Mindestversion nötig — neuere Funktionen (z. B. der Betriebsmodus-Sensor)
 bleiben gegen eine ältere Gegenseite einfach ungenutzt, statt die
 Verbindung zu stören. Die Karte im Dashboard braucht die App ab Version
-1.12.0; mit einer älteren App zeigt sie „App zu alt“.
+1.12.0, die Dashboard-Bausteine ab 1.30.0; mit einer älteren App zeigt sie „App zu alt“.
 
 #### 2. Custom Integration kopieren
 
@@ -491,6 +491,37 @@ style: stacked       # auto (je Entität), stacked (gestapelt), percent (Anteile
   gilt. Gespeicherte Vergleichstabellen werden mit denselben Zellen, Formeln und Stilen wie in der Kachel gezeigt
   (Quelle „Gespeicherte Tabelle“, `table_id`).
 - Bei einem Ausfall der App bleibt das letzte Bild stehen und die Karte nennt sein Alter.
+
+### Dashboard-Bausteine
+
+Mit der Quelle **Dashboard-Baustein** zeigt die Karte fertige Ausschnitte der Energie- und Wetterdashboards der App, mit
+deren Zahlen. Rollen, Formeln und Entitäten bleiben in der App eingerichtet; ein Baustein, den die App nicht eingerichtet
+hat, fehlt in der Auswahl. Dafür braucht die App Version 1.30.0 (Fähigkeit „card_elements“) und ein Administratorkonto.
+
+```yaml
+type: custom:zeitarchiv-card
+element: energie.kennzahlen
+values: [erzeugung, autarkie, speicher]   # nur Abweichungen von der Vorgabe stehen in der YAML
+period: month                             # day, week, month, year
+offset: -1                                # Perioden zurück, 0 = aktuell
+```
+
+| Baustein | Zeigt | Optionen |
+|---|---|---|
+| `energie.zeitraeume`, `wetter.zeitraeume` | Zeiträume im Vergleich (Tabelle) | `columns`, `vorjahr`, `diff`, beim Wetter `group` |
+| `energie.matrix`, `wetter.matrix` | Jahre × Monate (Energie) bzw. Jahresübersicht (Wetter) | `role` bzw. `metric`, `years` |
+| `energie.monatsvergleich`, `wetter.monatsvergleich` | Jahre als Linien mit Mittel und Spanne | `role` bzw. `metric`, `years`, `band` |
+| `energie.anteile` | Verbraucher- oder Versorgungsanteile (Ring) | `side`, `period`, `offset` |
+| `energie.heatmap` | Tageslastprofil | `period`, `offset` |
+| `energie.kennzahlen`, `wetter.kennzahlen` | Kacheln mit Wert, Veränderung und Verlauf; Energie auch Autarkie, Eigenverbrauch und Speicher | `values`, `sparkline`, `period`, `offset` |
+| `energie.speicher` | Speicher mit Batterie, Saldo, Ladung, Entladung und Kurve des Ladestands (Tag) | `period`, `offset`, `sparkline` |
+| `energie.rekorde` | Rekordtage als Kacheln (erst nach einem Jahr Daten) | – |
+| `energie.kenntage` | Kenntage je Jahr | `years`, `mode` (`komplett` = ganze Jahre, sonst bis heute) |
+| `energie.veraenderungen` | Verbraucher mit der größten Änderung zum Vorjahr | `mode`, `limit` (1 bis 20) |
+
+Mit `follow_energy_date: true` folgen Anteile, Lastprofil, Kennzahlen und Speicher der Datumsauswahl des
+Energie-Dashboards von Home Assistant; sie steht nur zur Verfügung, wenn schon eine Energie-Ansicht sie angelegt hat,
+sonst gilt der Zeitraum der Karte. Die Karte zeichnet mit denselben Funktionen wie die Dashboards der App.
 
 ### Verlauf unter einer Kachelkarte
 
