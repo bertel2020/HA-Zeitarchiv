@@ -94,8 +94,10 @@ const TEXTS = {
     help_diff: 'Zeigt unter dem Wert die Veränderung zum Vorjahr. Braucht „Mit Vorjahr vergleichen“.',
     help_offset: '0 ist der aktuelle Zeitraum, −1 der davor.',
     help_follow: 'Zeitraum und Versatz folgen dann der Datumsauswahl im Energie-Dashboard von Home Assistant.',
-    refresh: 'Aktualisierung (Sekunden)',
-    height: 'Höhe (Pixel)',
+    refresh: 'Aktualisierung',
+    help_refresh: 'Leer: 60 Sekunden, mindestens 15.',
+    height: 'Höhe',
+    help_height: 'Leer: bei Charts 260 Pixel, bei Tabellen und Bausteinen so hoch wie der Inhalt.',
     tap_action: 'Beim Tippen',
     notSupportedShort: 'noch nicht darstellbar',
     description: 'Zeigt ein gespeichertes Chart oder Entitäten aus dem Zeitarchiv.',
@@ -176,8 +178,10 @@ const TEXTS = {
     help_diff: 'Shows the change from the previous year below the value. Needs "Compare with last year".',
     help_offset: '0 is the current period, −1 the one before.',
     help_follow: 'Period and offset then follow the date selection of the Home Assistant energy dashboard.',
-    refresh: 'Refresh (seconds)',
-    height: 'Height (pixels)',
+    refresh: 'Refresh',
+    help_refresh: 'Empty: 60 seconds, at least 15.',
+    height: 'Height',
+    help_height: 'Empty: 260 pixels for charts, as tall as the content for tables and elements.',
     tap_action: 'On tap',
     notSupportedShort: 'not supported yet',
     description: 'Shows a saved chart or entities from Zeitarchiv.',
@@ -1362,6 +1366,8 @@ class ZeitarchivCardEditor extends HTMLElement {
 
   // Kurzer Hinweis unter einem Feld; nur dort, wo die Bezeichnung allein nicht sagt, was passiert.
   _fieldHelp(schema) {
+    const common = {refresh: 'help_refresh', height: 'help_height'}[schema.name];
+    if (common) return text(this._hass, common);
     if (this._source !== 'element') return undefined;
     const key = {vorjahr: 'help_vorjahr', diff: 'help_diff', offset: 'help_offset', follow_energy_date: 'help_follow'}[schema.name];
     return key ? text(this._hass, key) : undefined;

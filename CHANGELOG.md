@@ -11,7 +11,8 @@
     Datumsauswahl der Energie bewirken
   - Der Titel nennt als Vorgabe den Namen des Bausteins
   - Aktualisierung, Höhe und Tippen stehen unter „Weitere Einstellungen“
-    eingeklappt, bei allen Quellen der Karte
+    eingeklappt, bei allen Quellen der Karte; Aktualisierung und Höhe nennen
+    ihren Standard, wenn das Feld leer ist
 
 ---
 
@@ -26,7 +27,8 @@
     date selection of the energy dashboard do
   - The title names the element as its default
   - Refresh, height and tap action sit collapsed under "More settings", for all
-    sources of the card
+    sources of the card; refresh and height name their default when the field is
+    empty
 
 ## 1.4.1 - 2026-11-05
 
