@@ -14,6 +14,12 @@
   - Aktualisierung, Höhe und Tippen stehen unter „Weitere Einstellungen“
     eingeklappt, bei allen Quellen der Karte; Aktualisierung und Höhe nennen
     ihren Standard, wenn das Feld leer ist
+  - Unter dem Baustein steht ein Satz, was er zeigt
+  - Zeitraum, Perioden zurück und die Datumsauswahl der Energie stehen
+    zusammen in einem eigenen Abschnitt, Stil und Kennzahlen der Legende
+    eingeklappt unter „Legende anpassen“
+- **Karte: Beschreibung**: Im Dialog zum Hinzufügen nennt die Karte jetzt auch
+  Tabellen und Dashboard-Bausteine
 
 ### Behoben
 
@@ -36,6 +42,12 @@
   - Refresh, height and tap action sit collapsed under "More settings", for all
     sources of the card; refresh and height name their default when the field is
     empty
+  - A sentence below the element says what it shows
+  - Period, periods back and the date selection of the energy dashboard sit
+    together in a section of their own, style and values of the legend collapsed
+    under "Customize legend"
+- **Card: description**: In the dialog for adding a card, the description now
+  also mentions tables and dashboard elements
 
 #### Fixed
 

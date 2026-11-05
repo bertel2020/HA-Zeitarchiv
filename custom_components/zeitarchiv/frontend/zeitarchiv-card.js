@@ -90,6 +90,22 @@ const TEXTS = {
     title: 'Titel (leer: Name des Charts)',
     title_element: 'Titel (leer: Name des Bausteins)',
     title_table: 'Titel (leer: Name der Tabelle)',
+    period_group: 'Zeitraum und Versatz',
+    legend_more: 'Legende anpassen',
+    'desc_energie.zeitraeume': 'Energiewerte für Monat, Vormonat und Jahr im Vergleich, auf Wunsch mit dem Vorjahr und der Differenz.',
+    'desc_energie.matrix': 'Eine Energiegröße je Monat und Jahr als Tabelle (Jahre × Monate).',
+    'desc_energie.monatsvergleich': 'Die Monatswerte einer Energiegröße über mehrere Jahre im Vergleich.',
+    'desc_energie.anteile': 'Anteile der Verbraucher oder der Versorgung für einen Zeitraum.',
+    'desc_energie.kennzahlen': 'Kacheln mit Energiemengen und dem Vergleich zur Vorperiode, wahlweise mit Verlauf; auch Autarkie und Eigenverbrauch.',
+    'desc_energie.speicher': 'Der Batteriespeicher mit Ladestand; bei einem Tag mit der Kurve des Ladestands.',
+    'desc_energie.rekorde': 'Rekorde der Energie, etwa der stärkste Erzeugungstag, die höchste Einspeisung und der höchste Verbrauch.',
+    'desc_energie.kenntage': 'Kenntage je Jahr; wählbar sind die Jahre und „bis heute“ oder ganze Jahre.',
+    'desc_energie.veraenderungen': 'Was sich bei den Verbrauchern verändert hat; die Zahl der Verbraucher ist wählbar.',
+    'desc_energie.heatmap': 'Das Tageslastprofil der Energie als Heatmap über eine Woche, einen Monat oder ein Jahr.',
+    'desc_wetter.kennzahlen': 'Kacheln mit den aktuellen Wetterwerten; welche, ist wählbar.',
+    'desc_wetter.monatsvergleich': 'Die Monatswerte einer Wettergröße (Temperatur, Niederschlag, Sonne) über mehrere Jahre im Vergleich.',
+    'desc_wetter.matrix': 'Die Jahresübersicht des Wetters als Heatmap, Tag für Tag.',
+    'desc_wetter.zeitraeume': 'Wetterwerte für heute, gestern, Monat, Vormonat und Jahr, auf Wunsch mit dem Vorjahr; die Gruppe bestimmt die Werte.',
     moreSettings: 'Weitere Einstellungen',
     help_vorjahr: 'Zeigt zu jeder Spalte daneben den Wert des Vorjahres.',
     help_diff: 'Zeigt unter dem Wert die Veränderung zum Vorjahr. Braucht „Mit Vorjahr vergleichen“.',
@@ -101,7 +117,7 @@ const TEXTS = {
     help_height: 'Leer: bei Charts 260 Pixel, bei Tabellen und Bausteinen so hoch wie der Inhalt.',
     tap_action: 'Beim Tippen',
     notSupportedShort: 'noch nicht darstellbar',
-    description: 'Zeigt ein gespeichertes Chart oder Entitäten aus dem Zeitarchiv.',
+    description: 'Zeigt Charts, Tabellen und Entitäten aus dem Zeitarchiv sowie Bausteine aus den Dashboards der App (Energie und Wetter).',
   },
   en: {
     loading: 'Loading …',
@@ -175,6 +191,22 @@ const TEXTS = {
     title: 'Title (empty: chart name)',
     title_element: 'Title (empty: element name)',
     title_table: 'Title (empty: table name)',
+    period_group: 'Period and offset',
+    legend_more: 'Customize legend',
+    'desc_energie.zeitraeume': 'Energy values for this month, last month and this year compared, optionally with the previous year and the difference.',
+    'desc_energie.matrix': 'One energy measure per month and year as a table (years × months).',
+    'desc_energie.monatsvergleich': 'The monthly values of one energy measure compared over several years.',
+    'desc_energie.anteile': 'Shares of the consumers or of the supply for a period.',
+    'desc_energie.kennzahlen': 'Tiles with energy amounts and the comparison with the previous period, optionally with a trend; also self-sufficiency and self-consumption.',
+    'desc_energie.speicher': 'The battery storage with its charge level; for a day with the curve of the state of charge.',
+    'desc_energie.rekorde': 'Energy records, such as the strongest generation day, the highest feed-in and the highest consumption.',
+    'desc_energie.kenntage': 'Key days per year; you choose the years and "until today" or whole years.',
+    'desc_energie.veraenderungen': 'What has changed among the consumers; the number of consumers is selectable.',
+    'desc_energie.heatmap': 'The daily load profile of the energy as a heatmap over a week, a month or a year.',
+    'desc_wetter.kennzahlen': 'Tiles with the current weather values; which ones is selectable.',
+    'desc_wetter.monatsvergleich': 'The monthly values of a weather measure (temperature, precipitation, sun) compared over several years.',
+    'desc_wetter.matrix': 'The weather year overview as a heatmap, day by day.',
+    'desc_wetter.zeitraeume': 'Weather values for today, yesterday, this month, last month and this year, optionally with the previous year; the group determines the values.',
     moreSettings: 'More settings',
     help_vorjahr: 'Shows the value of the previous year next to each column.',
     help_diff: 'Shows the change from the previous year below the value. Needs "Compare with last year".',
@@ -186,7 +218,7 @@ const TEXTS = {
     help_height: 'Empty: 260 pixels for charts, as tall as the content for tables and elements.',
     tap_action: 'On tap',
     notSupportedShort: 'not supported yet',
-    description: 'Shows a saved chart or entities from Zeitarchiv.',
+    description: 'Shows charts, tables and entities from Zeitarchiv, plus elements from the app dashboards (energy and weather).',
   },
 };
 
@@ -1203,11 +1235,15 @@ class ZeitarchivCardEditor extends HTMLElement {
         schema.push(select('side', chosen.sides.map((value) => ({value, label: label(`side_${value}`)}))));
       }
       if (chosen && chosen.ranges && chosen.ranges.length) {
-        schema.push(
-          select('period', chosen.ranges.map((value) => ({value, label: label(`period_${value}`)}))),
-          {name: 'offset', selector: {number: {min: -60, max: 0, step: 1, mode: 'box'}}},
-          {name: 'follow_energy_date', selector: {boolean: {}}},
-        );
+        // Zeitraum, Versatz und die Datumsauswahl gehören zusammen und stehen in einem eigenen, offenen Abschnitt.
+        schema.push({
+          type: 'expandable', name: '', title: label('period_group'), expanded: true,
+          schema: [
+            select('period', chosen.ranges.map((value) => ({value, label: label(`period_${value}`)}))),
+            {name: 'offset', selector: {number: {min: -60, max: 0, step: 1, mode: 'box'}}},
+            {name: 'follow_energy_date', selector: {boolean: {}}},
+          ],
+        });
       }
       if (chosen && chosen.groups && chosen.groups.length) {
         schema.push(select('group', chosen.groups.map((value) => ({value, label: label(`group_${value}`)}))));
@@ -1231,10 +1267,15 @@ class ZeitarchivCardEditor extends HTMLElement {
       schema.push({name: 'legend', selector: {boolean: {}}});
       // Stil und Kennzahlen der Legende mit Werten (Roadmap 1.49); leer = wie im Chart.
       if (this._config.legend !== false) {
-        schema.push(
-          select('legend_style', ['chart', 'chips', 'table'].map((value) => ({value, label: label(`legendStyle_${value}`)}))),
-          {name: 'legend_metrics', selector: {select: {multiple: true, mode: 'list', options: LEGEND_KEYS.map((value) => ({value, label: label(`metric_${value}`)}))}}},
-        );
+        // Der Schalter bleibt sichtbar; Stil und Kennzahlen stehen eingeklappt, offen, sobald etwas gewählt ist.
+        schema.push({
+          type: 'expandable', name: '', title: label('legend_more'),
+          expanded: Boolean(this._config.legend_style || (this._config.legend_metrics || []).length),
+          schema: [
+            select('legend_style', ['chart', 'chips', 'table'].map((value) => ({value, label: label(`legendStyle_${value}`)}))),
+            {name: 'legend_metrics', selector: {select: {multiple: true, mode: 'list', options: LEGEND_KEYS.map((value) => ({value, label: label(`metric_${value}`)}))}}},
+          ],
+        });
       }
     }
     // Der Titel bleibt sichtbar; Aktualisierung, Höhe und Tippen sind selten nötig und stehen eingeklappt.
@@ -1371,6 +1412,11 @@ class ZeitarchivCardEditor extends HTMLElement {
 
   // Kurzer Hinweis unter einem Feld; nur dort, wo die Bezeichnung allein nicht sagt, was passiert.
   _fieldHelp(schema) {
+    if (schema.name === 'element' && this._config?.element) {
+      const key = `desc_${this._config.element}`;
+      const described = text(this._hass, key);
+      return described === key ? undefined : described;
+    }
     const common = {refresh: 'help_refresh', height: 'help_height'}[schema.name];
     if (common) return text(this._hass, common);
     if (this._source !== 'element') return undefined;
