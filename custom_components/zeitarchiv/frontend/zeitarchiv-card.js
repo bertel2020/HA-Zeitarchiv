@@ -674,7 +674,13 @@ class ZeitarchivCard extends HTMLElement {
       let range;
       let offset;
       if (days <= 1.5) { range = 'day'; offset = Math.round((day(start) - day(now)) / 864e5); }
-      else if (days <= 8) { range = 'week'; offset = Math.round((day(start) - day(now)) / (7 * 864e5)); }
+      else if (days <= 8) {
+        // Wochenanfang der laufenden Woche mit demselben Wochentag wie der gewählte Start vergleichen,
+        // sonst rundet eine rohe Tagesdifferenz ab dem vierten Wochentag auf die falsche Woche.
+        range = 'week';
+        const thisWeek = day(now) - ((now.getDay() - start.getDay() + 7) % 7) * 864e5;
+        offset = Math.round((day(start) - thisWeek) / (7 * 864e5));
+      }
       else if (days <= 32) { range = 'month'; offset = (start.getFullYear() - now.getFullYear()) * 12 + start.getMonth() - now.getMonth(); }
       else if (days <= 370) { range = 'year'; offset = start.getFullYear() - now.getFullYear(); }
       else return null;
