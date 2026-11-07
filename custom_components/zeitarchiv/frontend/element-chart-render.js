@@ -180,7 +180,7 @@
       yAxis: {type: 'value', scale: m.metric === 'temperature', name: unit, nameTextStyle: {color: colors.text}, ...axisStyle(colors, font)},
       tooltip: tooltipBox(colors, font, (params) => {
         const i = params[0].dataIndex;
-        const cell = (value) => (value == null ? '–' : `${num(value, decimals)} ${unit}`);
+        const cell = (value) => (value == null ? '–' : `${num(value, decimals)} ${escapeHtml(unit)}`);
         const running = i === m.current_month - 1;
         let html = `<b>${escapeHtml(monthName(i + 1, 'long'))}</b>`;
         const now = m.years[current] ? m.years[current][i] : null;
@@ -188,7 +188,7 @@
         if (lastPast != null) html += `<br>${lastPast}: ${cell(m.years[lastPast][i])}`;
         if (m.avg[i] != null) {
           html += `<br>Ø (${m.counts[i]}): ${cell(m.avg[i])}`;
-          if (now != null && !running) html += `<br>${escapeHtml(t('Abweichung'))}: ${num(now - m.avg[i], decimals)} ${unit === '°C' ? 'K' : unit}`;
+          if (now != null && !running) html += `<br>${escapeHtml(t('Abweichung'))}: ${num(now - m.avg[i], decimals)} ${escapeHtml(unit === '°C' ? 'K' : unit)}`;
         }
         return html;
       }),
