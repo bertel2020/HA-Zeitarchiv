@@ -349,11 +349,8 @@ window.TableCompute = (() => {
 
     let columnData = [];
     if (allEntityIds.length) {
-      try {
-        columnData = (await (queryTable || defaultQueryTable(base))(queryBody(columns, rows, at))).columns || [];
-      } catch (e) {
-        columnData = [];
-      }
+      // Ein Abfragefehler wird weitergeworfen: Aufrufer zeigen ihn an, statt ihn als leeren Zeitraum darzustellen.
+      columnData = (await (queryTable || defaultQueryTable(base))(queryBody(columns, rows, at))).columns || [];
     }
 
     columns.forEach((col, ci) => {
