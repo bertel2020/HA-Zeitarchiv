@@ -18,10 +18,14 @@
 
   // Auswahl-Namen (relativ) — im Tabellenkopf steht stattdessen der konkrete Zeitraum.
   function columnName(key) {
-    return {monat: t('Dieser Monat'), vormonat: t('Letzter Monat'), jahr: t('Dieses Jahr')}[key];
+    return {heute: t('Heute'), gestern: t('Gestern'), monat: t('Dieser Monat'), vormonat: t('Letzter Monat'), jahr: t('Dieses Jahr')}[key];
   }
 
-  function columnTitle(col) {
+  const isDayKey = (key) => key === 'heute' || key === 'gestern';
+
+  // Mit Stichtag stehen „Heute“ und „Gestern“ für andere Tage: dann das Datum selbst (wie im Wetterdashboard).
+  function columnTitle(col, data) {
+    if (isDayKey(col.key)) return data && data.at ? fmtDate(formats.dmy, col.cur.start) : columnName(col.key);
     return col.key === 'jahr' ? t('Jahr') : fmtDate(formats.month, col.cur.start);
   }
 
@@ -87,16 +91,20 @@
     const cols = data.columns;
     if (!cols.length) return `<tbody><tr><td>${escapeHtml(t('Keine Spalte ausgewählt.'))}</td></tr></tbody>`;
     const span = data.vorjahr ? 2 : 1;
-    const year = (range) => String(ZT.parts(range.start).year);
-    // Zwei Zeilen: Titel mit Info-Tooltip (Zeitraum), darunter das Jahr der Spalte und ihres Vorjahrs.
+    // Tage zeigen ihr Datum, alle anderen Zeiträume das Jahr.
+    const year = (range, key) => (isDayKey(key) ? fmtDate(formats.dmy, range.start) : String(ZT.parts(range.start).year));
+    // Zwei Zeilen: Titel mit Info-Tooltip (Zeitraum), darunter Tag bzw. Jahr der Spalte und ihres Vorjahrs.
     let head = '<thead><tr><th></th>';
     let sub = '<tr class="wt-subhead"><th></th>';
     for (const col of cols) {
-      head += `<th class="wt-cur wt-sep" data-tooltip-fixed="${escapeHtml(rangeText(col.cur.start, col.cur.end))}">${escapeHtml(columnTitle(col))}<span class="wt-info" aria-hidden="true">ⓘ</span></th>`;
-      sub += `<th class="wt-cur wt-sep">${escapeHtml(year(col.cur))}</th>`;
+      let tip = rangeText(col.cur.start, col.cur.end);
+      if (col.key === 'heute' && !data.at) tip = t('bis {time}', {time: fmtDate(formats.hm, data.now)});
+      if (data.at && isDayKey(col.key)) tip = fmtDate(formats.weekday, col.cur.start);
+      head += `<th class="wt-cur wt-sep" data-tooltip-fixed="${escapeHtml(tip)}">${escapeHtml(columnTitle(col, data))}<span class="wt-info" aria-hidden="true">ⓘ</span></th>`;
+      sub += `<th class="wt-cur wt-sep">${escapeHtml(data.at && isDayKey(col.key) ? fmtDate(formats.weekday, col.cur.start) : year(col.cur, col.key))}</th>`;
       if (data.vorjahr) {
         head += `<th class="wt-vj" data-tooltip-fixed="${escapeHtml(rangeText(col.vj.start, col.vj.end))}">${escapeHtml(t('Vorjahr'))}</th>`;
-        sub += `<th class="wt-vj">${escapeHtml(year(col.vj))}</th>`;
+        sub += `<th class="wt-vj">${escapeHtml(year(col.vj, col.key))}</th>`;
       }
     }
     let html = head + '</tr>' + sub + '</tr></thead><tbody>';
