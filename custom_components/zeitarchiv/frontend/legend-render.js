@@ -167,7 +167,9 @@
         const displayName = entityNames[s.entity_id] || s.friendly_name;
         if (s.entity_id === compare.target) { items.push(statsItem(s, s.points, displayName, color)); return; }
         items.push(statsItem(s, s.points, `${displayName} (${currentYear})`, color));
-        items.push(statsItem(s, s.compare_points, `${displayName} (${currentYear - 1})`, withOpacity(color, 0.55)));
+        // Die Vorjahresreihe läuft im Chart über das ganze Jahr; die Kennzahlen daneben gelten bis zum selben Tag wie das
+        // laufende Jahr (compare_cut_points, nur bei Zählern und Schaltern), sonst stünde "bis heute" neben "komplett".
+        items.push(statsItem(s, s.compare_cut_points || s.compare_points, `${displayName} (${currentYear - 1})`, withOpacity(color, 0.55)));
       });
       return items;
     }
