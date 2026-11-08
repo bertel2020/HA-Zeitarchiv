@@ -131,7 +131,7 @@
   function weatherMonthly(m, options) {
     const {colors} = options;
     const font = options.font || ((size) => size);
-    const decimals = m.metric === 'temperature' ? 1 : (m.unit === 'min' || m.unit === 'h' ? 0 : 1);
+    const decimals = m.decimals != null ? m.decimals : (m.metric === 'temperature' ? 1 : (m.unit === 'min' || m.unit === 'h' ? 0 : 1));
     const labels = Array.from({length: 12}, (_x, i) => monthName(i + 1, 'short'));
     const yearKeys = Object.keys(m.years).map(Number).sort((a, b) => a - b);
     const current = String(m.current_year);
