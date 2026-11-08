@@ -458,7 +458,7 @@
   // Der ganze Baustein der Karte: Satz zum Zeitraum darüber, die Felder darunter (ohne Schaltflächen).
   function energyKenntageBlock(kt, ytd) {
     return `<div class="kpi-sub">${escapeHtml(kenntageRange(kt, ytd))}</div>`
-      + `<div class="wt-kt">${energyKenntage(kt, {ytd, years: 0, current: new Date().getFullYear(), interactive: false})}</div>`;
+      + `<div class="wt-kt">${energyKenntage(kt, {ytd, years: 0, current: ZT.parts(Date.now() / 1000).year, interactive: false})}</div>`;
   }
 
   // Der ganze Baustein der Karte: Zeitraum darüber, die Zeilen darunter; ohne Verbraucher ein Hinweis.

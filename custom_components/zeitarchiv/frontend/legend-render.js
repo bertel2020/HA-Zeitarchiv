@@ -159,7 +159,8 @@
       // Wie die Balkenpaare: je Entität angezeigtes Jahr und Vorjahr, die
       // Soll-Entität als eigene Zeile — Namen wie die Serien, damit das
       // Umschalten per Legende greift.
-      const currentYear = data.window_start ? new Date(data.window_start * 1000).getFullYear() : new Date().getFullYear();
+      // Jahr in der Zeitzone des Servers: der Browser kann in einer anderen stehen und um Silvester das Vorjahr liefern.
+      const currentYear = window.ServerTime.parts(data.window_start || Date.now() / 1000).year;
       const items = [];
       series.forEach(s => {
         if (!s.compare_points) return;
