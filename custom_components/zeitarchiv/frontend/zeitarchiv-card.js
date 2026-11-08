@@ -605,7 +605,8 @@ class ZeitarchivCard extends HTMLElement {
       this._resize = new ResizeObserver(() => { this._chart?.resize(); this._restyleLegend(); });
       this._resize.observe(this._els.chart);
     }
-    if (this._hass && this._config) this._load();
+    // disconnectedCallback meldet das Abo ab; wird die Karte wieder eingehängt (Ansichtswechsel, Bearbeitungsmodus), muss es neu entstehen.
+    if (this._hass && this._config) { this._followEnergy(); this._load(); }
   }
 
   disconnectedCallback() {
@@ -1372,31 +1373,36 @@ class ZeitarchivCardEditor extends HTMLElement {
       if (!Array.isArray(next.columns) || !next.columns.length || (next.columns.length === all.length && all.every((c) => next.columns.includes(c)))) delete next.columns;
       if (next.vorjahr !== false) delete next.vorjahr;
       if (next.diff !== false) delete next.diff;
-      const chosenRoles = (this._elements || []).find((item) => item.key === next.element)?.roles || [];
+      // Fehlt die Elementliste noch (nicht geladen oder fehlgeschlagen) oder kennt sie das Element nicht, bleiben die Optionen
+      // stehen: ohne Katalog wüsste die Bereinigung nicht, was Vorgabe ist, und würde Zeitraum, Rolle, Werte u. a. löschen.
+      const known = (this._elements || []).some((item) => item.key === next.element);
       if (next.years !== undefined && next.years !== '') next.years = Number(next.years); else delete next.years;
-      if (!chosenRoles.length || next.role === chosenRoles[0]) delete next.role;
-      const chosenForYears = (this._elements || []).find((item) => item.key === next.element);
-      if (!(chosenRoles.length || chosenForYears?.year_limit) || next.years === 10) delete next.years;
-      if (!chosenForYears?.modes || next.mode !== 'komplett') delete next.mode;
-      if (!chosenForYears?.limit || Number(next.limit) === 8 || !Number(next.limit)) delete next.limit; else next.limit = Math.max(1, Math.min(20, Math.round(Number(next.limit))));
-      const chosenGroups = (this._elements || []).find((item) => item.key === next.element)?.groups || [];
-      if (!chosenGroups.length || next.group === chosenGroups[0]) delete next.group;
-      const chosenMetrics = (this._elements || []).find((item) => item.key === next.element)?.metrics || [];
-      if (!chosenMetrics.length || next.metric === chosenMetrics[0]) delete next.metric;
-      if (next.band !== false) delete next.band;
-      const chosenElement = (this._elements || []).find((item) => item.key === next.element);
-      const allValues = (chosenElement?.values || []).map((item) => item.key);
-      // Die Vorgabe ("default" in der Liste der App) steht nicht in der YAML.
-      const defaultValues = (chosenElement?.values || []).filter((item) => item.default).map((item) => item.key);
-      const everything = defaultValues.length > 0 && Array.isArray(next.values) && next.values.length === defaultValues.length && defaultValues.every((key) => next.values.includes(key));
-      if (!Array.isArray(next.values) || !next.values.length || everything) delete next.values;
-      if ((!allValues.length && chosenElement?.key !== 'energie.speicher') || next.sparkline !== false) delete next.sparkline;
-      if (!chosenElement?.sides?.length || next.side === chosenElement.sides[0]) delete next.side;
-      if (!chosenElement?.ranges?.length) { delete next.period; delete next.offset; delete next.follow_energy_date; }
-      else {
-        if (next.period === (chosenElement.ranges.includes('month') ? 'month' : chosenElement.ranges[0])) delete next.period;
-        if (!Number(next.offset)) delete next.offset; else next.offset = Math.max(-60, Math.min(0, Math.round(Number(next.offset))));
-        if (!next.follow_energy_date) delete next.follow_energy_date;
+      if (known) {
+        const chosenRoles = (this._elements || []).find((item) => item.key === next.element)?.roles || [];
+        if (!chosenRoles.length || next.role === chosenRoles[0]) delete next.role;
+        const chosenForYears = (this._elements || []).find((item) => item.key === next.element);
+        if (!(chosenRoles.length || chosenForYears?.year_limit) || next.years === 10) delete next.years;
+        if (!chosenForYears?.modes || next.mode !== 'komplett') delete next.mode;
+        if (!chosenForYears?.limit || Number(next.limit) === 8 || !Number(next.limit)) delete next.limit; else next.limit = Math.max(1, Math.min(20, Math.round(Number(next.limit))));
+        const chosenGroups = (this._elements || []).find((item) => item.key === next.element)?.groups || [];
+        if (!chosenGroups.length || next.group === chosenGroups[0]) delete next.group;
+        const chosenMetrics = (this._elements || []).find((item) => item.key === next.element)?.metrics || [];
+        if (!chosenMetrics.length || next.metric === chosenMetrics[0]) delete next.metric;
+        if (next.band !== false) delete next.band;
+        const chosenElement = (this._elements || []).find((item) => item.key === next.element);
+        const allValues = (chosenElement?.values || []).map((item) => item.key);
+        // Die Vorgabe ("default" in der Liste der App) steht nicht in der YAML.
+        const defaultValues = (chosenElement?.values || []).filter((item) => item.default).map((item) => item.key);
+        const everything = defaultValues.length > 0 && Array.isArray(next.values) && next.values.length === defaultValues.length && defaultValues.every((key) => next.values.includes(key));
+        if (!Array.isArray(next.values) || !next.values.length || everything) delete next.values;
+        if ((!allValues.length && chosenElement?.key !== 'energie.speicher') || next.sparkline !== false) delete next.sparkline;
+        if (!chosenElement?.sides?.length || next.side === chosenElement.sides[0]) delete next.side;
+        if (!chosenElement?.ranges?.length) { delete next.period; delete next.offset; delete next.follow_energy_date; }
+        else {
+          if (next.period === (chosenElement.ranges.includes('month') ? 'month' : chosenElement.ranges[0])) delete next.period;
+          if (!Number(next.offset)) delete next.offset; else next.offset = Math.max(-60, Math.min(0, Math.round(Number(next.offset))));
+          if (!next.follow_energy_date) delete next.follow_energy_date;
+        }
       }
     }
     this._config = {...next, type: 'custom:zeitarchiv-card'};
