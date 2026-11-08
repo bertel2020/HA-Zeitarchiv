@@ -87,27 +87,39 @@
     return `<td class="${cls}"><span class="wt-v">${formatValue(row, value)}</span>${deltaHtml || ''}</td>`;
   }
 
+  // Kopf der Vergleichstabellen, zwei Zeilen: Titel mit Info-Tooltip (Zeitraum), darunter Tag bzw. Jahr der Spalte und ihres
+  // Vorjahrs. Das Dashboard der Verbraucher teilt ihn mit der Summen-Tabelle. data: {columns, vorjahr, at, now}; eine Spalte
+  // kann Titel, Untertitel und Tooltips selbst mitbringen (title, sub, tip, vjSub, vjTip), etwa ein einzelnes Jahr.
+  // corner: {title, sub} der ersten Spalte (HTML, schon maskiert); titleHtml(col, html) umhüllt den Titel, etwa mit einem
+  // Sortierknopf.
+  function comparisonHead(data, {corner = {}, titleHtml = null} = {}) {
+    // Tage zeigen ihr Datum, alle anderen Zeiträume das Jahr.
+    const year = (range, key) => (isDayKey(key) ? fmtDate(formats.dmy, range.start) : String(ZT.parts(range.start).year));
+    let head = `<thead><tr><th>${corner.title || ''}</th>`;
+    let sub = `<tr class="wt-subhead"><th>${corner.sub || ''}</th>`;
+    for (const col of data.columns) {
+      let tip = col.tip != null ? col.tip : rangeText(col.cur.start, col.cur.end);
+      if (col.tip == null && col.key === 'heute' && !data.at) tip = t('bis {time}', {time: fmtDate(formats.hm, data.now)});
+      if (col.tip == null && data.at && isDayKey(col.key)) tip = fmtDate(formats.weekday, col.cur.start);
+      const title = escapeHtml(col.title != null ? col.title : columnTitle(col, data));
+      const subCur = col.sub != null ? col.sub : (data.at && isDayKey(col.key) ? fmtDate(formats.weekday, col.cur.start) : year(col.cur, col.key));
+      head += `<th class="wt-cur wt-sep${col.headClass || ''}"${col.headAttrs || ''} data-tooltip-fixed="${escapeHtml(tip)}">${titleHtml ? titleHtml(col, title) : title}<span class="wt-info" aria-hidden="true">ⓘ</span></th>`;
+      sub += `<th class="wt-cur wt-sep${col.headClass || ''}">${escapeHtml(subCur)}</th>`;
+      if (data.vorjahr) {
+        const vjTip = col.vjTip != null ? col.vjTip : rangeText(col.vj.start, col.vj.end);
+        const vjSub = col.vjSub != null ? col.vjSub : year(col.vj, col.key);
+        head += `<th class="wt-vj" data-tooltip-fixed="${escapeHtml(vjTip)}">${escapeHtml(t('Vorjahr'))}</th>`;
+        sub += `<th class="wt-vj">${escapeHtml(vjSub)}</th>`;
+      }
+    }
+    return head + '</tr>' + sub + '</tr></thead>';
+  }
+
   function renderTable(data, showDiff) {
     const cols = data.columns;
     if (!cols.length) return `<tbody><tr><td>${escapeHtml(t('Keine Spalte ausgewählt.'))}</td></tr></tbody>`;
     const span = data.vorjahr ? 2 : 1;
-    // Tage zeigen ihr Datum, alle anderen Zeiträume das Jahr.
-    const year = (range, key) => (isDayKey(key) ? fmtDate(formats.dmy, range.start) : String(ZT.parts(range.start).year));
-    // Zwei Zeilen: Titel mit Info-Tooltip (Zeitraum), darunter Tag bzw. Jahr der Spalte und ihres Vorjahrs.
-    let head = '<thead><tr><th></th>';
-    let sub = '<tr class="wt-subhead"><th></th>';
-    for (const col of cols) {
-      let tip = rangeText(col.cur.start, col.cur.end);
-      if (col.key === 'heute' && !data.at) tip = t('bis {time}', {time: fmtDate(formats.hm, data.now)});
-      if (data.at && isDayKey(col.key)) tip = fmtDate(formats.weekday, col.cur.start);
-      head += `<th class="wt-cur wt-sep" data-tooltip-fixed="${escapeHtml(tip)}">${escapeHtml(columnTitle(col, data))}<span class="wt-info" aria-hidden="true">ⓘ</span></th>`;
-      sub += `<th class="wt-cur wt-sep">${escapeHtml(data.at && isDayKey(col.key) ? fmtDate(formats.weekday, col.cur.start) : year(col.cur, col.key))}</th>`;
-      if (data.vorjahr) {
-        head += `<th class="wt-vj" data-tooltip-fixed="${escapeHtml(rangeText(col.vj.start, col.vj.end))}">${escapeHtml(t('Vorjahr'))}</th>`;
-        sub += `<th class="wt-vj">${escapeHtml(year(col.vj, col.key))}</th>`;
-      }
-    }
-    let html = head + '</tr>' + sub + '</tr></thead><tbody>';
+    let html = comparisonHead(data) + '<tbody>';
     let group = null;
     for (const row of data.rows) {
       if (row.group !== group) {
@@ -477,7 +489,7 @@
 
   window.ElementTableRender = {
     weatherComparison, WIND_KEYS, groupOf, inGroup,
-    formats, fmtDate, rangeText, energy, columnName, energyComparison: renderTable,
+    formats, fmtDate, rangeText, energy, columnName, delta, comparisonHead, energyComparison: renderTable,
     monthName, mean, present, monthKey, isPartialStart, monthStats, yearSum, energyMatrix,
     kenntagRule, kenntagLabels: KENNTAG_LABELS, energyKenntage, energyChanges, changesRange, kenntageRange, energyKenntageBlock, energyChangesBlock,
   };
