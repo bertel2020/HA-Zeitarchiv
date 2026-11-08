@@ -905,6 +905,8 @@ class ZeitarchivCard extends HTMLElement {
       if (this._hidden.has(name)) this._hidden.delete(name); else this._hidden.add(name);
       this._chart?.dispatchAction({type: 'legendToggleSelect', name});
       this._paintLegend();
+      // Die Legende wird neu aufgebaut; per Tastatur bedient, würde der Fokus sonst auf den Seitenanfang springen.
+      if (event.type === 'keydown') [...box.querySelectorAll('[data-series]')].find((el) => el.dataset.series === name)?.focus();
     };
     box.addEventListener('click', toggle);
     box.addEventListener('keydown', toggle);
