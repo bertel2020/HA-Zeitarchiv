@@ -773,7 +773,9 @@ class ZeitarchivCard extends HTMLElement {
   }
 
   _fail(err) {
-    const key = err && typeof err === 'object' && err.code && TEXTS.en[err.code] ? err.code : (err && err.script ? 'script' : 'unknown');
+    let key = err && typeof err === 'object' && err.code && TEXTS.en[err.code] ? err.code : (err && err.script ? 'script' : 'unknown');
+    // Bausteine sind nur für Administratoren; „Karte freigeben“ gilt für Charts und Tabellen und würde hier in die Irre führen.
+    if (key === 'unauthorized' && this._config?.element) key = 'elementAdminOnly';
     if (key !== 'unknown' && key !== 'script' && err.code !== 'unauthorized') console.debug('Zeitarchiv-Karte:', err.code, err.message);
     else console.warn('Zeitarchiv-Karte:', err);
     // Ein Ausfall nach einem guten Stand lässt das Bild stehen und sagt nur, wie alt es ist.
@@ -994,6 +996,7 @@ class ZeitarchivCard extends HTMLElement {
     this._els.note.hidden = true;
     this._els.chart.hidden = true;
     this._els.chart.removeAttribute('aria-label');
+    this._els.legend.hidden = true;
     this._els.table.hidden = false;
     this._els.table.style.maxHeight = this._explicitHeight ? `${Math.max(120, Number(this._config.height) || 260)}px` : '';
     this._els.table.innerHTML = TableTileRender.buildHtml({...table, style: result.table.style || {}});
@@ -1033,6 +1036,7 @@ class ZeitarchivCard extends HTMLElement {
     this._els.note.hidden = true;
     this._els.chart.hidden = true;
     this._els.chart.removeAttribute('aria-label');
+    this._els.legend.hidden = true;
     this._els.table.hidden = false;
     this._els.table.style.maxHeight = this._explicitHeight ? `${Math.max(120, Number(this._config.height) || 260)}px` : '';
     this._els.table.innerHTML = draw(runtime.ElementTableRender);
