@@ -197,7 +197,8 @@
   }
 
   // ECharts-Optionen der Jahresübersicht des Wetters (Jahre × 366 Tage als Heatmap). m: Antwort von matrix.
-  // options: colors (cur, prev, cold, text, grid, ink, surface, sun, sunSoft, overcast), narrow, font.
+  // options: colors (cur, prev, cold, text, grid, ink, surface, sun, sunSoft, overcast), narrow, font; sequential: Farbverlauf von
+  // surface nach cold wie beim Niederschlag (für Größen ohne Vorzeichen, etwa Energie je Tag); missingLabel: Text für Felder ohne Wert.
   function weatherMatrix(m, options) {
     const {colors} = options;
     const font = options.font || ((size) => size);
@@ -205,7 +206,7 @@
     const decimals = isPrecip && m.unit === 'min' ? 0 : 1;
     const unit = m.unit;
     const isSun = m.metric === 'sun';
-    const inRange = isPrecip
+    const inRange = isPrecip || options.sequential
       ? [colors.surface, colors.cold]
       : [colors.cold, colors.surface, colors.prev];
     const sunPieces = [
@@ -246,7 +247,10 @@
           const [slot, row, value] = param.data;
           const when = matrixDate(m.years[row], slot);
           const label = new Intl.DateTimeFormat(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC'}).format(when);
-          if (param.seriesIndex === 0) return `<b>${escapeHtml(label)}</b><br>${escapeHtml(isSun ? t('Keine Tagesklasse') : t('Zu wenige Werte'))}`;
+          if (param.seriesIndex === 0) {
+            const missing = options.missingLabel || (isSun ? t('Keine Tagesklasse') : t('Zu wenige Werte'));
+            return `<b>${escapeHtml(label)}</b><br>${escapeHtml(missing)}`;
+          }
           if (isSun) {
             const hours = m.hours ? m.hours[when.toISOString().slice(0, 10)] : null;
             return `<b>${escapeHtml(label)}</b><br>${escapeHtml(sunPieces.find((piece) => piece.value === value).label)}`
