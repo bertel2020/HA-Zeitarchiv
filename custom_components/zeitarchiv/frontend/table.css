@@ -205,6 +205,9 @@ table.dt.dt-cards tr.has-pending-purge td, table.dt.dt-cards tbody tr.has-pendin
 .wt-kt-bar i {display:block;height:100%;background:var(--chart-1);border-radius:3px;}
 .wt-kt-val {text-align:right;white-space:nowrap;color:var(--ink-muted);}
 .wt-kt-val b {color:var(--ink);font-weight:600;}
+.wt-kt-none {cursor:default;}
+.wt-kt-none:hover {background:none;}
+.wt-kt-none .wt-kt-val {color:var(--ink-faint);font-style:italic;}
 @media (max-width:760px) {
 .wt-kt {grid-template-columns:minmax(0,1fr);}
 }

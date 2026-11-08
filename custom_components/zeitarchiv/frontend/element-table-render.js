@@ -394,13 +394,16 @@
   // Kenntage: Beschriftung, Regel und die Zeile je Jahr. Die Schwellen kommen aus dem Setup der App.
   const KENNTAG_GROUPS = () => ({eigenversorgung: t('Eigenversorgung'), erzeugung: t('Erzeugung'), speicher: t('Speicher')});
   const KENNTAG_LABELS = () => ({
-    fast_autark: t('Fast autark'), ueberschuss: t('Überschusstage'), sonnig: t('Sonnentage'), truebe: t('Trübe Tage'),
+    fast_autark: t('Fast autark'), ohne_netz: t('Tage ohne Netzbezug'), ueberschuss: t('Überschusstage'),
+    einspeisung_hoch: t('Hohe Einspeisung'), sonnig: t('Sonnentage'), truebe: t('Trübe Tage'),
     speicher_stark: t('Speicher stark genutzt'), speicher_schwach: t('Speicher kaum genutzt'),
   });
 
   const KENNTAG_RULES = {
     fast_autark: (th) => t('Autarkie ab {value} %', {value: num(th.autark, 0)}),
+    ohne_netz: () => t('Netzbezug höchstens 0,1 kWh'),
     ueberschuss: () => t('mehr Einspeisung als Verbrauch'),
+    einspeisung_hoch: (th) => t('mehr als {value} kWh am Tag eingespeist', {value: num(th.einspeisung, 0)}),
     sonnig: (th) => t('ab {value} kWh je kWp', {value: num(th.sonnig, 1)}),
     truebe: (th) => t('unter {value} % des Tagesmittels', {value: num(th.truebe, 0)}),
     speicher_stark: (th) => t('ab {value} % der Kapazität', {value: num(th.speicher_stark, 0)}),
@@ -423,16 +426,23 @@
       const group = kt.groups[key];
       if (group !== lastGroup) html += `<div class="wt-kt-group">${escapeHtml(groups[group])}</div>`;
       lastGroup = group;
+      // Die Speicher-Kenntage zeigen ein Jahr ohne Speicher (kein Tag auswertbar) als „kein Speicher“ statt es wegzulassen.
+      const storage = key.startsWith('speicher');
       const rows = shownYears.map((entry) => {
         const f = entry.fields[key];
         const days = ytd ? f.days_ytd : f.days;
         const hit = ytd ? f.hit_ytd : f.hit;
-        return {year: entry.year, days, hit, pct: days ? hit / days * 100 : 0};
-      }).filter((row) => row.days > 0);
+        return {year: entry.year, days, hit, pct: days ? hit / days * 100 : 0, none: storage && f.days === 0};
+      }).filter((row) => row.days > 0 || row.none);
       const top = Math.max(0, ...rows.map((row) => row.pct));
       html += `<div class="wt-kt-col"><h3 class="wt-kt-title">${escapeHtml(labels[key])}</h3>`
         + `<p class="wt-kt-rule">${escapeHtml(kenntagRule(key, kt.thresholds))}</p>`;
       for (const row of rows) {
+        if (row.none) {
+          html += `<div class="wt-kt-row wt-kt-none"><span class="wt-kt-year">${row.year}${row.year === current ? '*' : ''}</span>`
+            + `<span class="wt-kt-bar"></span><span class="wt-kt-val">${escapeHtml(t('kein Speicher'))}</span></div>`;
+          continue;
+        }
         const pct = row.hit > 0 && row.pct < 1 ? '< 1 %' : `${num(row.pct, 0)} %`;
         const tip = `${t('Ausgewertete Tage')}: ${num(row.days, 0)}`;
         const data = interactive ? ` data-field="${key}" data-year="${row.year}"` : '';
