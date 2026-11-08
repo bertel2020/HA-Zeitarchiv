@@ -22,11 +22,13 @@
   }
 
   const isDayKey = (key) => key === 'heute' || key === 'gestern';
+  // Einzelnes Jahr im Wetterdashboard: „j2024“.
+  const isYearKey = (key) => /^j\d{4}$/.test(key);
 
   // Mit Stichtag stehen „Heute“ und „Gestern“ für andere Tage: dann das Datum selbst (wie im Wetterdashboard).
   function columnTitle(col, data) {
     if (isDayKey(col.key)) return data && data.at ? fmtDate(formats.dmy, col.cur.start) : columnName(col.key);
-    return col.key === 'jahr' ? t('Jahr') : fmtDate(formats.month, col.cur.start);
+    return col.key === 'jahr' || isYearKey(col.key) ? t('Jahr') : fmtDate(formats.month, col.cur.start);
   }
 
   function sameDay(a, b) {
@@ -241,7 +243,7 @@
     if (data && data.at && (col.key === 'heute' || col.key === 'gestern')) return fmtDate(formats.dmy, col.cur.start);
     if (col.key === 'heute') return t('Heute');
     if (col.key === 'gestern') return t('Gestern');
-    if (col.key === 'jahr') return t('Jahr');
+    if (col.key === 'jahr' || isYearKey(col.key)) return t('Jahr');
     return fmtDate(formats.month, col.cur.start);
   }
 
@@ -489,7 +491,7 @@
 
   window.ElementTableRender = {
     weatherComparison, WIND_KEYS, groupOf, inGroup,
-    formats, fmtDate, rangeText, energy, columnName, delta, comparisonHead, energyComparison: renderTable,
+    formats, fmtDate, rangeText, energy, columnName, delta, comparisonHead, cellHtml, energyComparison: renderTable,
     monthName, mean, present, monthKey, isPartialStart, monthStats, yearSum, energyMatrix,
     kenntagRule, kenntagLabels: KENNTAG_LABELS, energyKenntage, energyChanges, changesRange, kenntageRange, energyKenntageBlock, energyChangesBlock,
   };
