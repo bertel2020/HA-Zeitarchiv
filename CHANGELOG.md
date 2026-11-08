@@ -1,5 +1,45 @@
 # Changelog
 
+## Unreleased
+
+### Behoben
+
+- **Karte: Datumsauswahl der Energie**: Die Karte folgt dem Datum auch nach
+  einem Ansichtswechsel oder dem Bearbeitungsmodus
+  - „Diese Woche“ zeigte ab dem vierten Wochentag die Vorwoche
+- **Karte: Editor**: Die Einstellungen eines Bausteins (Zeitraum, Rolle, Werte)
+  gehen nicht mehr verloren, wenn die Liste der Bausteine nicht geladen werden
+  konnte
+- **Karte: Tabellen**: Ein Ladefehler erscheint als Fehler statt als leere
+  Zellen; die Legende eines vorherigen Charts bleibt nicht mehr unter einer
+  Tabelle stehen
+- **Karte: Legende**: Nach dem Umschalten eines Eintrags per Tastatur bleibt der
+  Fokus erhalten; beim Jahresvergleich gilt das Vorjahr bis zum gleichen Tag
+  und das Jahr stimmt auch bei abweichender Zeitzone des Browsers
+- **Karte: Dashboard-Bausteine**: Wer kein Administrator ist, sieht den Hinweis,
+  dass Bausteine nur Administratoren sehen, statt eines Hinweises auf „Karte
+  freigeben“
+
+---
+
+### English
+
+#### Fixed
+
+- **Card: energy date selection**: The card follows the date again after a view
+  change or edit mode
+  - "This week" showed the previous week from the fourth weekday on
+- **Card: editor**: The settings of an element (period, role, values) are no
+  longer lost when the list of elements could not be loaded
+- **Card: tables**: A loading error is shown as an error instead of empty
+  cells; the legend of a previous chart no longer stays below a table
+- **Card: legend**: Keyboard focus is kept after toggling an entry; in the year
+  comparison the previous year runs up to the same day, and the year is
+  correct even if the browser is in a different time zone
+- **Card: dashboard elements**: Users who are not administrators see the
+  notice that elements are visible to administrators only, instead of a hint
+  about "Share card"
+
 ## 1.4.1 - 2026-11-05
 
 ### Geändert
