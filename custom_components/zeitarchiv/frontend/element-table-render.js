@@ -404,7 +404,13 @@
       const kind = (row) => (row.unit === '%' ? t('Feuchte') : t('Temperatur'));
       const roomBlock = (name) => {
         const list = rooms.get(name);
-        let block = `<tr class="wt-grp"><th colspan="${span2}">${escapeHtml(name || t('Ohne Raum'))}</th></tr>`;
+        const roomClosed = (opts.closedRooms || []).includes(name);
+        const roomTitle = escapeHtml(name || t('Ohne Raum'));
+        let block = opts.interactive
+          ? `<tr class="wt-grp wt-room is-toggle${roomClosed ? ' is-closed' : ''}"><th colspan="${span2}" data-room="${escapeHtml(name)}" role="button" tabindex="0" aria-expanded="${!roomClosed}">`
+            + `<span class="wt-floor-chev" aria-hidden="true">▾</span> ${roomTitle}</th></tr>`
+          : `<tr class="wt-grp"><th colspan="${span2}">${roomTitle}</th></tr>`;
+        if (roomClosed) return block;
         // Zwei Sensoren gleicher Art im Raum: der Name des Eintrags unterscheidet sie.
         const kinds = list.map(kind);
         const label = (row, i) => (!name || kinds.indexOf(kinds[i]) !== i || kinds.lastIndexOf(kinds[i]) !== i ? row.label : kinds[i]);
@@ -420,7 +426,7 @@
         });
         return block;
       };
-      // Etagen aus Home Assistant: Räume unter ihrer Etage, die Etage lässt sich einklappen (opts.closedFloors).
+      // Etagen aus Home Assistant: Räume unter ihrer Etage, Etage und Raum lassen sich einklappen (opts.closedFloors, opts.closedRooms).
       // Ohne Etage bei allen Räumen entfallen die Köpfe. Räume ohne Etage stehen zuletzt unter „Ohne Etage“.
       const floorOf = (name) => (name ? (rooms.get(name)[0].floor || '') : '');
       if (!names.some((name) => floorOf(name))) {
