@@ -483,7 +483,7 @@
   // Der Zeitraum der Kenntage in einem Satz (ganze Jahre oder alle nur bis zum Kalendertag von heute).
   function kenntageRange(kt, ytd) {
     if (!ytd) return t('Ganze Kalenderjahre. Das laufende Jahr (*) zählt bis heute.');
-    const date = fmtDate(formats.dmy, Date.parse(kt.today + 'T12:00:00Z') / 1000);
+    const date = fmtDate(formats.dm, Date.parse(kt.today + 'T12:00:00Z') / 1000);
     return t('Alle Jahre nur bis {date} gezählt, damit das laufende Jahr (*) vergleichbar ist.', {date});
   }
 
