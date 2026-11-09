@@ -215,6 +215,9 @@
       {value: 0, label: t('trüb'), color: colors.overcast},
     ];
     const hidden = {itemStyle: {borderWidth: 0}};
+    // Den 29. Februar gibt es nur in Schaltjahren: in allen anderen Zeilen bleibt Spalte 59 sonst als weißer Strich stehen.
+    const isLeap = (year) => (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+    const noLeapDay = m.years.map((year, row) => (isLeap(year) ? null : [59, row, 0])).filter(Boolean);
     return {
       animation: false,
       grid: {left: 8, right: 16, top: 6, bottom: 52, containLabel: true},
@@ -245,6 +248,7 @@
         textStyle: {color: colors.ink, fontSize: font(12)},
         formatter: (param) => {
           const [slot, row, value] = param.data;
+          if (param.seriesIndex === 2) return `<b>${escapeHtml(m.years[row])}</b><br>${escapeHtml(t('Den 29. Februar gibt es nur in Schaltjahren'))}`;
           const when = matrixDate(m.years[row], slot);
           const label = new Intl.DateTimeFormat(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC'}).format(when);
           if (param.seriesIndex === 0) {
@@ -265,6 +269,7 @@
           itemStyle: {color: colors.grid, borderWidth: 0},
         },
         {type: 'heatmap', data: m.cells, ...hidden},
+        {type: 'heatmap', data: noLeapDay, silent: false, itemStyle: {color: colors.grid, opacity: 0.45, borderWidth: 0}},
       ],
     };
   }
