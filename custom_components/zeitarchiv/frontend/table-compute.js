@@ -94,7 +94,9 @@ window.TableCompute = (() => {
     if (!cell) return explicitMissing ? t('Keine Daten') : '–';
     if (cell.error) return t('Fehler');
     if (cell.value == null) return explicitMissing ? t('Keine Daten') : '–';
-    const decimalsInt = decimals && decimals !== 'auto' ? parseInt(decimals, 10) : null;
+    // Spalte auf "Auto": die Nachkommastellen der Entität (Entitäten-Seite) gelten, sonst die Standardformatierung.
+    const decimalsInt = decimals && decimals !== 'auto' ? parseInt(decimals, 10)
+      : (Number.isInteger(cell.decimals) ? cell.decimals : null);
     return fmtNum(cell.value, decimalsInt);
   }
 
@@ -245,6 +247,10 @@ window.TableCompute = (() => {
       const vals = pts.map(p => (p[key] != null ? p[key] : p.value)).filter(v => v != null);
       return vals.length ? Math[aggregation](...vals) : null;
     }
+    if (aggregation === 'last') {
+      const vals = pts.map(p => p.value).filter(v => v != null);
+      return vals.length ? vals[vals.length - 1] : null;
+    }
     if (!pts.length) return 0;
     const total = pts.reduce((a, p) => a + (p.value || 0), 0);
     if (aggregation === 'sum') return total;
@@ -375,17 +381,19 @@ window.TableCompute = (() => {
         const memberComparisonValues = members.map(s => memberComparisonValueFor(s, aggregation));
         let value;
         let comparisonValue;
-        if (aggregation === 'min' || aggregation === 'max') {
+        if (aggregation === 'min' || aggregation === 'max' || aggregation === 'last') {
           // Ein Mitglied ganz ohne Datenpunkte fließt hier NICHT als 0 ein
           // (anders als bei avg/sum/auto unten) — sonst würde eine Entität
           // ohne Daten im Zeitraum fälschlich zum globalen Minimum. Sind ALLE
           // Mitglieder ohne Daten, bleibt die Zelle leer statt 0.
           const valid = memberValues.filter(v => v != null);
           if (!valid.length) { values[ci][ri] = null; return; }
-          value = aggregation === 'min' ? Math.min(...valid) : Math.max(...valid);
+          value = aggregation === 'min' ? Math.min(...valid)
+            : aggregation === 'max' ? Math.max(...valid) : valid.reduce((a, v) => a + v, 0);
           const validComparison = memberComparisonValues.filter(v => v != null);
           comparisonValue = validComparison.length
-            ? (aggregation === 'min' ? Math.min(...validComparison) : Math.max(...validComparison))
+            ? (aggregation === 'min' ? Math.min(...validComparison)
+              : aggregation === 'max' ? Math.max(...validComparison) : validComparison.reduce((a, v) => a + v, 0))
             : null;
         } else {
           // Wie bisher: eine Gruppen-Zeile summiert die (je nach Modus schon
@@ -396,7 +404,10 @@ window.TableCompute = (() => {
             : memberComparisonValues.reduce((a, v) => a + (v || 0), 0);
         }
         const memberUnits = [...new Set(members.map(member => member.unit || ''))];
-        values[ci][ri] = {value, unit: memberUnits.length === 1 ? memberUnits[0] : '', comparisonValue};
+        // Nachkommastellen der Entität(en), wenn die Spalte auf "Auto" steht (siehe cellValueText()).
+        const memberDecimals = [...new Set(members.map(member => member.decimals))];
+        const entityDecimals = memberDecimals.length === 1 && Number.isInteger(memberDecimals[0]) ? memberDecimals[0] : null;
+        values[ci][ri] = {value, unit: memberUnits.length === 1 ? memberUnits[0] : '', comparisonValue, decimals: entityDecimals};
       });
     });
 
