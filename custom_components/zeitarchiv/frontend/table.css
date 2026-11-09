@@ -150,6 +150,7 @@ table.dt.dt-cards tr.has-pending-purge td, table.dt.dt-cards tbody tr.has-pendin
 .wt-table tbody th .wt-qual {font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);}
 .wt-table .wt-sep {border-left:1px solid var(--border);}
 .wt-table tr.wt-grp th {font-size:calc(11.5px * var(--font-scale, 1));font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--accent-line);text-align:left;padding-top:12px;border-bottom:1px solid var(--border-strong);white-space:nowrap;}
+.wt-table tr.wt-sub th {font-size:calc(12px * var(--font-scale, 1));font-weight:600;color:var(--ink-muted);text-align:left;padding-top:8px;padding-bottom:2px;border-bottom:0;white-space:nowrap;}
 .wt-table td .wt-v {font-weight:600;color:var(--ink);}
 .wt-table td.wt-vj .wt-v {font-weight:400;color:var(--ink-muted);}
 .wt-table td[data-tooltip-fixed] {cursor:help;}

@@ -340,7 +340,7 @@
   }
 
 
-  function weatherComparison(data, group, showDiff) {
+  function weatherComparison(data, group, showDiff, opts = {}) {
     const cols = data.columns;
     if (!cols.length) return `<tbody><tr><td>${escapeHtml(t('Keine Spalte ausgewählt.'))}</td></tr></tbody>`;
     const span = data.vorjahr ? 2 : 1;
@@ -371,21 +371,61 @@
     let html = head + '</tr>' + sub + '</tr>';
     html += '</thead><tbody>';
 
-    for (const row of data.rows.filter((r) => inGroup(r.key, group))) {
-      html += `<tr class="wt-grp"><th colspan="${1 + cols.length * span}">${escapeHtml(row.label)}</th></tr>`;
-      for (const metric of metricsFor(row, data)) {
-        html += `<tr><th scope="row">${metricLabelHtml(metric.label)}</th>`;
+    const span2 = 1 + cols.length * span;
+    // Eine Zeilengruppe: Kopf (Name des Blocks) und je Kennzahl eine Zeile. label überschreibt den Namen der Kennzahl.
+    const metricRows = (row, metrics, label) => {
+      let out = '';
+      for (const metric of metrics) {
+        out += `<tr><th scope="row">${label ? escapeHtml(label) : metricLabelHtml(metric.label)}</th>`;
         for (const col of cols) {
           const cell = row.cells[col.key] || {};
           const decimals = metric.decimals != null ? metric.decimals : (row.decimals != null ? row.decimals : 1);
           const unit = metric.unit != null ? metric.unit : (row.unit === '°C' ? 'K' : row.unit);
           const deltaHtml = showDiff && data.vorjahr && metric.delta && cell.cur && cell.vj
             ? weatherDelta(cell.cur[metric.field], cell.vj[metric.field], unit, decimals, !!metric.percent) : '';
-          html += weatherCell(cell.cur, cell.cur_from, metric, row, col, false, deltaHtml);
-          if (data.vorjahr) html += weatherCell(cell.vj, cell.vj_from, metric, row, col, true, '');
+          out += weatherCell(cell.cur, cell.cur_from, metric, row, col, false, deltaHtml);
+          if (data.vorjahr) out += weatherCell(cell.vj, cell.vj_from, metric, row, col, true, '');
         }
-        html += '</tr>';
+        out += '</tr>';
       }
+      return out;
+    };
+    const shown = data.rows.filter((r) => inGroup(r.key, group));
+    // Weitere Sensoren mit Raum: ein Block je Raum, darin Temperatur und Feuchte (Roadmap 1.51). Ohne Raum bei allen
+    // Sensoren bleibt es beim Block je Sensor. Reihenfolge der Räume wie die der Einträge, „Ohne Raum“ zuletzt.
+    if (group === 'klima' && shown.some((r) => r.room)) {
+      const rooms = new Map();
+      for (const row of shown) {
+        const name = row.room || '';
+        if (!rooms.has(name)) rooms.set(name, []);
+        rooms.get(name).push(row);
+      }
+      const names = [...rooms.keys()].filter(Boolean).concat(rooms.has('') ? [''] : []);
+      const kind = (row) => (row.unit === '%' ? t('Feuchte') : t('Temperatur'));
+      for (const name of names) {
+        const list = rooms.get(name);
+        html += `<tr class="wt-grp"><th colspan="${span2}">${escapeHtml(name || t('Ohne Raum'))}</th></tr>`;
+        // Zwei Sensoren gleicher Art im Raum: der Name des Eintrags unterscheidet sie.
+        const kinds = list.map(kind);
+        const label = (row, i) => (!name || kinds.indexOf(kinds[i]) !== i || kinds.lastIndexOf(kinds[i]) !== i ? row.label : kinds[i]);
+        list.forEach((row, i) => {
+          const metrics = metricsFor(row, data);
+          const wanted = opts.avgOnly ? metrics.filter((m) => m.field === 'avg') : metrics;
+          const title = label(row, i);
+          if (opts.avgOnly) html += metricRows(row, wanted, `${title} Ø`);
+          else {
+            if (list.length > 1 || !name) html += `<tr class="wt-sub"><th colspan="${span2}">${escapeHtml(title)}</th></tr>`;
+            html += metricRows(row, wanted);
+          }
+        });
+      }
+      return html + '</tbody>';
+    }
+    for (const row of shown) {
+      html += `<tr class="wt-grp"><th colspan="${span2}">${escapeHtml(row.label)}</th></tr>`;
+      const metrics = metricsFor(row, data);
+      html += metricRows(row, opts.avgOnly && group === 'klima' ? metrics.filter((m) => m.field === 'avg') : metrics,
+        opts.avgOnly && group === 'klima' ? 'Ø' : '');
     }
     return html + '</tbody>';
   }
