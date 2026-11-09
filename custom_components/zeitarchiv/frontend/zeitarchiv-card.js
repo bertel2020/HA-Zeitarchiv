@@ -74,7 +74,8 @@ const TEXTS = {
     style: 'Darstellung',
     period_saved: 'Wie im Chart gespeichert',
     legend: 'Legende anzeigen',
-    legend_style: 'Legenden-Stil', legendStyle_chart: 'Wie im Chart', legendStyle_chips: 'Chips', legendStyle_table: 'Tabelle',
+    legend_style: 'Legenden-Stil', legendStyle_chart: 'Wie im Chart', legendStyle_chips: 'Chips', legendStyle_table: 'Tabelle', legendStyle_off: 'Aus',
+    legend_size: 'Legendengröße', legendSize_chart: 'Wie im Chart', legendSize_normal: 'Normal', legendSize_small: 'Klein',
     legend_metrics: 'Kennzahlen der Legende (leer: wie im Chart)',
     metric_last: 'Aktuell', metric_min: 'Min', metric_max: 'Max', metric_average: 'Durchschnitt', metric_sum: 'Summe',
     period_day: 'Heute',
@@ -175,7 +176,8 @@ const TEXTS = {
     style: 'Display',
     period_saved: 'As saved in the chart',
     legend: 'Show legend',
-    legend_style: 'Legend style', legendStyle_chart: 'As in the chart', legendStyle_chips: 'Chips', legendStyle_table: 'Table',
+    legend_style: 'Legend style', legendStyle_chart: 'As in the chart', legendStyle_chips: 'Chips', legendStyle_table: 'Table', legendStyle_off: 'Off',
+    legend_size: 'Legend size', legendSize_chart: 'As in the chart', legendSize_normal: 'Normal', legendSize_small: 'Small',
     legend_metrics: 'Legend values (empty: as in the chart)',
     metric_last: 'Current', metric_min: 'Min', metric_max: 'Max', metric_average: 'Average', metric_sum: 'Total',
     period_day: 'Today',
@@ -845,6 +847,8 @@ class ZeitarchivCard extends HTMLElement {
   _renderLegend(runtime, result, spec, series, multiYear) {
     const raw = result.spec || {};
     const donut = (this._chart.getOption().series || []).some((entry) => entry.type === 'pie');
+    // "Aus" (an der Karte oder im Chart) blendet die Legende ganz aus, auch die Namensliste.
+    if ((this._config.legend_style || raw.legendStyle) === 'off') { this._hideLegend(); return; }
     if (raw.chartStats !== 'true' || donut || this._config.legend === false) { this._renderNameLegend(); return; }
     const box = this._els.legend;
     let metrics = [];
@@ -862,8 +866,18 @@ class ZeitarchivCard extends HTMLElement {
     };
     this._legendRender = runtime.LegendRender;
     box.className = 'legend values dtile-legend is-visible';
+    // Größe: eigene Option, sonst die des Charts, sonst Normal (die globale Einstellung der App kennt die Karte nicht).
+    box.dataset.legendSize = this._config.legend_size || raw.legendSize || 'normal';
     box.hidden = false;
     this._paintLegend();
+  }
+
+  _hideLegend() {
+    const box = this._els.legend;
+    box.replaceChildren();
+    box.className = 'legend';
+    box.hidden = true;
+    this._legend = null;
   }
 
   // "Wie das Chart" ist auf einer schmalen Karte (unter etwa 300 px) eine Chip-Reihe: eine Tabelle würde seitlich
@@ -1283,9 +1297,10 @@ class ZeitarchivCardEditor extends HTMLElement {
         // Der Schalter bleibt sichtbar; Stil und Kennzahlen stehen eingeklappt, offen, sobald etwas gewählt ist.
         schema.push({
           type: 'expandable', name: '', title: label('legend_more'),
-          expanded: Boolean(this._config.legend_style || (this._config.legend_metrics || []).length),
+          expanded: Boolean(this._config.legend_style || this._config.legend_size || (this._config.legend_metrics || []).length),
           schema: [
-            select('legend_style', ['chart', 'chips', 'table'].map((value) => ({value, label: label(`legendStyle_${value}`)}))),
+            select('legend_style', ['chart', 'chips', 'table', 'off'].map((value) => ({value, label: label(`legendStyle_${value}`)}))),
+            select('legend_size', ['chart', 'normal', 'small'].map((value) => ({value, label: label(`legendSize_${value}`)}))),
             {name: 'legend_metrics', selector: {select: {multiple: true, mode: 'list', options: LEGEND_KEYS.map((value) => ({value, label: label(`metric_${value}`)}))}}},
           ],
         });
@@ -1318,6 +1333,7 @@ class ZeitarchivCardEditor extends HTMLElement {
     }
     data.legend = data.legend !== false;
     data.legend_style = data.legend_style || 'chart';
+    data.legend_size = data.legend_size || 'chart';
     data.legend_metrics = Array.isArray(data.legend_metrics) ? data.legend_metrics : [];
     if (this._source === 'element') {
       const chosen = (this._elements || []).find((item) => item.key === data.element);
@@ -1353,7 +1369,7 @@ class ZeitarchivCardEditor extends HTMLElement {
     if (source !== this._source) {
       this._source = source;
       delete next.chart_id; delete next.table_id; delete next.entities; delete next.period; delete next.style; delete next.legend;
-      delete next.legend_style; delete next.legend_metrics;
+      delete next.legend_style; delete next.legend_size; delete next.legend_metrics;
       delete next.element; delete next.columns; delete next.vorjahr; delete next.diff; delete next.role; delete next.years; delete next.group; delete next.metric; delete next.band; delete next.side; delete next.offset; delete next.follow_energy_date; delete next.values; delete next.sparkline; delete next.mode; delete next.limit;
       if (source === 'entities') this._loadEntities();
       if (source === 'element') this._loadElements();
@@ -1368,7 +1384,8 @@ class ZeitarchivCardEditor extends HTMLElement {
     if (this._source === 'table' || next.period === 'saved') delete next.period;
     if (next.legend !== false) delete next.legend;
     // Vorgaben nicht in die YAML schreiben: "wie im Chart" ist kein Stil und keine Auswahl.
-    if (!['chips', 'table'].includes(next.legend_style) || next.legend === false || ['table', 'element'].includes(this._source)) delete next.legend_style;
+    if (!['chips', 'table', 'off'].includes(next.legend_style) || next.legend === false || ['table', 'element'].includes(this._source)) delete next.legend_style;
+    if (!['normal', 'small'].includes(next.legend_size) || next.legend === false || ['table', 'element'].includes(this._source)) delete next.legend_size;
     if (!Array.isArray(next.legend_metrics) || !next.legend_metrics.length || next.legend === false || ['table', 'element'].includes(this._source)) delete next.legend_metrics;
     if (this._source !== 'chart') delete next.chart_id;
     if (this._source !== 'table') delete next.table_id;

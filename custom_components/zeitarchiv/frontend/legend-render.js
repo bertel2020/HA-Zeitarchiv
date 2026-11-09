@@ -127,6 +127,7 @@
   // ausgeblendeten Serien.
   function renderLegendHtml(legend, hiddenSet) {
     const {items, legendMetrics, showStats, style} = legend;
+    if (style === 'off') return '';
     return style === 'table'
       ? renderLegendTable(items, legendMetrics, showStats, hiddenSet)
       : renderLegendChips(items, legendMetrics, showStats, hiddenSet);

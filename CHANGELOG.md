@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+### Neu
+
+- **Karte: Legende**: Die Legende der Chart-Karte lässt sich ausschalten und
+  in zwei Größen zeigen
+  - Legenden-Stil „Aus“ blendet die Legende ganz aus
+  - Legendengröße „Wie im Chart“, „Normal“ oder „Klein“; ohne Angabe gilt die
+    Größe des Charts
+
+---
+
+### English
+
+#### New
+
+- **Card: legend**: The legend of the chart card can be switched off and shown
+  in two sizes
+  - Legend style "Off" hides the legend completely
+  - Legend size "As in the chart", "Normal" or "Small"; without a setting the
+    size of the chart applies
+
 ## 1.4.2 - 2026-11-08
 
 ### Behoben

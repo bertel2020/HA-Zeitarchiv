@@ -1,39 +1,44 @@
 /* Erzeugt von scripts/build_card_table_css.py aus den Stylesheets der App, nicht von Hand ändern. */
 /* css/app.css */
-.chart-legend {display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;}
-.chart-legend-item {display:flex;flex-wrap:wrap;align-items:baseline;gap:9px;max-width:100%;
-  padding:6px 13px;border-radius:20px;border:1px solid var(--border);
+[data-legend-size="normal"] {--legend-scale:1;}
+[data-legend-size="small"] {--legend-scale:.85;}
+.chart-legend {display:flex;flex-wrap:wrap;gap:calc(8px * var(--legend-scale, 1));margin-top:14px;}
+.chart-legend-item {display:flex;flex-wrap:wrap;align-items:baseline;gap:calc(9px * var(--legend-scale, 1));max-width:100%;
+  padding:calc(6px * var(--legend-scale, 1)) calc(13px * var(--legend-scale, 1));border-radius:20px;border:1px solid var(--border);
   background:var(--surface-alt);cursor:pointer;font:inherit;color:inherit;
   transition:opacity .15s ease,border-color .15s ease;}
-.chart-legend-item .compare-row {flex-basis:100%;display:flex;align-items:baseline;gap:9px;}
+.chart-legend-item .compare-row {flex-basis:100%;display:flex;align-items:baseline;gap:calc(9px * var(--legend-scale, 1));}
 .chart-legend-item .compare-row .dot {opacity:.55;}
 .chart-legend-item .compare-row .compare-label {color:var(--ink-faint);white-space:nowrap;overflow:hidden;
-  text-overflow:ellipsis;max-width:180px;font-size:calc(11px * var(--font-scale, 1));}
+  text-overflow:ellipsis;max-width:180px;font-size:calc(11px * var(--font-scale, 1) * var(--legend-scale, 1));}
 .chart-legend-item .compare-row .values {color:var(--ink-faint);}
 .chart-legend-item .compare-row .compare-cut {color:var(--accent-line);background:var(--accent-line-soft);border-radius:8px;padding:0 7px;white-space:nowrap;}
 .chart-legend-table td .legend-compare-value.compare-cut {color:var(--accent-line);}
 .chart-legend-item:hover {border-color:var(--accent-line);}
 .chart-legend-item.inactive {opacity:.4;}
 .chart-legend-item[tabindex]:focus-visible {outline:2px solid var(--accent-line);outline-offset:2px;}
-.chart-legend-item .dot {width:9px;height:9px;border-radius:999px;flex:none;}
+.chart-legend-item .dot {width:calc(9px * var(--legend-scale, 1));height:calc(9px * var(--legend-scale, 1));border-radius:999px;flex:none;}
 .chart-legend-item .name {font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;
-  text-overflow:ellipsis;max-width:180px;font-size:calc(12.5px * var(--font-scale, 1));}
-.chart-legend-item .values {display:flex;flex-wrap:wrap;gap:2px 9px;flex:0 1 auto;min-width:0;font-family:var(--font-mono);color:var(--ink-muted);
-  white-space:nowrap;font-size:calc(11px * var(--font-scale, 1));}
+  text-overflow:ellipsis;max-width:180px;font-size:calc(12.5px * var(--font-scale, 1) * var(--legend-scale, 1));}
+.chart-legend-item .values {display:flex;flex-wrap:wrap;gap:2px calc(9px * var(--legend-scale, 1));flex:0 1 auto;min-width:0;font-family:var(--font-mono);color:var(--ink-muted);
+  white-space:nowrap;font-size:calc(11px * var(--font-scale, 1) * var(--legend-scale, 1));}
 .chart-legend-item.static {cursor:default;}
 .chart-legend-item.static:hover {border-color:var(--border);}
 .chart-legend-table th:not(.legend-name-col), .chart-legend-table td:not(.legend-name-col) {text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
 @media (max-width:640px) {
-.chart-legend-table .legend-name-col {width:14rem;min-width:14rem;max-width:14rem;}
+.chart-legend-table .legend-name-col {width:calc(14rem * var(--legend-scale, 1));min-width:calc(14rem * var(--legend-scale, 1));max-width:calc(14rem * var(--legend-scale, 1));}
 }
 .chart-legend-table td.legend-name-col {font-weight:600;color:var(--ink);}
 .chart-legend-table .legend-name-cell {display:inline-flex;align-items:center;gap:8px;}
-.chart-legend-table .legend-name-cell .dot {width:9px;height:9px;border-radius:999px;flex:none;}
+.chart-legend-table .legend-name-cell .dot {width:calc(9px * var(--legend-scale, 1));height:calc(9px * var(--legend-scale, 1));border-radius:999px;flex:none;}
+table.dt.chart-legend-table {font-size:calc(13.5px * var(--font-scale, 1) * var(--legend-scale, 1));}
+table.dt.compact.chart-legend-table th {padding:calc(4px * var(--legend-scale, 1)) calc(14px * var(--legend-scale, 1));font-size:calc(12.5px * var(--font-scale, 1) * var(--legend-scale, 1));}
+table.dt.compact.chart-legend-table td {padding:calc(2px * var(--legend-scale, 1)) calc(14px * var(--legend-scale, 1));}
 .chart-legend-table-row {cursor:pointer;}
 .chart-legend-table-row.static {cursor:default;}
 .chart-legend-table-row.inactive {opacity:.4;}
 .chart-legend-table-row[tabindex]:focus-visible {outline:2px solid var(--accent-line);outline-offset:-2px;}
-.chart-legend-table .legend-compare-label, .chart-legend-table td .legend-compare-value {display:block;color:var(--ink-faint);font-size:calc(10.5px * var(--font-scale, 1));}
+.chart-legend-table .legend-compare-label, .chart-legend-table td .legend-compare-value {display:block;color:var(--ink-faint);font-size:calc(10.5px * var(--font-scale, 1) * var(--legend-scale, 1));}
 .tbl-wrap {max-width:100%;min-width:0;overflow-x:auto;-webkit-overflow-scrolling:touch;
   border:1px solid var(--border);border-radius:12px;background:var(--surface);
   
