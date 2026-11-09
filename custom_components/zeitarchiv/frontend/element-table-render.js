@@ -402,9 +402,9 @@
       }
       const names = [...rooms.keys()].filter(Boolean).concat(rooms.has('') ? [''] : []);
       const kind = (row) => (row.unit === '%' ? t('Feuchte') : t('Temperatur'));
-      for (const name of names) {
+      const roomBlock = (name) => {
         const list = rooms.get(name);
-        html += `<tr class="wt-grp"><th colspan="${span2}">${escapeHtml(name || t('Ohne Raum'))}</th></tr>`;
+        let block = `<tr class="wt-grp"><th colspan="${span2}">${escapeHtml(name || t('Ohne Raum'))}</th></tr>`;
         // Zwei Sensoren gleicher Art im Raum: der Name des Eintrags unterscheidet sie.
         const kinds = list.map(kind);
         const label = (row, i) => (!name || kinds.indexOf(kinds[i]) !== i || kinds.lastIndexOf(kinds[i]) !== i ? row.label : kinds[i]);
@@ -412,12 +412,33 @@
           const metrics = metricsFor(row, data);
           const wanted = opts.avgOnly ? metrics.filter((m) => m.field === 'avg') : metrics;
           const title = label(row, i);
-          if (opts.avgOnly) html += metricRows(row, wanted, `${title} Ø`);
+          if (opts.avgOnly) block += metricRows(row, wanted, `${title} Ø`);
           else {
-            if (list.length > 1 || !name) html += `<tr class="wt-sub"><th colspan="${span2}">${escapeHtml(title)}</th></tr>`;
-            html += metricRows(row, wanted);
+            if (list.length > 1 || !name) block += `<tr class="wt-sub"><th colspan="${span2}">${escapeHtml(title)}</th></tr>`;
+            block += metricRows(row, wanted);
           }
         });
+        return block;
+      };
+      // Etagen aus Home Assistant: Räume unter ihrer Etage, die Etage lässt sich einklappen (opts.closedFloors).
+      // Ohne Etage bei allen Räumen entfallen die Köpfe. Räume ohne Etage stehen zuletzt unter „Ohne Etage“.
+      const floorOf = (name) => (name ? (rooms.get(name)[0].floor || '') : '');
+      if (!names.some((name) => floorOf(name))) {
+        for (const name of names) html += roomBlock(name);
+        return html + '</tbody>';
+      }
+      const floors = [];
+      for (const name of names) if (floorOf(name) && !floors.includes(floorOf(name))) floors.push(floorOf(name));
+      if (names.some((name) => !floorOf(name))) floors.push('');
+      const closed = opts.closedFloors || [];
+      for (const floor of floors) {
+        const inFloor = names.filter((name) => floorOf(name) === floor);
+        const isClosed = closed.includes(floor);
+        const attrs = opts.interactive
+          ? ` data-floor="${escapeHtml(floor)}" role="button" tabindex="0" aria-expanded="${!isClosed}"` : '';
+        html += `<tr class="wt-floor${isClosed ? ' is-closed' : ''}${opts.interactive ? ' is-toggle' : ''}"><th colspan="${span2}"${attrs}>`
+          + `<span class="wt-floor-chev" aria-hidden="true">▾</span> ${escapeHtml(floor || t('Ohne Etage'))}</th></tr>`;
+        if (!isClosed) for (const name of inFloor) html += roomBlock(name);
       }
       return html + '</tbody>';
     }

@@ -72,6 +72,9 @@ class Registry:
     def async_get_area(self, key):
         return self.entries.get(key)
 
+    def async_get_floor(self, key):
+        return self.entries.get(key)
+
 
 class Matcher:
     def __init__(self, selected: set[str], excluded: set[str]) -> None:
@@ -105,6 +108,25 @@ def _catalog():
         Matcher({"sensor.netz_bezug"}, {"sensor.ignoriert"}),
         {"sensor.netz_bezug": "grid_import"},
     )
+
+
+def test_catalog_adds_the_floor_of_the_area_when_home_assistant_has_floors() -> None:
+    entity_registry = Registry({
+        "sensor.bad_t": Entry(area_id="a1"), "sensor.garten_t": Entry(area_id="a2"), "sensor.flur_t": Entry(),
+    })
+    area_registry = Registry({
+        "a1": SimpleNamespace(name="Bad", floor_id="f1"), "a2": SimpleNamespace(name="Garten", floor_id=None),
+    })
+    floors = Registry({"f1": SimpleNamespace(name=" Obergeschoss ")})
+    states = [_state(entity_id, device_class="temperature") for entity_id in ("sensor.bad_t", "sensor.garten_t", "sensor.flur_t")]
+    args = (states, entity_registry, Registry(), area_registry, Matcher(set(), set()))
+    rows = {row["entity_id"]: row for row in build_catalog(*args, floor_registry=floors)}
+    assert (rows["sensor.bad_t"]["area"], rows["sensor.bad_t"]["floor"]) == ("Bad", "Obergeschoss")
+    assert (rows["sensor.garten_t"]["area"], rows["sensor.garten_t"]["floor"]) == ("Garten", None)
+    assert (rows["sensor.flur_t"]["area"], rows["sensor.flur_t"]["floor"]) == (None, None)
+    # Ältere Aufrufer und Home Assistant ohne Etagen: der Katalog bleibt gleich, nur ohne Etage.
+    old = {row["entity_id"]: row for row in build_catalog(*args)}
+    assert old["sensor.bad_t"]["area"] == "Bad" and old["sensor.bad_t"]["floor"] is None
 
 
 def test_build_catalog_collects_metadata_without_values() -> None:

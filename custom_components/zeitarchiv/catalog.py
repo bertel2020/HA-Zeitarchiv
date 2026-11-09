@@ -126,6 +126,7 @@ def build_catalog(
     *,
     ledger: Mapping[str, Any] | None = None,
     label_registry: Any = None,
+    floor_registry: Any = None,
 ) -> list[dict[str, Any]]:
     """Eine Zeile je archivierbarer Entität, ohne Werte.
 
@@ -149,6 +150,15 @@ def build_catalog(
             return None
         area = area_registry.async_get_area(area_id)
         return _text(getattr(area, "name", None))
+
+    def floor_name(area_id: str | None) -> str | None:
+        """Etage der Area (Home Assistant führt Etagen an der Area); ohne Etagen-Registry oder Zuordnung None."""
+        if not area_id or floor_registry is None:
+            return None
+        floor_id = getattr(area_registry.async_get_area(area_id), "floor_id", None)
+        if not floor_id:
+            return None
+        return _text(getattr(floor_registry.async_get_floor(floor_id), "name", None))
 
     def label_name(value: str) -> str:
         label = label_registry.async_get_label(value) if label_registry is not None else None
@@ -178,6 +188,7 @@ def build_catalog(
         entry = entity_registry.async_get(entity_id)
         attrs = state.attributes if state is not None else {}
         device = device_registry.async_get(entry.device_id) if entry is not None and entry.device_id else None
+        area_id = getattr(entry, "area_id", None) or getattr(device, "area_id", None)
         explanation = _explain(matcher, entity_id)
         selected = bool(explanation.get("selected"))
         ledger_entry = entries.get(entity_id)
@@ -197,7 +208,8 @@ def build_catalog(
             "unit": _text(attrs.get("unit_of_measurement"), 40),
             "platform": _text(getattr(entry, "platform", None), 80),
             "device": _name(device),
-            "area": area_name(getattr(entry, "area_id", None) or getattr(device, "area_id", None)),
+            "area": area_name(area_id),
+            "floor": floor_name(area_id),
             "entity_category": _text(getattr(entry, "entity_category", None), 20),
             "hidden": bool(getattr(entry, "hidden_by", None)),
             "energy_role": roles.get(entity_id),

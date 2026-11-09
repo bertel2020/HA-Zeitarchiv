@@ -47,6 +47,15 @@ def _label_registry(hass: HomeAssistant) -> Any:
         return None
 
 
+def _floor_registry(hass: HomeAssistant) -> Any:
+    try:
+        from homeassistant.helpers import floor_registry as fr  # noqa: PLC0415
+
+        return fr.async_get(hass)
+    except Exception:  # noqa: BLE001 — ältere Home Assistant ohne Etagen: der Katalog bleibt ohne Etage
+        return None
+
+
 class CatalogSender:
     def __init__(
         self,
@@ -125,6 +134,7 @@ class CatalogSender:
                 await self._energy_roles(),
                 ledger=ledger,
                 label_registry=labels,
+                floor_registry=_floor_registry(self._hass),
             )
             label_name = None
             if ledger and ledger.get("label_id") and labels is not None:
