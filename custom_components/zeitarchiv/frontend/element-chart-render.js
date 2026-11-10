@@ -67,16 +67,18 @@
         areaStyle: {color: colors.prev, opacity: 0.16},
       });
     }
-    for (const year of past.slice().reverse()) {
+    // Wie im Wetter-Monatsvergleich: höchstens SHOWN_PAST_YEARS frühere Jahre, das Vorjahr kräftig, ältere blasser, alle in der Legende.
+    const shownPast = past.slice(0, SHOWN_PAST_YEARS);  // past: neuestes Jahr zuerst
+    for (const year of shownPast.slice().reverse()) {
       const strong = year === lastPast;
       const data = role.values[year].map((value, i) => (isPartialStart(role, year, i) ? null : value));
       series.push({
         name: String(year), type: 'line', data, symbol: 'none', connectNulls: false,
-        lineStyle: {color: colors.prev, width: strong ? 2 : 1.2, opacity: strong ? 1 : 0.45},
+        lineStyle: {color: colors.prev, width: strong ? 2 : 1.2, opacity: pastOpacity(shownPast.indexOf(year))},
         itemStyle: {color: colors.prev},
       });
-      if (strong) legend.push(String(year));
     }
+    shownPast.forEach((year, index) => legend.push(legendEntry(String(year), colors.prev, pastOpacity(index))));
     if (hasAvg) {
       series.push({
         name: 'Ø', type: 'line', data: avg, symbol: 'none',
@@ -130,6 +132,25 @@
   // ECharts-Optionen für den Monatsvergleich des Wetters (Temperatur, Regen, Sonne). m: Antwort von monatsvergleich.
   const SHOWN_PAST_YEARS = 5;
 
+  // Deckkraft einer früheren Jahreslinie: das Vorjahr (Rang 0) voll, jedes ältere Jahr blasser, nie unter 0,3.
+  function pastOpacity(rank) {
+    return rank <= 0 ? 1 : Math.max(0.3, 0.7 - 0.1 * rank);
+  }
+
+  // Farbe mit Deckkraft als rgba (nur für #rrggbb; alles andere bleibt unverändert).
+  function withAlpha(color, alpha) {
+    const hex = /^#([0-9a-f]{6})$/i.exec(String(color).trim());
+    if (!hex) return color;
+    const n = parseInt(hex[1], 16);
+    return `rgba(${n >> 16}, ${(n >> 8) & 255}, ${n & 255}, ${Math.round(alpha * 100) / 100})`;
+  }
+
+  // Legendeneintrag in genau dem Ton der Linie: das Zeichen soll zeigen, wie blass das Jahr im Diagramm ist.
+  function legendEntry(name, color, opacity = 1) {
+    const tone = withAlpha(color, opacity);
+    return {name, itemStyle: {color: tone, opacity: 1}, lineStyle: {color: tone, opacity: 1}};
+  }
+
   function weatherMonthly(m, options) {
     const {colors} = options;
     const font = options.font || ((size) => size);
@@ -152,17 +173,18 @@
       });
     }
     // Linien nur für die letzten SHOWN_PAST_YEARS früheren Jahre; Ø und Band gelten für alle Jahre.
-    const shownPast = new Set(yearKeys.filter((year) => year < m.current_year).slice(-SHOWN_PAST_YEARS));
-    for (const year of yearKeys) {
-      if (year >= m.current_year || !shownPast.has(year)) continue;
+    const shownPast = yearKeys.filter((year) => year < m.current_year).slice(-SHOWN_PAST_YEARS);
+    // Das Vorjahr kräftig, ältere Jahre in immer blasseren Tönen derselben Farbe; alle stehen in der Legende (neueste zuerst).
+    shownPast.forEach((year, index) => {
+      const rank = shownPast.length - 1 - index;
       const strong = year === lastPast;
       series.push({
         name: String(year), type: 'line', data: m.years[year], symbol: 'none', connectNulls: false,
-        lineStyle: {color: colors.prev, width: strong ? 2 : 1.2, opacity: strong ? 1 : 0.45},
+        lineStyle: {color: colors.prev, width: strong ? 2 : 1.2, opacity: pastOpacity(rank)},
         itemStyle: {color: colors.prev},
       });
-      if (strong) legend.push(String(year));
-    }
+    });
+    shownPast.slice().reverse().forEach((year, index) => legend.push(legendEntry(String(year), colors.prev, pastOpacity(index))));
     if (hasAvg) {
       series.push({
         name: 'Ø', type: 'line', data: m.avg, symbol: 'none',
@@ -351,5 +373,5 @@
   }
 
   window.ElementChartRender = {
-    energyHeatmap, energyShares,energyMonthly, weatherMonthly, weatherMatrix};
+    energyHeatmap, energyShares,energyMonthly, weatherMonthly, weatherMatrix, pastOpacity, legendEntry};
 })();
