@@ -124,10 +124,10 @@
       + `<div class="kpi-value">${value}</div>${change ? `<div class="kpi-sub">${change}</div>` : ''}</div></div>${lines}${sparkline(data.soc)}</div>`;
   }
 
-  // Rekorde: je ein Kachel mit dem höchsten Tageswert und dem Datum. Sie gibt es erst nach einem Jahr Archiv (enough).
+  // Rekorde: je ein Kachel mit dem höchsten Tageswert und dem Datum; ohne Tageswerte (enough) gibt es keine.
   function energyRecords(data) {
     const records = data.records || [];
-    if (!data.enough || !records.length) return `<div class="kpi-empty">${escapeHtml(t('Rekorde erscheinen, sobald ein Jahr Daten vorliegt.'))}</div>`;
+    if (!data.enough || !records.length) return `<div class="kpi-empty">${escapeHtml(t('Noch keine Rekorde: Es liegen noch keine Tageswerte vor.'))}</div>`;
     const {formats, fmtDate} = window.ElementTableRender;
     const tiles = records.map((record) => {
       const date = fmtDate(formats.dmy, Date.parse(`${record.date}T12:00:00Z`) / 1000);
