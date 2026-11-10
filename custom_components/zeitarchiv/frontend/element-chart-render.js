@@ -128,6 +128,8 @@
   }
 
   // ECharts-Optionen für den Monatsvergleich des Wetters (Temperatur, Regen, Sonne). m: Antwort von monatsvergleich.
+  const SHOWN_PAST_YEARS = 5;
+
   function weatherMonthly(m, options) {
     const {colors} = options;
     const font = options.font || ((size) => size);
@@ -149,8 +151,10 @@
         areaStyle: {color: colors.prev, opacity: 0.16},
       });
     }
+    // Linien nur für die letzten SHOWN_PAST_YEARS früheren Jahre; Ø und Band gelten für alle Jahre.
+    const shownPast = new Set(yearKeys.filter((year) => year < m.current_year).slice(-SHOWN_PAST_YEARS));
     for (const year of yearKeys) {
-      if (year >= m.current_year) continue;
+      if (year >= m.current_year || !shownPast.has(year)) continue;
       const strong = year === lastPast;
       series.push({
         name: String(year), type: 'line', data: m.years[year], symbol: 'none', connectNulls: false,
