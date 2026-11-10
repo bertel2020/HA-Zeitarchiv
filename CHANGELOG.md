@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.5.0 - 2026-11-10
 
 ### Neu
 
@@ -9,6 +9,24 @@
   - Legenden-Stil „Aus“ blendet die Legende ganz aus
   - Legendengröße „Wie im Chart“, „Normal“ oder „Klein“; ohne Angabe gilt die
     Größe des Charts
+- **Karte: Weitere Sensoren nach Raum und Etage**: Die Tabelle des
+  Wetterdashboards gruppiert die Sensoren nach Raum, die Räume lassen sich
+  einklappen und stehen unter ihrer Etage aus Home Assistant (braucht
+  Zeitarchiv 1.40.0)
+- **Karte: Tabellen**: Die Karte folgt den Tabellen der App
+  - Neue Zeilen-Aggregation „Aktueller Wert“, Nachkommastellen der Entität bei
+    der Spalte „Auto“
+  - Spalten „Heute“ und „Gestern“, Vorjahr-Menü und Spaltenköpfe wie in der
+    App, einzelne Jahre mit eigenem Kopf
+- **Karte: Charts**: Anpassungen an die App
+  - Der Monatsvergleich zeigt höchstens die letzten fünf früheren Jahre, alle
+    stehen in der Legende, ältere Jahre blasser
+  - Monatsdiagramm mit wählbaren Nachkommastellen
+  - Neue Kenntage „Tage ohne Netzbezug“ und „Hohe Einspeisung“, Jahre ohne
+    Speicher; Heatmap mit Farbverlauf und Text für leere Felder, der 29.
+    Februar in der Jahresmatrix grau
+  - Rekorde ohne Mindestlänge des Archivs, mit eigenem Text, wenn noch keine
+    vorliegen
 
 ---
 
@@ -21,6 +39,23 @@
   - Legend style "Off" hides the legend completely
   - Legend size "As in the chart", "Normal" or "Small"; without a setting the
     size of the chart applies
+- **Card: more sensors by room and floor**: The weather dashboard table groups
+  the sensors by room, rooms can be collapsed and sit below their floor from
+  Home Assistant (needs Zeitarchiv 1.40.0)
+- **Card: tables**: The card follows the tables of the app
+  - New row aggregation "Current value", decimals of the entity for the
+    column "Auto"
+  - Columns "Today" and "Yesterday", the previous-year menu and column heads as
+    in the app, single years with their own head
+- **Card: charts**: Adjustments to the app
+  - The monthly comparison shows at most the last five earlier years, all of
+    them are in the legend, older years fainter
+  - Monthly chart with selectable decimals
+  - New record days "Days without grid import" and "High feed-in", years
+    without storage; heatmap with a colour gradient and text for empty cells,
+    February 29 grey in the yearly matrix
+  - Records without a minimum archive length, with their own text when there
+    are none yet
 
 ## 1.4.2 - 2026-11-08
 
