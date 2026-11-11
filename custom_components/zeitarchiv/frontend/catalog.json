@@ -97,6 +97,7 @@
     "So": "Sun",
     "Sommertage": "Summer days",
     "Sonnenstunden": "Hours of sunshine",
+    "Sonnenstunden (ab {n} % des klaren Himmels)": "Sunshine hours (from {n} % of clear sky)",
     "Sonnenstunden (ab {n} lx)": "Sunshine hours (from {n} lx)",
     "Sonnentage": "Sunny days",
     "Sonnigster Tag": "Sunniest day",
@@ -160,7 +161,7 @@
     "{name} ({year}) kumuliert": "{name} ({year}) cumulative",
     "{phrase} · bis {cutoff}": "{phrase} · until {cutoff}",
     "{range} Uhr": "{range}",
-    "Ø {from}–{to}": "Ø {from}–{to}",
+    "Ø {from}–{to}": "Avg {from}–{to}",
     "Überschusstage": "Surplus days"
   }
 }

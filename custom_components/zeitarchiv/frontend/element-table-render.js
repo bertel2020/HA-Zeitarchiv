@@ -284,7 +284,7 @@
     if (row.kind === 'sunshine') {
       // Stundengenau: Stunden, deren Mittel die Schwelle erreicht. Die Schwelle steht in der Beschriftung.
       return [
-        {label: t('Sonnenstunden (ab {n} lx)', {n: num(data.sun_threshold_lx, 0)}), field: 'hours', decimals: 1, unit: 'h', delta: true, percent: true},
+        {label: data.sun_relative ? t('Sonnenstunden (ab {n} % des klaren Himmels)', {n: num(data.sun_share_pct, 0)}) : t('Sonnenstunden (ab {n} lx)', {n: num(data.sun_threshold_lx, 0)}), field: 'hours', decimals: 1, unit: 'h', delta: true, percent: true},
         {label: t('Sonnigster Tag'), field: 'top', decimals: 1, unit: 'h', when: 'day'},
       ];
     }
