@@ -971,9 +971,12 @@
       const gid = stackMembers[s.entity_id];
       return gid ? 'bar-' + axisKey(s) + '-' + gid : null;
     });
+    const stackNameOf = gid => ((stackGroups.groups || []).find(g => g.id === gid) || {}).name || t('Stapel');
     const keyCounts = new Map();
     stackKeys.forEach(k => { if (k) keyCounts.set(k, (keyCounts.get(k) || 0) + 1); });
     if (hasStackGroups) stackKeys.forEach((k, i) => { if (k && keyCounts.get(k) < 2) stackKeys[i] = null; });
+    const stackNameByKey = new Map();
+    series.forEach((s, i) => { if (stackKeys[i] && hasStackGroups) stackNameByKey.set(stackKeys[i], stackNameOf(stackMembers[s.entity_id])); });
     // 100%-Normierung nur, wenn jeder Balken der Achse in einem Stapel liegt: sonst stünden
     // Prozent und absolute Werte auf einer Achse.
     const normalizeActive = stackedActive && normalize;
@@ -1427,7 +1430,26 @@
                  + `<span style="margin-left:8px;text-align:right;"><strong>${value}${extra}</strong>`
                  + `${TooltipHold.note(p, inkFaint, ms => fmtTooltipTimestamp(ms, tooltipBucketSeconds))}</span></div>`;
           }).join('');
-          return header ? `<div style="margin-bottom:4px;color:${inkFaint};">${header}</div>${rows}` : rows;
+          // Summe je Stapel (nur mit eigenen Stapeln): bei Anteilen (%) die Summe der Absolutwerte.
+          const sums = new Map();
+          if (hasStackGroups) {
+            params.forEach(p => {
+              const key = stackKeys[p.seriesIndex];
+              if (!key) return;
+              const abs = p.data[5];
+              const entry = sums.get(key) || {n: 0, sum: 0, unit: abs != null ? p.data[6] : p.data[2], decimals: abs != null ? p.data[7] : p.data[3], duration: !!p.data[4]};
+              entry.n += 1;
+              entry.sum += abs != null ? abs : p.data[1];
+              sums.set(key, entry);
+            });
+          }
+          const sumRows = [...sums.entries()].filter(([, e]) => e.n >= 2).map(([key, e]) => {
+            const value = e.duration ? NumberFormat.fmtDuration(e.sum) : `${fmtCompactNumber(e.sum, e.decimals)}${e.unit ? ' ' + escapeHtml(e.unit) : ''}`;
+            return `<div style="display:flex;justify-content:space-between;gap:14px;margin-top:4px;padding-top:4px;border-top:1px solid ${borderColor};">`
+                 + `<span>Σ ${escapeHtml(stackNameByKey.get(key) || '')}</span><span style="margin-left:8px;text-align:right;"><strong>${value}</strong></span></div>`;
+          }).join('');
+          const body = rows + sumRows;
+          return header ? `<div style="margin-bottom:4px;color:${inkFaint};">${header}</div>${body}` : body;
         },
         // Kachel hat overflow:hidden (verhindert, dass z. B. die Legende das
         // Kachel-Layout sprengt) — ohne appendToBody würde der Tooltip am
@@ -1447,7 +1469,26 @@
     }, true);
   }
 
+  // Name des Stapels je Entität für die Legende (nur bei wirksamen Stapeln): gleiche Regel wie
+  // stackKeys in draw() — Balken mit Gruppe, mindestens zwei je Achse, nicht bei Auflösung „Voll“.
+  function stackLabels(series, spec) {
+    const out = {};
+    const members = (spec.stackGroups && spec.stackGroups.members) || {};
+    if (!spec.stacked || spec.resolutionPreset === 'full' || !Object.keys(members).length) return out;
+    const axisOf = s => (s.aggregation_type === 'switch' && s.display_mode === 'time') ? ' duration' : s.unit;
+    const bars = series.filter(s => s.chart_type === 'bar' && members[s.entity_id]);
+    const counts = new Map();
+    bars.forEach(s => { const k = axisOf(s) + '|' + members[s.entity_id]; counts.set(k, (counts.get(k) || 0) + 1); });
+    bars.forEach(s => {
+      if (counts.get(axisOf(s) + '|' + members[s.entity_id]) < 2) return;
+      const group = (spec.stackGroups.groups || []).find(g => g.id === members[s.entity_id]);
+      out[s.entity_id] = (group && group.name) || t('Stapel');
+    });
+    return out;
+  }
+
   window.ChartTileRender = {
+    stackLabels,
     PALETTE,
     LOCALE,
     scaledFont,

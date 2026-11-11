@@ -18,6 +18,8 @@
 .chart-legend-item.inactive {opacity:.4;}
 .chart-legend-item[tabindex]:focus-visible {outline:2px solid var(--accent-line);outline-offset:2px;}
 .chart-legend-item .dot {width:calc(9px * var(--legend-scale, 1));height:calc(9px * var(--legend-scale, 1));border-radius:999px;flex:none;}
+.legend-stack {font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);white-space:nowrap;}
+.legend-stack::before {content:"· ";}
 .chart-legend-item .name {font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;
   text-overflow:ellipsis;max-width:180px;font-size:calc(12.5px * var(--font-scale, 1) * var(--legend-scale, 1));}
 .chart-legend-item .values {display:flex;flex-wrap:wrap;gap:2px calc(9px * var(--legend-scale, 1));flex:0 1 auto;min-width:0;font-family:var(--font-mono);color:var(--ink-muted);

@@ -71,6 +71,9 @@
       + (showStats ? ` <strong>${escapeHtml(row.text)}</strong>` : '') + '</span>').join('')}</span>`;
   }
 
+  // Stapelname hinter dem Serien-Namen (nur bei wirksamen Stapeln).
+  const stackTag = item => (item.stack ? ` <span class="legend-stack">${escapeHtml(item.stack)}</span>` : '');
+
   // Chip-Variante (Standard) — dieselben Chips/Kennzahlen wie chart_editor.html
   // (.chart-legend-item aus app.css), hier zusätzlich klickbar, anders als die
   // "static" (nicht umschaltbare) Variante auf entity_detail.html.
@@ -95,7 +98,7 @@
       const inactive = hiddenSet.has(item.name) ? ' inactive' : '';
       return `<span class="chart-legend-item${inactive}" data-series="${escapeHtml(item.name)}" role="button" tabindex="0">`
            + legendSwatch(item)
-           + `<span class="name">${escapeHtml(item.name)}</span>${values}</span>`;
+           + `<span class="name">${escapeHtml(item.name)}</span>${stackTag(item)}${values}</span>`;
     }).join('');
   }
 
@@ -116,7 +119,7 @@
       return `<tr class="chart-legend-table-row${inactive}" data-series="${escapeHtml(item.name)}" role="button" tabindex="0">`
            + `<td class="legend-name-col"><span class="legend-name-cell">`
            + legendSwatch(item)
-           + `<span class="name">${escapeHtml(item.name)}</span></span></td>${cells}</tr>`;
+           + `<span class="name">${escapeHtml(item.name)}</span>${stackTag(item)}</span></td>${cells}</tr>`;
     }).join('');
     return `<div class="tbl-wrap"><table class="dt compact chart-legend-table">`
          + `<thead><tr><th class="legend-name-col">Name</th>${headerCells}</tr></thead>`
@@ -175,7 +178,11 @@
       });
       return items;
     }
-    return series.map(s => statsItem(s, s.points, entityNames[s.entity_id] || s.friendly_name, colorFor(s.entity_id)));
+    const stackNames = window.ChartTileRender.stackLabels(series, spec);
+    return series.map(s => ({
+      ...statsItem(s, s.points, entityNames[s.entity_id] || s.friendly_name, colorFor(s.entity_id)),
+      stack: stackNames[s.entity_id] || '',
+    }));
   }
 
   window.LegendRender = {buildStatsItem, buildLegendItems, renderLegendHtml};
