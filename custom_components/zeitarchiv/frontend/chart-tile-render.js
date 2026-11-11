@@ -767,6 +767,9 @@
     // stackedActive/normalizeActive in draw() (chart_editor.js-Parität).
     const stacked = ds.stacked === 'true';
     const normalize = ds.normalize === 'true';
+    // Mehrere Stapel (saved_charts.stack_groups): {groups: [{id, name}], members: {entity_id: id}}.
+    let stackGroups = {};
+    try { stackGroups = JSON.parse(ds.stackGroups || '{}') || {}; } catch (e) { stackGroups = {}; }
     // "Ausrichtung" (Optionen-Menü, nur bei Auflösung "Voll") — siehe
     // horizontalActive in draw() (chart_editor.js-Parität).
     const horizontal = ds.horizontal === 'true';
@@ -776,7 +779,7 @@
     const spec = {
       entityIds, entityNames, colorFor, range, continuous, resolutionPreset, dynamicYAxis, animation,
       chartType, timeline, donut, donutAggregation, effectiveDecimals, showValues, averageLine,
-      averageStyle, areaFill, showPoints, stacked, normalize, horizontal, heatmapStates,
+      averageStyle, areaFill, showPoints, stacked, normalize, stackGroups, horizontal, heatmapStates,
       periodAnchor: ds.periodAnchor || '',
       compareSettings: ds.compareSettings || '',
     };
@@ -879,7 +882,7 @@
     const {
       entityNames, colorFor, range, resolutionPreset, dynamicYAxis, animation, timeline, donut,
       donutAggregation, effectiveDecimals, showValues, averageLine, averageStyle, areaFill,
-      showPoints, stacked, normalize, horizontal, heatmapStates, compare,
+      showPoints, stacked, normalize, stackGroups, horizontal, heatmapStates, compare,
     } = spec;
     const borderColor = style.getPropertyValue('--border').trim();
     const inkFaint = style.getPropertyValue('--ink-faint').trim();
@@ -957,9 +960,25 @@
     // eine mitgezeichnete Linie derselben Einheit stünde sonst auf einer
     // 0–100%-Skala, die für die gestapelten Balken gemeint ist.
     const stackedActive = stacked && !singleBucket && series.filter(s => s.chart_type === 'bar').length >= 2;
+    // Stapelschlüssel je Serie: ohne Stapel-Einstellung ein Stapel je Achse (wie bisher), mit
+    // Stapeln nur die zugeordneten Balken je Stapel. Ein Stapel mit nur einer Balken-Serie
+    // wirkt wie ein Einzelbalken (Schlüssel null).
+    const stackMembers = (stackGroups && stackGroups.members) || {};
+    const hasStackGroups = !!(stackGroups && (stackGroups.groups || []).length);
+    const stackKeys = series.map(s => {
+      if (!stackedActive || s.chart_type !== 'bar') return null;
+      if (!hasStackGroups) return 'bar-' + axisKey(s);
+      const gid = stackMembers[s.entity_id];
+      return gid ? 'bar-' + axisKey(s) + '-' + gid : null;
+    });
+    const keyCounts = new Map();
+    stackKeys.forEach(k => { if (k) keyCounts.set(k, (keyCounts.get(k) || 0) + 1); });
+    if (hasStackGroups) stackKeys.forEach((k, i) => { if (k && keyCounts.get(k) < 2) stackKeys[i] = null; });
+    // 100%-Normierung nur, wenn jeder Balken der Achse in einem Stapel liegt: sonst stünden
+    // Prozent und absolute Werte auf einer Achse.
     const normalizeActive = stackedActive && normalize;
     const barOnlyAxis = new Set(
-      units.filter(u => series.every(s => axisKey(s) !== u || s.chart_type === 'bar'))
+      units.filter(u => series.every((s, i) => axisKey(s) !== u || (s.chart_type === 'bar' && stackKeys[i])))
     );
     // Strengste (kleinste) Nachkommastellen-Einstellung aller Entitäten einer
     // gemeinsamen Achse — dieselbe Regel wie in chart_editor.html.
@@ -1088,23 +1107,23 @@
       // letzten Wert und würde das Fenster am Rand verfälschen.
       return {lineData, averageValues, rawPoints: displayPoints};
     });
-    // x (ms-Zeitstempel bzw. 0 bei singleBucket) -> Summe je Achse, nur für
+    // x (ms-Zeitstempel bzw. 0 bei singleBucket) -> Summe je Stapel, nur für
     // tatsächlich normierte reine Balken-Achsen (barOnlyAxis, s. o.).
     const axisTotals = new Map();
     if (normalizeActive) {
       series.forEach((s, i) => {
         const u = axisKey(s);
         if (!barOnlyAxis.has(u)) return;
-        if (!axisTotals.has(u)) axisTotals.set(u, new Map());
-        const totals = axisTotals.get(u);
+        if (!axisTotals.has(stackKeys[i])) axisTotals.set(stackKeys[i], new Map());
+        const totals = axisTotals.get(stackKeys[i]);
         prepared[i].lineData.forEach(p => totals.set(p[0], (totals.get(p[0]) || 0) + p[1]));
       });
     }
-    // Letzter Balken-Index je Achse — nur der bekommt beim Stapeln abgerundete
+    // Letzter Balken-Index je Stapel — nur der bekommt beim Stapeln abgerundete
     // obere Ecken (das oberste, sichtbare Ende des Stapels), statt wie im
     // gruppierten Fall JEDES Segment einzeln abzurunden.
-    const lastBarIndexForAxis = new Map();
-    series.forEach((s, i) => { if (s.chart_type === 'bar') lastBarIndexForAxis.set(axisKey(s), i); });
+    const lastBarIndexForStack = new Map();
+    stackKeys.forEach((k, i) => { if (k) lastBarIndexForStack.set(k, i); });
 
     // Gesammelt statt direkt in echartsSeries gepusht — series.map() liefert
     // genau ein Element je Durchlauf, die Trendlinie ist aber eine
@@ -1116,14 +1135,14 @@
     const echartsSeries = series.map((s, i) => {
       const color = colorFor(s.entity_id);
       const displayName = entityNames[s.entity_id] || s.friendly_name;
-      const isStackedBar = s.chart_type === 'bar' && stackedActive;
+      const isStackedBar = !!stackKeys[i];
       // 100%-Normierung nur auf reinen Balken-Achsen und nur für Balken-
       // Serien — eine überlagerte Linie derselben Einheit bleibt unverändert
       // in Absolutwerten (barOnlyAxis enthält ihre Achse dann nicht).
-      const axisNormalized = normalizeActive && s.chart_type === 'bar' && barOnlyAxis.has(axisKey(s));
+      const axisNormalized = normalizeActive && isStackedBar && barOnlyAxis.has(axisKey(s));
       let lineData = prepared[i].lineData;
       if (axisNormalized) {
-        const totals = axisTotals.get(axisKey(s));
+        const totals = axisTotals.get(stackKeys[i]);
         // Felder 6/7 (Originaleinheit/-Nachkommastellen) stehen schon an
         // Position 2/3 des Ausgangs-Tupels — direkt übernommen statt erneut
         // nachgeschlagen. Feld 5: der Original-Absolutwert, nur für den
@@ -1159,7 +1178,7 @@
         // Kategorie-Index als x-Wert und den Messwert als Kategorie-Index
         // (Balken verschwinden, Werte-Achse skaliert auf ~Kategorien-Anzahl).
         encode: horizontalActive ? {x: 1, y: 0} : undefined,
-        stack: isStackedBar ? 'bar-' + axisKey(s) : undefined,
+        stack: stackKeys[i] || undefined,
         // Bei aktiver Trendlinie tritt die rohe Kurve zurück, bleibt aber
         // sichtbar — dieselbe Ergänzung-statt-Ersatz-Logik wie im Editor.
         lineStyle: {width: 2, color, opacity: showRollingAverage ? 0.45 : 1},
@@ -1197,9 +1216,9 @@
         // dank der niedrigen Deckkraft nicht. Abschaltbar (Optionen-Menü,
         // "Fläche"), Default an — siehe chart_editor.js.
         if (areaFill) cfg.areaStyle = {color, opacity: 0.08};
-      } else if (!stackedActive) {
+      } else if (!isStackedBar) {
         cfg.itemStyle.borderRadius = [3, 3, 0, 0];
-      } else if (lastBarIndexForAxis.get(axisKey(s)) === i) {
+      } else if (lastBarIndexForStack.get(stackKeys[i]) === i) {
         // Nur das oberste Segment jedes Stapels abrunden — jedes einzelne
         // Segment abzurunden sähe wie mehrere getrennte Balken aus, nicht
         // wie ein durchgehender Stapel.
