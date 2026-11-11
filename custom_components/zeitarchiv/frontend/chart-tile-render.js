@@ -949,7 +949,6 @@
     // Kommentar dort für die ausführliche Begründung).
     const singleBucket = resolutionPreset === 'full';
     const horizontalActive = singleBucket && horizontal;
-    const entityCategories = series.map(s => entityNames[s.entity_id] || s.friendly_name);
     // Wie chart_editor.js: "Gestapelt" nur ab zwei Balken-Serien UND
     // außerhalb von Auflösung "Voll" (dort hat jede Entität schon ihre
     // eigene Kategorie — eine gestapelte Kombination aller Entitäten in
@@ -959,12 +958,14 @@
     // Normierung nur auf Achsen, auf denen AUSSCHLIESSLICH Balken liegen —
     // eine mitgezeichnete Linie derselben Einheit stünde sonst auf einer
     // 0–100%-Skala, die für die gestapelten Balken gemeint ist.
-    const stackedActive = stacked && !singleBucket && series.filter(s => s.chart_type === 'bar').length >= 2;
     // Stapelschlüssel je Serie: ohne Stapel-Einstellung ein Stapel je Achse (wie bisher), mit
     // Stapeln nur die zugeordneten Balken je Stapel. Ein Stapel mit nur einer Balken-Serie
     // wirkt wie ein Einzelbalken (Schlüssel null).
     const stackMembers = (stackGroups && stackGroups.members) || {};
     const hasStackGroups = Object.keys(stackMembers).length > 0;
+    // Bei Auflösung „Voll“ (eine Kategorie je Entität) stapelt nur, was einem Stapel zugeordnet
+    // ist: jeder Stapel bekommt dann eine eigene Kategorie, ohne Stapel bleibt es der Ranking-Vergleich.
+    const stackedActive = stacked && (!singleBucket || hasStackGroups) && series.filter(s => s.chart_type === 'bar').length >= 2;
     const stackKeys = series.map(s => {
       if (!stackedActive || s.chart_type !== 'bar') return null;
       if (!hasStackGroups) return 'bar-' + axisKey(s);
@@ -977,6 +978,21 @@
     if (hasStackGroups) stackKeys.forEach((k, i) => { if (k && keyCounts.get(k) < 2) stackKeys[i] = null; });
     const stackNameByKey = new Map();
     series.forEach((s, i) => { if (stackKeys[i] && hasStackGroups) stackNameByKey.set(stackKeys[i], stackNameOf(stackMembers[s.entity_id])); });
+    // Kategorie je Serie bei „Voll“: Mitglieder eines Stapels teilen sich eine Kategorie (Name des
+    // Stapels), jede übrige Serie hat ihre eigene (Entitätsname).
+    const slotOf = [];
+    const slotLabels = [];
+    const slotForKey = new Map();
+    series.forEach((s, i) => {
+      const key = stackKeys[i];
+      if (singleBucket && key) {
+        if (!slotForKey.has(key)) { slotForKey.set(key, slotLabels.length); slotLabels.push(stackNameByKey.get(key) || ''); }
+        slotOf[i] = slotForKey.get(key);
+      } else {
+        slotOf[i] = slotLabels.length;
+        slotLabels.push(entityNames[s.entity_id] || s.friendly_name);
+      }
+    });
     // 100%-Normierung nur, wenn jeder Balken der Achse in einem Stapel liegt: sonst stünden
     // Prozent und absolute Werte auf einer Achse.
     const normalizeActive = stackedActive && normalize;
@@ -1039,7 +1055,7 @@
     // Kategorie-Achse für singleBucket — Entitätsnamen statt Zeit-Ticks.
     const categoryAxisObj = singleBucket ? {
       type: 'category',
-      data: entityCategories,
+      data: slotLabels,
       axisTick: {show: false},
       axisLine: {show: false, onZero: false},
       axisLabel: {
@@ -1085,9 +1101,9 @@
           : rawValues.reduce((sum, v) => sum + v, 0) / rawValues.length;
         return {
           // x-Position ist die EIGENE Kategorie dieser Entität (ihre Position
-          // in series, s. entityCategories), nicht mehr 0 für alle — seit
+          // in series, s. slotOf), nicht mehr 0 für alle — seit
           // jede Entität ihre eigene Kategorie bekommt (s. o.).
-          lineData: [[i, aggregate, s.unit, effectiveDecimals(s), isDurationSeries(s)]],
+          lineData: [[slotOf[i], aggregate, s.unit, effectiveDecimals(s), isDurationSeries(s)]],
           averageValues: [aggregate],
           rawPoints: [{ts: data.window_start, value: aggregate}],
         };
@@ -1470,11 +1486,11 @@
   }
 
   // Name des Stapels je Entität für die Legende (nur bei wirksamen Stapeln): gleiche Regel wie
-  // stackKeys in draw() — Balken mit Gruppe, mindestens zwei je Achse, nicht bei Auflösung „Voll“.
+  // stackKeys in draw() — Balken mit Gruppe, mindestens zwei je Achse.
   function stackLabels(series, spec) {
     const out = {};
     const members = (spec.stackGroups && spec.stackGroups.members) || {};
-    if (!spec.stacked || spec.resolutionPreset === 'full' || !Object.keys(members).length) return out;
+    if (!spec.stacked || !Object.keys(members).length) return out;
     const axisOf = s => (s.aggregation_type === 'switch' && s.display_mode === 'time') ? ' duration' : s.unit;
     const bars = series.filter(s => s.chart_type === 'bar' && members[s.entity_id]);
     const counts = new Map();
