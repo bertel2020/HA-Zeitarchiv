@@ -902,6 +902,13 @@ class ZeitarchivCard extends HTMLElement {
     this._els.legend.innerHTML = this._legendRender.renderLegendHtml(this._legend, this._hidden);
   }
 
+  // Blendet eine Serie samt ihrer Begleitserien (Vorjahr/Vorperiode, gleitender Ø; legendOwner) ein oder aus.
+  _setSeriesVisible(name, visible) {
+    if (!this._chart) return;
+    const companions = (this._chart.getOption().series || []).filter((entry) => entry.legendOwner === name).map((entry) => entry.name);
+    [name, ...companions].forEach((n) => this._chart.dispatchAction({type: visible ? 'legendSelect' : 'legendUnSelect', name: n}));
+  }
+
   // Ein Klick-Verteiler für die ganze Legende (Chips und Tabellenzeilen), wie auf der Kachel: blendet die Serie
   // ein oder aus und löst die tap_action der Karte nicht aus.
   _wireLegend() {
@@ -917,7 +924,7 @@ class ZeitarchivCard extends HTMLElement {
       }
       const name = item.dataset.series;
       if (this._hidden.has(name)) this._hidden.delete(name); else this._hidden.add(name);
-      this._chart?.dispatchAction({type: 'legendToggleSelect', name});
+      this._setSeriesVisible(name, !this._hidden.has(name));
       this._paintLegend();
       // Die Legende wird neu aufgebaut; per Tastatur bedient, würde der Fokus sonst auf den Seitenanfang springen.
       if (event.type === 'keydown') [...box.querySelectorAll('[data-series]')].find((el) => el.dataset.series === name)?.focus();
@@ -959,7 +966,7 @@ class ZeitarchivCard extends HTMLElement {
         event.stopPropagation();
         if (this._hidden.has(name)) this._hidden.delete(name); else this._hidden.add(name);
         item.classList.toggle('inactive', this._hidden.has(name));
-        this._chart.dispatchAction({type: 'legendToggleSelect', name});
+        this._setSeriesVisible(name, !this._hidden.has(name));
       });
       box.appendChild(item);
     });

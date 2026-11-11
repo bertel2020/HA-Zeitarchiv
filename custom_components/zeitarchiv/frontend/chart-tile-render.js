@@ -1237,6 +1237,7 @@
         // Legende einzeln umschaltbar, sie gehört sichtbar zur Hauptserie.
         rollingSeries.push({
           name: `${displayName} (Ø gleitend)`,
+          legendOwner: displayName,
           type: 'line',
           yAxisIndex: units.indexOf(axisKey(s)),
           data: rollingData,
@@ -1274,6 +1275,7 @@
         }
         const cmp = {
           name: `${displayName} (${compare.mode === 'year' ? t('Vorjahr') : t('Vorperiode')})`,
+          legendOwner: displayName,
           type: s.chart_type,
           yAxisIndex: units.indexOf(axisKey(s)),
           data: compareData,
@@ -1300,7 +1302,12 @@
     // legendToggleSelect (setupLegendToggles()) überhaupt etwas zum
     // Umschalten hat.
     const legendSelected = {};
-    echartsSeries.forEach(s => { legendSelected[s.name] = !hiddenSet || !hiddenSet.has(s.name); });
+    // Begleitserien (Vorjahr/Vorperiode, gleitender Ø) folgen der Hauptserie
+    // (legendOwner) — ausgeblendete Serie, ausgeblendete Vergleichswerte.
+    echartsSeries.forEach(s => {
+      const key = s.legendOwner || s.name;
+      legendSelected[s.name] = !hiddenSet || !hiddenSet.has(key);
+    });
 
     chart.setOption({
       animation,
