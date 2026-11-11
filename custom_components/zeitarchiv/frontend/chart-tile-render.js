@@ -962,7 +962,7 @@
     // Stapeln nur die zugeordneten Balken je Stapel. Ein Stapel mit nur einer Balken-Serie
     // wirkt wie ein Einzelbalken (Schlüssel null).
     const stackMembers = (stackGroups && stackGroups.members) || {};
-    const hasStackGroups = Object.keys(stackMembers).length > 0;
+    const hasStackGroups = Object.keys(stackMembers).length > 0 || (((stackGroups && stackGroups.groups) || []).length > 0);
     // Bei Auflösung „Voll“ (eine Kategorie je Entität) stapelt nur, was einem Stapel zugeordnet
     // ist: jeder Stapel bekommt dann eine eigene Kategorie, ohne Stapel bleibt es der Ranking-Vergleich.
     const stackedActive = stacked && (!singleBucket || hasStackGroups) && series.filter(s => s.chart_type === 'bar').length >= 2;
