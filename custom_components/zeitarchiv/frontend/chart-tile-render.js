@@ -1455,7 +1455,7 @@
           const header = singleBucket
             ? (data.window_start != null ? new Date(data.window_start * 1000).toLocaleDateString(LOCALE, window.ServerTime.withZone({day: '2-digit', month: '2-digit', year: 'numeric'})) : '')
             : fmtTooltipTimestamp(params[0].axisValue, tooltipBucketSeconds);
-          const rows = params.map(p => {
+          const rowOf = p => {
             const unit = p.data[2] || '';
             const decimals = p.data[3];
             const value = p.data[4]
@@ -1473,7 +1473,7 @@
                  + `<span>${p.marker}${escapeHtml(p.seriesName)}</span>`
                  + `<span style="margin-left:8px;text-align:right;"><strong>${value}${extra}</strong>`
                  + `${TooltipHold.note(p, inkFaint, ms => fmtTooltipTimestamp(ms, tooltipBucketSeconds))}</span></div>`;
-          }).join('');
+          };
           // Summe je Stapel (nur mit eigenen Stapeln): bei Anteilen (%) die Summe der Absolutwerte.
           const sums = new Map();
           if (hasStackGroups) {
@@ -1487,12 +1487,29 @@
               sums.set(key, entry);
             });
           }
-          const sumRows = [...sums.entries()].filter(([, e]) => e.n >= 2).map(([key, e]) => {
+          const sumRowFor = (key, e) => {
             const value = e.duration ? NumberFormat.fmtDuration(e.sum) : `${fmtCompactNumber(e.sum, e.decimals)}${e.unit ? ' ' + escapeHtml(e.unit) : ''}`;
-            return `<div style="display:flex;justify-content:space-between;gap:14px;margin-top:4px;padding-top:4px;border-top:1px solid ${borderColor};">`
+            return `<div style="display:flex;justify-content:space-between;gap:14px;margin-top:4px;padding-top:4px;border-top:1px solid ${borderColor};margin-bottom:6px;">`
                  + `<span>Σ ${escapeHtml(stackNameByKey.get(key) || '')}</span><span style="margin-left:8px;text-align:right;"><strong>${value}</strong></span></div>`;
-          }).join('');
-          const body = rows + sumRows;
+          };
+          // Mitglieder eines Stapels stehen eingerückt beisammen (an der Stelle des ersten) mit der Summe darunter,
+          // übrige Zeilen in Reihenfolge (Parität zu stackedRows in chart_editor.js).
+          const stackOfParam = p => (echartsSeries[p.seriesIndex] || {}).stack;
+          const stackedRows = renderRow => {
+            const out = [];
+            const done = new Set();
+            params.forEach(p => {
+              const key = stackOfParam(p);
+              const e = key && sums.get(key);
+              if (!e || e.n < 2) { out.push(renderRow(p)); return; }
+              if (done.has(key)) return;
+              done.add(key);
+              params.filter(q => stackOfParam(q) === key).forEach(q => out.push(`<div style="padding-left:10px;border-left:2px solid ${borderColor};">${renderRow(q)}</div>`));
+              out.push(sumRowFor(key, e));
+            });
+            return out.join('');
+          };
+          const body = stackedRows(rowOf);
           return header ? `<div style="margin-bottom:4px;color:${inkFaint};">${header}</div>${body}` : body;
         },
         // Kachel hat overflow:hidden (verhindert, dass z. B. die Legende das
