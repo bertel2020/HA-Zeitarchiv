@@ -51,16 +51,15 @@
 
   // Vergleich, der mit dem Chart gespeichert ist (saved_charts.compare_settings,
   // data-compare-settings) — dieselben Regeln wie chart_editor.js: kein
-  // Vergleich bei Zeitstrahl, Donut, Auflösung "Voll" oder gestapelten Balken
-  // (dort ist der Knopf gesperrt), "Langzeit" nur bei Jahr/kalendarisch/genau
+  // Vergleich bei Zeitstrahl, Donut oder Auflösung "Voll" (gestapelte Balken
+  // bekommen einen eigenen Vergleichsstapel), "Langzeit" nur bei Jahr/kalendarisch/genau
   // einer Entität, sonst wie im Editor "Vorjahr" (load()); "Vorjahr" mit
   // Laufsumme oder Soll zeichnet Monats-Balkenpaare (yearsCompareActive).
   const COMPARE_YEAR_RANGES = ['hour', 'day', 'week', 'month'];
   function tileCompare({compareSettings, range, continuous, entityIds, chartType, resolutionPreset, stacked}) {
     let settings = {};
     try { settings = JSON.parse(compareSettings || '{}') || {}; } catch (e) { settings = {}; }
-    if (!settings.compare || ['timeline', 'donut', 'shares', 'changes', 'heatmap'].includes(chartType) || resolutionPreset === 'full'
-        || (stacked && entityIds.length >= 2)) return null;
+    if (!settings.compare || ['timeline', 'donut', 'shares', 'changes', 'heatmap'].includes(chartType) || resolutionPreset === 'full') return null;
     let mode = settings.mode || 'previous';
     const longterm = mode === 'longterm' && range === 'year' && !continuous && entityIds.length === 1;
     if (mode === 'longterm' && !longterm) mode = 'previous';
@@ -1295,17 +1294,40 @@
     // dieselbe Technik wie render() in chart_editor.js: um die exakte
     // Fensterdifferenz verschoben, nicht über den Array-Index zugeordnet.
     if (compare && !singleBucket) {
-      series.forEach(s => {
+      // Gestapelte Balken: je Stapel ein eigener, blasser Vergleichsstapel ('<Schlüssel>-cmp') mit
+      // denselben Segmenten; bei Anteilen (%) auf die eigene Summe normiert (Parität zu chart_editor.js).
+      const compareShiftMs = s => ((s.compare_window_start != null && data.window_start != null)
+        ? (data.window_start - s.compare_window_start) * 1000 : 0);
+      const compareResampled = s => resamplePoints(
+        s.compare_points, range, resolutionPreset, s.aggregation_type, s.compare_window_start
+      );
+      const compareStackKey = (s, i) => (stackKeys[i] && s.chart_type === 'bar' && s.compare_points && s.compare_points.length)
+        ? stackKeys[i] + '-cmp' : null;
+      const compareTotals = new Map();
+      const lastCompareIndex = new Map();
+      series.forEach((s, i) => {
+        const key = compareStackKey(s, i);
+        if (!key) return;
+        lastCompareIndex.set(key, i);
+        if (!normalizeActive || !barOnlyAxis.has(axisKey(s))) return;
+        if (!compareTotals.has(key)) compareTotals.set(key, new Map());
+        const totals = compareTotals.get(key);
+        const shift = compareShiftMs(s);
+        compareResampled(s).forEach(p => { const x = p.ts * 1000 + shift; totals.set(x, (totals.get(x) || 0) + p.value); });
+      });
+      series.forEach((s, i) => {
         if (!s.compare_points || !s.compare_points.length) return;
         const color = colorFor(s.entity_id);
         const displayName = entityNames[s.entity_id] || s.friendly_name;
-        const shiftMs = (s.compare_window_start != null && data.window_start != null)
-          ? (data.window_start - s.compare_window_start) * 1000
-          : 0;
-        const comparePoints = resamplePoints(
-          s.compare_points, range, resolutionPreset, s.aggregation_type, s.compare_window_start
-        );
-        const compareData = comparePoints.map(p => [p.ts * 1000 + shiftMs, p.value, s.unit, effectiveDecimals(s), isDurationSeries(s)]);
+        const shiftMs = compareShiftMs(s);
+        const cmpStackKey = compareStackKey(s, i);
+        const cmpNormalized = !!cmpStackKey && normalizeActive && barOnlyAxis.has(axisKey(s));
+        const compareData = compareResampled(s).map(p => {
+          const x = p.ts * 1000 + shiftMs;
+          if (!cmpNormalized) return [x, p.value, s.unit, effectiveDecimals(s), isDurationSeries(s)];
+          const total = compareTotals.get(cmpStackKey).get(x) || 0;
+          return [x, total ? (p.value / total) * 100 : 0, '%', 0, false, p.value, s.unit, effectiveDecimals(s)];
+        });
         if (s.chart_type === 'line' && compareData.length && data.window_end != null
             && compareData[compareData.length - 1][0] < data.window_end * 1000) {
           const last = compareData[compareData.length - 1];
@@ -1326,8 +1348,14 @@
           cmp.smooth = true;
           if (!showPoints) cmp.symbol = 'none';
           if (areaFill) cmp.areaStyle = {color, opacity: 0.05};
-        } else {
+        } else if (!cmpStackKey) {
           cmp.itemStyle.borderRadius = [3, 3, 0, 0];
+        } else if (lastCompareIndex.get(cmpStackKey) === i) {
+          cmp.itemStyle.borderRadius = [3, 3, 0, 0];
+        }
+        if (cmpStackKey) {
+          cmp.stack = cmpStackKey;
+          stackNameByKey.set(cmpStackKey, `${stackNameByKey.get(stackKeys[i]) || ''}${hasStackGroups ? ' ' : ''}(${compare.mode === 'year' ? t('Vorjahr') : t('Vorperiode')})`.trim());
         }
         echartsSeries.push(cmp);
       });
@@ -1450,7 +1478,7 @@
           const sums = new Map();
           if (hasStackGroups) {
             params.forEach(p => {
-              const key = stackKeys[p.seriesIndex];
+              const key = (echartsSeries[p.seriesIndex] || {}).stack;
               if (!key) return;
               const abs = p.data[5];
               const entry = sums.get(key) || {n: 0, sum: 0, unit: abs != null ? p.data[6] : p.data[2], decimals: abs != null ? p.data[7] : p.data[3], duration: !!p.data[4]};
