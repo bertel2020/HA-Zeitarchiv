@@ -964,7 +964,7 @@
     // Stapeln nur die zugeordneten Balken je Stapel. Ein Stapel mit nur einer Balken-Serie
     // wirkt wie ein Einzelbalken (Schlüssel null).
     const stackMembers = (stackGroups && stackGroups.members) || {};
-    const hasStackGroups = !!(stackGroups && (stackGroups.groups || []).length);
+    const hasStackGroups = Object.keys(stackMembers).length > 0;
     const stackKeys = series.map(s => {
       if (!stackedActive || s.chart_type !== 'bar') return null;
       if (!hasStackGroups) return 'bar-' + axisKey(s);
