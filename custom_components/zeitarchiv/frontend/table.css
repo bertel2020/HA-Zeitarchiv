@@ -20,6 +20,17 @@
 .chart-legend-item .dot {width:calc(9px * var(--legend-scale, 1));height:calc(9px * var(--legend-scale, 1));border-radius:999px;flex:none;}
 .legend-stack {font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);white-space:nowrap;}
 .legend-stack::before {content:"· ";}
+.chart-legend-group {display:inline-flex;flex-wrap:wrap;align-items:center;gap:calc(8px * var(--legend-scale, 1));max-width:100%;
+  padding:calc(4px * var(--legend-scale, 1)) calc(8px * var(--legend-scale, 1)) calc(4px * var(--legend-scale, 1)) calc(12px * var(--legend-scale, 1));
+  border-radius:24px;border:1px solid var(--border);background:var(--surface);}
+.chart-legend-group-name {font-size:calc(12px * var(--font-scale, 1));font-weight:500;color:var(--ink-muted);white-space:nowrap;}
+.chart-legend-group-sum {font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);padding-right:4px;white-space:nowrap;}
+.chart-legend-group-sum strong {color:var(--ink);font-weight:500;}
+.chart-legend-group-row td {background:var(--surface-alt);font-weight:500;}
+.chart-legend-group-row .legend-name-cell {gap:8px;}
+.chart-legend-group-row .chart-legend-group-dash {color:var(--ink-faint);font-weight:400;}
+.chart-legend-group-member .legend-name-cell {padding-left:18px;}
+.chart-legend-table .chart-legend-group-member td.legend-name-col {font-weight:500;}
 .chart-legend-item .name {font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;
   text-overflow:ellipsis;max-width:180px;font-size:calc(12.5px * var(--font-scale, 1) * var(--legend-scale, 1));}
 .chart-legend-item .values {display:flex;flex-wrap:wrap;gap:2px calc(9px * var(--legend-scale, 1));flex:0 1 auto;min-width:0;font-family:var(--font-mono);color:var(--ink-muted);
@@ -224,6 +235,7 @@ table.dt.dt-cards tr.has-pending-purge td, table.dt.dt-cards tbody tr.has-pendin
 @media (max-width:760px) {
 .wt-kt {grid-template-columns:minmax(0,1fr);}
 }
+.chart-legend-plain {display:contents;}
 /* css/pages/dashboard_detail.css */
 .dtile-legend {display:none;flex-wrap:wrap;gap:8px;padding-top:10px;flex:none;}
 .dtile-legend.is-visible {display:flex;}

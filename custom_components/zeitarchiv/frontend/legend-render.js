@@ -47,6 +47,11 @@
     return {
       name,
       color,
+      // Rohwerte und Formatierer für die Summe über einen Stapel (groupByStack).
+      lastRaw: values.length ? values[values.length - 1] : null,
+      sumRaw: hasSum && values.length ? sumValue : null,
+      fmtValue: formatted,
+      fmtSum: isSwitch ? NumberFormat.fmtDuration : formatted,
       last: values.length ? formatted(values[values.length - 1]) : '—',
       min: minima.length ? formatted(Math.min(...minima)) : '—',
       max: maxima.length ? formatted(Math.max(...maxima)) : '—',
@@ -71,14 +76,36 @@
       + (showStats ? ` <strong>${escapeHtml(row.text)}</strong>` : '') + '</span>').join('')}</span>`;
   }
 
-  // Stapelname hinter dem Serien-Namen (nur bei wirksamen Stapeln).
-  const stackTag = item => (item.stack ? ` <span class="legend-stack">${escapeHtml(item.stack)}</span>` : '');
+  // Einträge eines Stapels zusammenziehen (an der Stelle des ersten Mitglieds, Reihenfolge wie in der Liste).
+  // Gleiche Regel wie legendEntries in chart_editor.js. Aktuell und Σ des Stapels sind die Summen der Mitglieder,
+  // Min/Max/Ø gibt es für einen Stapel nicht (kein Mittel der Einzelwerte).
+  function groupByStack(items) {
+    const entries = [];
+    const byKey = new Map();
+    items.forEach(item => {
+      if (!item.stack || !item.stackKey || item.states) { entries.push({group: false, items: [item]}); return; }
+      let entry = byKey.get(item.stackKey);
+      if (!entry) { entry = {group: true, name: item.stack, items: []}; byKey.set(item.stackKey, entry); entries.push(entry); }
+      entry.items.push(item);
+    });
+    entries.forEach(entry => {
+      if (!entry.group) return;
+      const first = entry.items[0];
+      const total = key => (entry.items.every(m => Number.isFinite(m[key]))
+        ? entry.items.reduce((sum, m) => sum + m[key], 0) : null);
+      const last = total('lastRaw');
+      const sum = total('sumRaw');
+      entry.last = last === null ? null : first.fmtValue(last);
+      entry.sum = sum === null ? null : first.fmtSum(sum);
+    });
+    return entries;
+  }
 
   // Chip-Variante (Standard) — dieselben Chips/Kennzahlen wie chart_editor.html
   // (.chart-legend-item aus app.css), hier zusätzlich klickbar, anders als die
   // "static" (nicht umschaltbare) Variante auf entity_detail.html.
   function renderLegendChips(items, legendMetrics, showStats, hiddenSet) {
-    return items.map(item => {
+    const chip = item => {
       // "+N Jahre" (Langzeit-Kachel): nur ein Hinweis, kein Serien-Umschalter.
       if (item.more) return `<span class="chart-legend-item is-more">${escapeHtml(item.more)}</span>`;
       if (item.states) {
@@ -98,7 +125,15 @@
       const inactive = hiddenSet.has(item.name) ? ' inactive' : '';
       return `<span class="chart-legend-item${inactive}" data-series="${escapeHtml(item.name)}" role="button" tabindex="0">`
            + legendSwatch(item)
-           + `<span class="name">${escapeHtml(item.name)}</span>${stackTag(item)}${values}</span>`;
+           + `<span class="name">${escapeHtml(item.name)}</span>${values}</span>`;
+    };
+    // Stapel: die Chips der Mitglieder in einer Kapsel mit Name; Σ nur mit Statistik und gewählter Σ-Spalte.
+    return groupByStack(items).map(entry => {
+      if (!entry.group) return chip(entry.items[0]);
+      const sum = showStats && legendMetrics.includes('sum') && entry.sum !== null
+        ? `<span class="chart-legend-group-sum">Σ <strong>${escapeHtml(entry.sum)}</strong></span>` : '';
+      return `<span class="chart-legend-group"><span class="chart-legend-group-name">${escapeHtml(entry.name)}</span>`
+           + `${entry.items.map(chip).join('')}${sum}</span>`;
     }).join('');
   }
 
@@ -109,17 +144,28 @@
   function renderLegendTable(items, legendMetrics, showStats, hiddenSet) {
     const cols = showStats ? METRIC_ORDER.filter(k => legendMetrics.includes(k)) : [];
     const headerCells = cols.map(key => `<th>${LEGEND_METRIC_LABELS[key]}</th>`).join('');
-    const rows = items.filter(item => !item.more).map(item => {
+    const row = (item, member) => {
       const cells = cols.map(key => `<td>${escapeHtml(key === 'sum' && item.sum === null ? '—' : item[key])}</td>`).join('');
       const inactive = hiddenSet.has(item.name) ? ' inactive' : '';
       if (item.states) {
         return `<tr class="chart-legend-table-row static"><td class="legend-name-col"><span class="name">${escapeHtml(item.name)}</span>`
              + `${stateLegendValues(item, showStats)}</td>${cells}</tr>`;
       }
-      return `<tr class="chart-legend-table-row${inactive}" data-series="${escapeHtml(item.name)}" role="button" tabindex="0">`
+      return `<tr class="chart-legend-table-row${inactive}${member ? ' chart-legend-group-member' : ''}" data-series="${escapeHtml(item.name)}" role="button" tabindex="0">`
            + `<td class="legend-name-col"><span class="legend-name-cell">`
            + legendSwatch(item)
-           + `<span class="name">${escapeHtml(item.name)}</span>${stackTag(item)}</span></td>${cells}</tr>`;
+           + `<span class="name">${escapeHtml(item.name)}</span></span></td>${cells}</tr>`;
+    };
+    // Stapel: Kopfzeile mit Aktuell und Σ der Mitglieder, darunter die Mitglieder eingerückt.
+    const rows = groupByStack(items.filter(item => !item.more)).map(entry => {
+      if (!entry.group) return row(entry.items[0], false);
+      const headCells = cols.map(key => {
+        const value = key === 'last' ? entry.last : (key === 'sum' ? entry.sum : null);
+        return value === null ? '<td class="chart-legend-group-dash">–</td>' : `<td>${escapeHtml(value)}</td>`;
+      }).join('');
+      return `<tr class="chart-legend-group-row"><td class="legend-name-col"><span class="legend-name-cell">`
+           + `<span class="name">${escapeHtml(entry.name)}</span> <span class="legend-stack">${escapeHtml(t('Stapel'))}</span></span></td>${headCells}</tr>`
+           + entry.items.map(item => row(item, true)).join('');
     }).join('');
     return `<div class="tbl-wrap"><table class="dt compact chart-legend-table">`
          + `<thead><tr><th class="legend-name-col">Name</th>${headerCells}</tr></thead>`
@@ -179,11 +225,14 @@
       return items;
     }
     const stackNames = window.ChartTileRender.stackLabels(series, spec);
+    const stackMembers = (spec.stackGroups && spec.stackGroups.members) || {};
+    const axisOf = s => (s.aggregation_type === 'switch' && s.display_mode === 'time') ? ' duration' : s.unit;
     return series.map(s => ({
       ...statsItem(s, s.points, entityNames[s.entity_id] || s.friendly_name, colorFor(s.entity_id)),
       stack: stackNames[s.entity_id] || '',
+      stackKey: stackNames[s.entity_id] ? `${stackMembers[s.entity_id]}|${axisOf(s)}` : '',
     }));
   }
 
-  window.LegendRender = {buildStatsItem, buildLegendItems, renderLegendHtml};
+  window.LegendRender = {buildStatsItem, buildLegendItems, renderLegendHtml, groupByStack};
 })();
