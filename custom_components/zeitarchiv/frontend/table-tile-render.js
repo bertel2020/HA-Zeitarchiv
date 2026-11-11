@@ -228,7 +228,7 @@
         const span = visibleCols.length + 1 + (showRowSum ? 1 : 0);
         const sectionLabel = row.show_label && row.label ? escapeHtml(row.label) : '';
         const sepClasses = `tbl-separator-row${row.bold ? ' tbl-bold' : ''}`;
-        html += `<tr class="${sepClasses}"><td colspan="${span}"><span class="tbl-separator-content"><span class="tbl-separator-line" aria-hidden="true"></span>${sectionLabel ? `<span class="tbl-separator-label">${sectionLabel}</span><span class="tbl-separator-line" aria-hidden="true"></span>` : ''}</span></td></tr>`;
+        html += `<tr class="${sepClasses}"><td colspan="${span}"><span class="tbl-separator-content${row.hide_line ? ' is-blank' : ''}"><span class="tbl-separator-line" aria-hidden="true"></span>${sectionLabel ? `<span class="tbl-separator-label">${sectionLabel}</span><span class="tbl-separator-line" aria-hidden="true"></span>` : ''}</span></td></tr>`;
         return;
       }
       if (isRowEmpty(row, ri)) return;

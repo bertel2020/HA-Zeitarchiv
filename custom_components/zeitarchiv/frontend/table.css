@@ -74,6 +74,8 @@ table.dt th {position:relative;}
 table.dt th:hover .table-column-resize-handle::after {opacity:1;}
 .tbl-separator-content {display:flex;align-items:center;gap:8px;width:100%;}
 .tbl-separator-line {display:block;flex:1;height:1px;background:var(--border);}
+.tbl-separator-content.is-blank {min-height:1.2em;}
+.tbl-separator-content.is-blank .tbl-separator-line {background:transparent;}
 .tbl-separator-label {color:var(--ink-muted);font-size:calc(11px * var(--font-scale, 1));font-weight:600;
   letter-spacing:.035em;text-transform:uppercase;white-space:nowrap;}
 .dtile-mini-table .tbl-separator-label {font-size:calc(9.5px * var(--font-scale, 1));}
