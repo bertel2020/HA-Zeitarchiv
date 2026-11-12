@@ -1,0 +1,587 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/bertel2020/HA-Zeitarchiv/main/custom_components/zeitarchiv/brand/logo.png" alt="Zeitarchiv" width="160">
+</p>
+
+<h1 align="center">Zeitarchiv Integration</h1>
+
+<p align="center">
+  Der zuverlässige Schreibpfad von Home Assistant in das Zeitarchiv.
+</p>
+
+<p align="center">
+  <a href="https://github.com/hacs/integration"><img src="https://img.shields.io/badge/HACS-Default-41BDF5.svg" alt="HACS Default"></a>
+  <a href="https://github.com/bertel2020/HA-Zeitarchiv/releases"><img src="https://img.shields.io/github/v/release/bertel2020/HA-Zeitarchiv?sort=semver" alt="Release"></a>
+  <a href="https://github.com/bertel2020/HA-Zeitarchiv/actions/workflows/validate.yml"><img src="https://github.com/bertel2020/HA-Zeitarchiv/actions/workflows/validate.yml/badge.svg" alt="Validate"></a>
+  <a href="https://github.com/bertel2020/HA-Zeitarchiv/actions/workflows/tests.yml"><img src="https://github.com/bertel2020/HA-Zeitarchiv/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/bertel2020/HA-Zeitarchiv" alt="License"></a>
+</p>
+
+<p align="center">
+  <a href="https://buymeacoffee.com/bertel2020"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support-FFDD00?logo=buy-me-a-coffee&logoColor=black" alt="Buy Me a Coffee"></a>
+  <a href="https://ko-fi.com/bertel2020"><img src="https://img.shields.io/badge/Ko--fi-support-FF5E5B?logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
+  <a href="https://paypal.me/RobertoMartins"><img src="https://img.shields.io/badge/PayPal-donate-00457C?logo=paypal&logoColor=white" alt="PayPal"></a>
+</p>
+
+<p align="center"><em><a href="README.md">English version</a></em></p>
+
+Zeitarchiv ist ein Langzeitarchiv für Home Assistant mit Zeitvergleichen,
+Energie- und Wetterauswertung und CSV-Export, eine einfache Alternative zu
+InfluxDB/Grafana. Diese Integration liefert die Daten dafür.
+
+Die Zeitarchiv-Integration beobachtet ausgewählte Zustandsänderungen und
+überträgt sie gebündelt an die [Zeitarchiv-App](https://github.com/bertel2020/HA-Apps/tree/main/zeitarchiv). Sie
+erzeugt keine Kopien der archivierten Entitäten in Home Assistant: Die
+eigentlichen Zeitreihen, Charts und Tabellen bleiben Aufgabe der App.
+
+## Was die Integration übernimmt
+
+| Aufgabe | Verhalten |
+| --- | --- |
+| **Auswahl der Entitäten** | Bevorzugt Labels; optional einzelne Entitäten, Bereiche, Geräte und Entity-Muster kombinieren |
+| **Ausschlüsse** | Einzelne Entity-IDs und Ausschlussmuster haben immer Vorrang |
+| **Wertaufbereitung** | Numerische Werte mit einstellbaren Nachkommastellen (0–3, Standard 3) sowie Schalter- (`on`/`off`) und Anwesenheitszustände (`home`/`not_home`) |
+| **Zuverlässiger Transport** | In-Memory-Queue, Batches, Timeout und dauerhafte Retries |
+| **Sichere Verbindung** | Bearer-Token; Reauth-Hinweis bei abgelehntem Token |
+| **Diagnose** | Vier Diagnose-Sensoren und Diagnose-Download |
+| **Filter übertragen** | Als versioniertes YAML exportieren/importieren — praktisch, um dieselbe Auswahl auf ein zweites System zu übernehmen |
+
+## Installation
+
+### Über HACS (empfohlen)
+
+[![HACS-Repository in My Home Assistant öffnen](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=bertel2020&repository=HA-Zeitarchiv&category=integration)
+[![Zeitarchiv zu My Home Assistant hinzufügen](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=zeitarchiv)
+
+1. Über den ersten Button das Zeitarchiv-Repository in HACS öffnen. Ab Home Assistant 2026.11 ist HACS als **Marketplace** eingebaut; die Schritte sind dieselben.
+2. **Zeitarchiv** herunterladen und Home Assistant neu starten.
+3. Über den zweiten Button die Integration hinzufügen. Alternativ in Home
+   Assistant **Einstellungen → Geräte & Dienste → Integration hinzufügen →
+   Zeitarchiv** öffnen.
+
+Alternativ in HACS bzw. im Marketplace unter **Integrationen** nach **Zeitarchiv** suchen.
+
+### Manuell
+
+#### 1. Voraussetzung
+
+Die [Zeitarchiv-App](https://github.com/bertel2020/HA-Apps/tree/main/zeitarchiv) muss laufen. Den API-Token findest
+du dort unter **Einstellungen → Verbindung**.
+
+App und Integration versionieren unabhängig voneinander, keine bestimmte
+Mindestversion nötig — neuere Funktionen (z. B. der Betriebsmodus-Sensor)
+bleiben gegen eine ältere Gegenseite einfach ungenutzt, statt die
+Verbindung zu stören. Die Karte im Dashboard braucht die App ab Version
+1.12.0, die Dashboard-Bausteine ab 1.30.0; mit einer älteren App zeigt sie „App zu alt“.
+
+#### 2. Custom Integration kopieren
+
+Das Verzeichnis `custom_components/zeitarchiv` nach
+`/config/custom_components/zeitarchiv` kopieren und Home Assistant neu
+starten.
+
+#### 3. Verbindung einrichten
+
+In Home Assistant **Einstellungen → Geräte & Dienste → Integration hinzufügen
+→ Zeitarchiv** öffnen und eintragen:
+
+| Feld | Bedeutung |
+| --- | --- |
+| Verbindungsname | Frei wählbarer Name, z. B. `Produktivsystem` oder `Testsystem` |
+| Host | Erreichbarer Host der Zeitarchiv-App |
+| Port | Standardmäßig `8127` |
+| API-Token | Token aus den App-Einstellungen |
+
+Die Verbindung wird vor dem Speichern geprüft. Ein nicht erreichbarer Host und
+ein abgelehnter Token erscheinen als getrennte Fehlermeldungen.
+
+Mehrere Verbindungen können parallel eingerichtet werden. Jede Verbindung hat
+eine eigene Warteschlange, eigene Filter und eigene Diagnose-Sensoren. Dadurch
+kann derselbe Home Assistant seine Zustandsänderungen beispielsweise zugleich
+an ein Produktiv- und ein Test-Zeitarchiv senden; auch zwei benannte Einträge
+mit identischem Host und Port sind zulässig. Nur ein zweiter Eintrag mit
+demselben Host, Port **und** Token wird abgelehnt, weil er jeden Wert doppelt
+an dieselbe App schicken würde.
+
+#### 4. Archivfilter wählen
+
+Auf der Zeitarchiv-Integrationskachel **Konfigurieren → Archivfilter
+bearbeiten** öffnen.
+
+| Auswahl | Wirkung |
+| --- | --- |
+| Labels (empfohlen) | Direkt gelabelte Entitäten sowie Entitäten gelabelter Geräte und Bereiche; Änderungen gelten ohne erneutes Speichern für folgende Zustandsänderungen |
+| Einzelne Entitäten | Zusätzliche konkrete Entity-IDs |
+| Bereiche | Alle aktuell zugeordneten Entitäten |
+| Geräte | Alle aktuell zugeordneten Entitäten |
+| Ausgeschlossene Entitäten | Werden in jedem Fall verworfen |
+| Entitätsmuster einschließen | `*`-/`?`-Muster; ohne Punkt für Objekt-IDs, mit Punkt für vollständige Entity-IDs |
+| Entitätsmuster ausschließen | Musterbasierte Ausschlüsse mit demselben Vorrang wie einzelne Ausschlüsse |
+| Nachkommastellen | Rundung numerischer Werte vor der Übertragung, 0–3, Standard 3 |
+
+Nach dem Absenden zeigt ein Prüfschritt die tatsächlich aufgelösten
+Entity-IDs. Die Vorschau unterscheidet aktive Entitäten, registrierte
+Entitäten ohne aktuellen Zustand und durch Ausschlüsse entfernte Entitäten.
+Bei Labels, Bereichen und Geräten werden dadurch alle zugehörigen Entitäten
+sichtbar, bevor die Auswahl gespeichert wird. Die Vorschau nennt außerdem die
+eingestellten Nachkommastellen; Schaltzustände werden unabhängig davon als
+`1/0` gespeichert.
+
+Über **Konfigurieren → Aktuell erfasste Entitäten** lässt sich derselbe Report
+auch später jederzeit für die gespeicherten Filter öffnen, ohne die Auswahl zu
+verändern.
+
+Domainfilter werden nicht mehr angeboten. Beim Upgrade werden früher
+gespeicherte Domainauswahlen einmalig in die zu diesem Zeitpunkt bekannten
+konkreten Entity-IDs umgewandelt. Für neue und später hinzukommende Entitäten
+sind Labels der bevorzugte Weg.
+
+## Datenfluss
+
+```text
+Integration geladen/neu geladen ─► aktueller Zustand
+state_changed                  ───► neue Zustandsänderung
+     │
+     ├─ nur tatsächliche Zustandsänderung?
+     ├─ Filter trifft zu und nicht ausgeschlossen?
+     └─ unterstützter Wert?
+             │
+             ▼
+       In-Memory-Queue
+       max. 5.000 Events
+             │
+             ▼
+       Batch bis 100 Events
+       oder spätestens nach 5 s
+             │
+             ▼
+       Zeitarchiv-App :8127
+```
+
+Eine stabile Event-ID macht wiederholte Übertragungen idempotent. Geht eine
+HTTP-Antwort verloren, kann derselbe Batch erneut gesendet werden, ohne in der
+App denselben Messpunkt doppelt anzulegen.
+
+Unmittelbar beim Laden oder Neuladen eines Integrationseintrags werden die
+aktuellen Zustände aller passenden Entitäten einmal in die Warteschlange
+gelegt. Dadurch erscheinen neu ausgewählte Entitäten sofort in der App; die
+Integration wartet weder auf die nächste Zustandsänderung noch auf einen
+erneuten Start von Home Assistant.
+
+## Welche Werte werden archiviert?
+
+Die Integration reagiert nur, wenn sich der eigentliche Zustand ändert. Eine
+reine Änderung von Attributen wie Friendly Name oder Einheit erzeugt keinen
+zusätzlichen Archivpunkt.
+
+- Numerische Zustände von `sensor`, `climate`, `input_number`, `counter` und
+  vergleichbaren Domains werden als Zahl mit den im Options-Flow eingestellten
+  Nachkommastellen (0–3, Standard 3) übertragen. Empfohlen ist der Standard;
+  weniger Nachkommastellen verbessern die Komprimierbarkeit der
+  Langzeitspeicherung in der App und können bei sehr vielen Entitäten und
+  langer Aufbewahrung spürbar Speicherplatz sparen, kosten bei kleinteiligen
+  Messwerten (z. B. Strom in A) aber Genauigkeit.
+- `binary_sensor`, `switch`, `input_boolean`, `light`, `fan`, `automation`,
+  `script`, `remote`, `siren`, `humidifier`, `update` und `calendar` werden
+  als `on → 1` und `off → 0` übertragen.
+- `device_tracker` und `person` werden als Anwesenheit übertragen:
+  `home → 1`, jeder andere Zustand (`not_home` oder eine benannte Zone
+  ungleich `home`) `→ 0`.
+- Textwerte (z. B. `Heating`/`Idle` eines Thermostats oder das Programm einer
+  Waschmaschine) werden als Zustand übertragen, mit der Übersetzung aus Home
+  Assistant, sofern es eine gibt. Das gilt nur für **einzeln ausgewählte**
+  Entitäten: Über ein Muster oder eine Auswahl nach Bereich, Gerät oder Label
+  kommen Text-Sensoren bewusst nicht mit. Bei solchen Entitäten gehen auch
+  `unknown` und `unavailable` an die App, die sie als „nicht verfügbar“
+  einträgt.
+- Kann die verbundene App noch keine Zustände annehmen (ältere Version),
+  werden Textwerte nicht archiviert. Damit das nicht unbemerkt bleibt, meldet
+  die Integration einzeln ausgewählte Entitäten mit Textwerten dann als
+  Repair-Karte und im Log (siehe
+  [Wartungshinweise](#wartungshinweise-repairs-und-health-sensoren)); nach
+  einem Update der App werden sie automatisch übertragen.
+- `unknown`, `unavailable`, `none` und leere Zustände werden sonst nicht
+  archiviert.
+
+Auflösung, Aufbewahrung und Bereinigungsschwellen gehören nicht in diesen
+Filter. Sie werden global oder je Entität in der App konfiguriert.
+
+## Einstellungsmenü
+
+**Konfigurieren** öffnet ein kompaktes Menü mit vier Aktionen:
+
+1. **Archivfilter bearbeiten** – aktive Auswahl ändern.
+2. **Aktuell erfasste Entitäten** – aufgelöste Auswahl und Rundung prüfen.
+3. **Filter als YAML exportieren** – eine portable Kopie anzeigen.
+4. **Filter aus YAML importieren** – alle Filter aus einer Kopie ersetzen.
+
+Die Auswahl der Entitäten erfolgt normalerweise direkt in der Oberfläche über
+**Archivfilter bearbeiten**. Der YAML-Export und -Import ist optional und dient
+nur dazu, dieselbe Auswahl auf ein anderes System zu übertragen.
+
+### YAML-Export für Testsysteme
+
+Der Export enthält ausschließlich die Filter und niemals Host, Port oder
+API-Token. Der angezeigte Inhalt kann kopiert und als `.yaml` gespeichert
+werden:
+
+```yaml
+format: zeitarchiv-options
+version: 3
+filters:
+  labels:
+    - zeitarchiv
+  entities:
+    - sensor.aussentemperatur
+  areas: []
+  devices: []
+  exclude_entities:
+    - sensor.testwert
+  entity_patterns:
+    - sensor.wetter_*
+  exclude_entity_patterns:
+    - "*_id"
+```
+
+Der Import verwendet einen sicheren YAML-Loader und prüft Formatversion,
+Struktur, Entity-IDs und Muster. Exporte der vorherigen Formatversionen 1 und 2
+bleiben importierbar; enthaltene Domains werden einmalig in aktuell bekannte
+Entity-IDs umgewandelt. Erst nach erfolgreicher Prüfung ersetzt der Import die
+Optionen und lädt die Integration neu.
+
+> [!NOTE]
+> Entity-IDs sind zwischen gleich aufgebauten Systemen meist direkt
+> übertragbar. Labels, Bereiche und Geräte referenzieren interne Registry-IDs
+> und funktionieren auf dem Zielsystem nur, wenn diese IDs übereinstimmen.
+
+## Warteschlange und Fehlerverhalten
+
+| Eigenschaft | Wert |
+| --- | ---: |
+| Maximale Queue | 5.000 Events |
+| Batchgröße | 100 Events |
+| Batch-Timeout | 5 Sekunden |
+| Retry-Abstände | 1, 2, 4, 8, 15, 30, danach 60 Sekunden |
+
+Der Worker läuft in einem eigenen Thread und blockiert den Home-Assistant-
+Event-Loop nicht. Ein fehlgeschlagener Batch bleibt erhalten und wird ohne
+festes Retry-Limit erneut versucht. Beim Entladen versucht die Integration,
+Queue und Teilbatch kontrolliert zu leeren.
+
+Ist die Queue voll, werden neu eintreffende Events verworfen und gezählt. Die
+Queue ist nicht persistent; ein Neustart verwirft noch nicht übertragene
+Werte.
+
+## Diagnose in Home Assistant
+
+Auf der Geräteseite der Integration erscheinen unter **Diagnose** vier
+Sensoren:
+
+| Sensor | Aussage |
+| --- | --- |
+| Letzte Übertragung | Zeitpunkt des letzten bestätigten Batches |
+| Übertragene Datensätze (seit Start) | Von der App bestätigte Events; Retries zählen nicht doppelt |
+| Warteschlange | Noch wartende Events im Hintergrund-Worker |
+| Verworfene Ereignisse (seit Start) | Wegen voller oder gestoppter Queue verworfene Events |
+
+Die beiden Zähler beginnen nach jedem Start der Integration bei null.
+
+Über die Integrationskachel kann zusätzlich **Diagnose herunterladen** gewählt
+werden. Der Bericht enthält:
+
+- einen aktuellen Verbindungstest;
+- Queue-Größe, letzten Fehler und letzten Erfolg;
+- gesendete und verworfene Events seit Start;
+- Zahl der momentan von den Filtern erfassten Entitäten;
+- die gespeicherten Optionen.
+
+Der API-Token wird automatisch geschwärzt.
+
+## Wartungshinweise: Repairs und Health-Sensoren
+
+Beide Wege lesen dieselben Meldungen der App (`/api/notices`, gepollt alle
+60 s), aber für unterschiedliche Zwecke — nur ein Ausschnitt wird zur
+Repair-Karte, ein anderer (überlappender) Ausschnitt zu automatisierbaren
+Entities:
+
+**Drei `binary_sensor`-Health-Entities** am Zeitarchiv-Gerät, bewusst
+**keine** Diagnose-Entities (sollen im normalen Dashboard/für Automationen
+auffindbar bleiben):
+
+| Sensor | Springt an bei |
+| --- | --- |
+| Backup fehlgeschlagen | letzter Sicherungslauf fehlgeschlagen, oder das Backup konnte nicht auf das externe Ziel der App übertragen werden |
+| Inaktive Entitäten erkannt | eine oder mehrere Entitäten melden sich seit mehreren Tagen nicht mehr (info/warn/error gebündelt) |
+| Wartungshinweis | Speicherindex-Abgleichsfehler, fehlgeschlagene Aufbewahrung, empfohlene Bereinigung, knapper Host-Speicherplatz, empfohlene Index-Optimierung |
+
+Jeder Sensor trägt als Attribut `reasons`/`details` die genauen Meldungs-IDs
+und Texte, die ihn gerade auslösen — praktisch, wenn mehrere Ursachen
+gleichzeitig zutreffen.
+
+**Home-Assistant-Repairs** (Einstellungen → System → Repairs) decken davon
+nur die wirklich kritischen Fälle ab, die einer bewussten Reaktion
+bedürfen: fehlgeschlagenes Backup, fehlgeschlagene Aufbewahrung, lange
+inaktive Entitäten (nur die kritische Stufe), veraltete
+Integrationsversion, sowie kritisch knapper Host-Speicherplatz. Absichtlich
+keine interaktiven Fix-Flows — die eigentliche Behebung (Backup erneut
+anstoßen, Aufbewahrung prüfen, Integration aktualisieren) passiert in der
+Zeitarchiv-App bzw. über HACS, die Repair-Karte dient als Hinweis mit
+Handlungsanweisung im Text.
+
+**Eine Ausnahme kommt nicht aus den Meldungen:** Das Repair-Issue „Zeitarchiv-
+Verbindung pausiert" (siehe [Token ändern](#token-ändern)) entsteht
+eigenständig direkt aus dem Schreibpfad, weil der normale, meldungsbasierte
+Weg in genau dem Moment (abgelehnter Token) selbst nicht erreichbar ist.
+Ebenso direkt aus dem Schreibpfad kommt „Zeitarchiv: Entitäten mit
+Textwerten werden noch nicht archiviert": Sie listet einzeln ausgewählte
+Entitäten, deren Zustand Text statt einer Zahl ist, solange die verbundene
+App noch keine Zustände annehmen kann — die App erfährt von ihnen dann nie
+etwas. Die Karte verschwindet nach einem Update der App von selbst, oder
+sobald keine dieser Entitäten mehr Text liefert.
+Dasselbe zeigt der `binary_sensor` **Nicht archivierbare Entitäten** am
+Zeitarchiv-Gerät für Dashboards und Automationen: „OK“, solange alle
+ausgewählten Entitäten archivierbare Werte liefern, sonst „Problem“. Die
+Attribute `entities` (vollständige Liste) und `count` nennen die betroffenen
+Entitäten; der Sensor aktualisiert sich sofort, nicht im 60-s-Takt.
+
+## Betriebsmodus
+
+Der Sensor **Betriebsmodus** am Zeitarchiv-Gerät zeigt, ob die verbundene
+App-Instanz gerade produktiv oder im Demo-Modus läuft (eine synthetische
+Vorführ-/Testinstanz mit eigenem Datenverzeichnis, siehe Zeitarchiv-App-
+Dokumentation). Nützlich, um in Automationen oder per Blick aufs Dashboard
+zu erkennen, ob man gerade auf einer Vorführinstanz statt der echten Anlage
+sitzt. Bewusst keine Diagnose-Entity, aus demselben Grund wie beim
+Backup-Sensor unten. Ist die App gerade nicht erreichbar, zeigt die Entity
+den Home-Assistant-Standardzustand „Nicht verfügbar" statt eines falschen
+Werts.
+
+## Offsite-Backup per Automation
+
+Zeitarchiv kann Backups selbst auf einen Netzwerkspeicher (NFS/SMB) oder
+einen WebDAV-Server kopieren (Seite **Sicherung → Externes Ziel** in der App).
+Dafür brauchst du keine Automation, und die Integration meldet das Ergebnis:
+Der Sensor **Letztes Backup** trägt die Attribute `external_status`
+(`ok`, `failed` oder `running`; leer, wenn kein externes Ziel eingerichtet
+ist), `external_target` und `external_finished_at`, und **Backup
+fehlgeschlagen** springt auch an, wenn nur die externe Kopie fehlt.
+
+Für alles, was die App nicht kann (S3, Cloud-Dienste, eigene Skripte), liefert
+die Integration einen Automations-Trigger: den Sensor **Letztes Backup**
+(State = Zeitstempel des letzten ERFOLGREICHEN Backups, Attribute
+`filename`/`size_bytes`) — bewusst keine Diagnose-Entity, damit er in
+Automationen leicht auffindbar bleibt.
+
+[![Blueprint importieren](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fbertel2020%2FHA-Zeitarchiv%2Fmain%2Fblueprints%2Fautomation%2Fzeitarchiv%2Fbackup_upload.yaml)
+
+Nach dem Import: den Backup-Sensor der gewünschten Verbindung auswählen und
+eine eigene Upload-Aktion eintragen, z. B. ein `shell_command` mit
+`rclone copy`:
+
+```yaml
+shell_command:
+  rclone_backup_upload: "rclone copy '/config/zeitarchiv-backups/{{ filename }}' remote:zeitarchiv-backups/"
+```
+
+In der Blueprint-Aktion stehen Dateiname und Größe per Vorlage zur
+Verfügung: `{{ trigger.to_state.attributes.filename }}` und
+`{{ trigger.to_state.attributes.size_bytes }}`.
+
+## Token ändern
+
+Wird der Token in der App neu generiert, lehnt die App den nächsten Batch ab.
+Die Integration startet daraufhin den Home-Assistant-Reauth-Flow; der
+ausstehende Batch bleibt erhalten. Den neuen Token einfach im angezeigten
+Dialog eintragen.
+
+**Ausnahme: Demo-Modus.** Schaltet die App auf den [Demo-Modus](#betriebsmodus)
+um, ändert sich ihr Token ebenfalls — löst aber bewusst **keinen** Reauth
+aus: Die Integration erkennt den Grund selbst (kein echtes Tokenproblem) und
+pausiert stattdessen ruhig, erkennbar an einem eigenen Hinweis unter
+Einstellungen → Repairs. Sobald die App zurück auf Produktiv geschaltet
+wird, sendet die Verbindung von selbst wieder — mit dem ursprünglichen
+Token, ohne etwas hier nachzupflegen. Nur wenn sich das nicht eindeutig
+bestimmen lässt, fragt der gewohnte Reauth-Dialog nach — und warnt dann
+zusätzlich, falls der neu eingetragene Token zufällig doch zu einer
+Demo-Instanz gehört.
+
+Verbindungsname, Host, Port und Token können außerdem jederzeit über die
+Integrationskachel → **Neu konfigurieren** geändert werden. Die Verbindung wird
+vor der Übernahme erneut getestet.
+
+## Filterlogik im Detail
+
+Eine Entität wird archiviert, wenn sie nicht ausdrücklich ausgeschlossen ist
+und mindestens eine Einschlussregel erfüllt:
+
+```text
+nicht ausgeschlossen
+        UND
+(Domain gewählt ODER Entity-ID gewählt ODER über Bereich/Gerät aufgelöst
+ ODER Einschlussmuster trifft)
+```
+
+Muster ohne Punkt werden auf die Objekt-ID hinter der Domain angewendet:
+`*_id` trifft beispielsweise `sensor.device_id` und `input_number.user_id`.
+Muster mit Punkt prüfen die vollständige Entity-ID, sodass `sensor.*_id` nur
+Sensoren erfasst. Unterstützt werden ausschließlich `*` und `?`; reguläre
+Ausdrücke sind bewusst nicht zugelassen.
+
+Bereiche und Geräte werden beim Speichern der Optionen in konkrete Entity-IDs
+aufgelöst. Entitäten, die später neu zu einem gewählten Bereich oder Gerät
+hinzukommen, werden erst nach erneutem Speichern der Filter berücksichtigt.
+
+## Karte im Dashboard
+
+Die Integration bringt eine Lovelace-Karte mit, die ein gespeichertes Chart aus
+dem Zeitarchiv zeigt. Eine Ressource muss nicht eingetragen werden.
+
+1. Im Dashboard **Karte hinzufügen → Zeitarchiv** wählen.
+2. Im Editor das Chart auswählen. Titel, Aktualisierung (Standard 60 Sekunden)
+   und Höhe sind optional.
+
+```yaml
+type: custom:zeitarchiv-card
+chart_id: 12
+title: Stromverbrauch
+refresh: 60
+height: 260
+tap_action:            # optional: Standard-Aktion von Home Assistant beim Tippen
+  action: navigate
+  navigation_path: /lovelace/energie
+```
+
+**Karte fehlt im Kartenwähler oder zeigt nur einen Ladekreis?** Die Karte wird beim Start von Home
+Assistant angemeldet, nach der Installation oder einem Update also zuerst Home Assistant neu starten.
+Danach die Seite im Browser komplett neu laden (Strg+Umschalt+R bzw. Cmd+Umschalt+R); die Companion-App
+unter Einstellungen → Companion-App → Fehlerbehebung → Frontend-Cache zurücksetzen. Bleibt es dabei, hilft
+die Browser-Konsole (F12): Ein Fehler beim Laden von `zeitarchiv-card.js` steht dort.
+
+**Beim Tippen:** Im Editor unter „Beim Tippen“ lässt sich wie bei jeder Home-Assistant-Karte eine Aktion
+wählen (Dashboard öffnen, URL, Aktion ausführen). Ohne Auswahl passiert nichts. Bei „Entitäten direkt“ gilt
+die erste Entität als Ziel von „Mehr Informationen“. Mit Aktion ist die Karte per Tastatur erreichbar.
+
+**Entitäten direkt:** Statt eines gespeicherten Charts lassen sich im Editor Entitäten, Zeitraum und Darstellung
+einstellen (Quelle „Entitäten direkt“). Zur Auswahl stehen nur Entitäten, die das Zeitarchiv archiviert.
+
+```yaml
+type: custom:zeitarchiv-card
+entities:
+  - sensor.netzbezug
+  - sensor.einspeisung
+period: month        # day, week, month, year, 24h, 7d, 30d
+style: stacked       # auto (je Entität), stacked (gestapelt), percent (Anteile in Prozent)
+```
+
+- **Standardmäßig nur für Administratoren.** Home Assistant kennt keine Rechte je Chart, deshalb
+  zeigt die Karte anderen Benutzern nichts. Soll sie auch auf einem Wandtablet oder unter einem
+  Familienkonto laufen, wähle in den Einstellungen der Integration (**Konfigurieren → Karte
+  freigeben**) die Charts und Tabellen aus, die jeder angemeldete Benutzer sehen darf. Nur diese
+  sind dann abrufbar; Entitäten direkt bleiben Administratoren vorbehalten. Die Sparkline unter einer Kachelkarte dürfen alle Benutzer abrufen: wer eine Entität in Home Assistant sieht, liest ihren Verlauf dort ohnehin.
+- **Nur die Integration spricht mit dem Zeitarchiv.** Die Karte spricht nie mit der App,
+  sondern über Home Assistant; der Token bleibt in der Integration. Dafür braucht die
+  App die Fähigkeit „cards“ (App-Update, wenn die Karte darauf hinweist).
+- **Reihenfolge beim Aktualisieren:** erst die Zeitarchiv-App, dann die Integration. Ist die App älter als
+  die Integration, zeigt die Karte „Die Zeitarchiv-App ist zu alt für die Karte“, bis die App aktualisiert ist.
+- **Was die Karte zeichnet:** alle Darstellungen eines gespeicherten Charts: Zahlen als Linie, Balken, gestapelt
+  und als Anteile in Prozent, mit Vorperiode, Vorjahr und Mehrjahresvergleich, dazu Zeitstrahl, Donut und bei
+  Zuständen Anteile, Wechsel und Heatmap. Tooltips, helles und dunkles Thema. Der im Chart gespeicherte Zeitraum
+  gilt. Gespeicherte Vergleichstabellen werden mit denselben Zellen, Formeln und Stilen wie in der Kachel gezeigt
+  (Quelle „Gespeicherte Tabelle“, `table_id`).
+- Bei einem Ausfall der App bleibt das letzte Bild stehen und die Karte nennt sein Alter.
+
+### Dashboard-Bausteine
+
+Mit der Quelle **Dashboard-Baustein** zeigt die Karte fertige Ausschnitte der Energie- und Wetterdashboards der App, mit
+deren Zahlen. Rollen, Formeln und Entitäten bleiben in der App eingerichtet; ein Baustein, den die App nicht eingerichtet
+hat, fehlt in der Auswahl. Dafür braucht die App Version 1.30.0 (Fähigkeit „card_elements“) und ein Administratorkonto.
+
+```yaml
+type: custom:zeitarchiv-card
+element: energie.kennzahlen
+values: [erzeugung, autarkie, speicher]   # nur Abweichungen von der Vorgabe stehen in der YAML
+period: month                             # day, week, month, year
+offset: -1                                # Perioden zurück, 0 = aktuell
+```
+
+| Baustein | Zeigt | Optionen |
+|---|---|---|
+| `energie.zeitraeume`, `wetter.zeitraeume` | Zeiträume im Vergleich (Tabelle) | `columns`, `vorjahr`, `diff`, beim Wetter `group` |
+| `energie.matrix`, `wetter.matrix` | Jahre × Monate (Energie) bzw. Jahresübersicht (Wetter) | `role` bzw. `metric`, `years` |
+| `energie.monatsvergleich`, `wetter.monatsvergleich` | Jahre als Linien mit Mittel und Spanne | `role` bzw. `metric`, `years`, `band` |
+| `energie.anteile` | Verbraucher- oder Versorgungsanteile (Ring) | `side`, `period`, `offset` |
+| `energie.heatmap` | Tageslastprofil | `period`, `offset` |
+| `energie.kennzahlen`, `wetter.kennzahlen` | Kacheln mit Wert, Veränderung und Verlauf; Energie auch Autarkie, Eigenverbrauch und Speicher | `values`, `sparkline`, `period`, `offset` |
+| `energie.speicher` | Speicher mit Batterie, Saldo, Ladung, Entladung und Kurve des Ladestands (Tag) | `period`, `offset`, `sparkline` |
+| `energie.rekorde` | Rekordtage als Kacheln (erst nach einem Jahr Daten) | – |
+| `energie.kenntage` | Kenntage je Jahr | `years`, `mode` (`komplett` = ganze Jahre, sonst bis heute) |
+| `energie.veraenderungen` | Verbraucher mit der größten Änderung zum Vorjahr | `mode`, `limit` (1 bis 20) |
+
+Mit `follow_energy_date: true` folgen Anteile, Lastprofil, Kennzahlen und Speicher der Datumsauswahl des
+Energie-Dashboards von Home Assistant; sie steht nur zur Verfügung, wenn schon eine Energie-Ansicht sie angelegt hat,
+sonst gilt der Zeitraum der Karte. Die Karte zeichnet mit denselben Funktionen wie die Dashboards der App.
+
+### Verlauf unter einer Kachelkarte
+
+Zusätzlich gibt es eine kleine Verlaufslinie als **Funktion** der Standard-Kachelkarte: In der Kachelkarte
+**Funktion hinzufügen → Zeitarchiv-Verlauf** wählen. Sie zeigt die Entität der Kachel für die letzten 24 Stunden,
+7 oder 30 Tage als Linie, Fläche oder Balken, auf Wunsch mit markiertem Minimum und Maximum und der Änderung.
+Die Entität muss im Zeitarchiv archiviert sein; sonst steht dort „Nicht archiviert“.
+
+```yaml
+type: tile
+entity: sensor.aussentemperatur
+features:
+  - type: custom:zeitarchiv-sparkline
+    range: 24h          # 24h, 7d, 30d
+    style: line         # line, area, bars
+    color: accent       # accent oder trend (grün steigend, rot fallend)
+    min_max: true
+    show_change: true
+```
+
+Die Sparkline ist für alle Benutzer sichtbar, nicht nur für Administratoren.
+
+Wie die Karte mit Entitäten direkt nur für Administratoren sichtbar.
+
+## Bekannte Grenzen
+
+- Nichtnumerische Textsensoren werden nicht archiviert; ausgewählte werden
+  als Repair-Karte gemeldet.
+- Bereichs- und Gerätezuordnungen werden nicht laufend neu aufgelöst.
+- Queue und Übertragungszähler bestehen nur für die Laufzeit der Integration.
+- Die Verbindung verwendet einen gemeinsamen statischen Token und kein OAuth.
+- Die Integration ist ein Schreibpfad; archivierte Werte werden nicht als neue
+  Home-Assistant-Entitäten zurückgelesen. Die Karte zeigt gespeicherte Charts,
+  macht daraus aber keine Entitäten.
+
+## Entfernen
+
+1. **Einstellungen → Geräte & Dienste → Zeitarchiv** öffnen, beim Eintrag
+   **⋮ → Löschen** wählen. Bei mehreren Verbindungen jede einzeln löschen.
+2. Bei Installation über HACS die Integration zusätzlich in HACS entfernen,
+   bei manueller Installation den Ordner `/config/custom_components/zeitarchiv`
+   löschen.
+3. Home Assistant neu starten.
+
+Mit dem Löschen einer Verbindung verschwinden ihr Dienst-Gerät, die Diagnose-
+und Health-Sensoren sowie ihre Repair-Karten. Werte, die zu diesem Zeitpunkt
+noch in der Warteschlange stehen, werden nicht mehr übertragen.
+
+Das Archiv selbst bleibt unberührt: Alle bereits übertragenen Werte liegen in
+der Zeitarchiv-App und bleiben dort erhalten. Wer auch sie entfernen will,
+deinstalliert die App getrennt davon. Der API-Token kann in der App unter
+**Einstellungen → Verbindung** neu generiert werden, damit der alte nicht
+weiter gültig ist.
+
+---
+
+<p align="center">
+  <a href="https://github.com/bertel2020/HA-Apps/tree/main/zeitarchiv">Zeitarchiv-App</a>
+  ·
+  <a href="https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.de.md">App-Changelog</a>
+</p>
+
+## Lizenz
+
+Dieses Projekt steht unter der [MIT-Lizenz](LICENSE).
+Copyright 2026 Roberto / bertel2020.

@@ -5,7 +5,7 @@
 <h1 align="center">Zeitarchiv Integration</h1>
 
 <p align="center">
-  Der zuverlässige Schreibpfad von Home Assistant in das Zeitarchiv.
+  The reliable write path from Home Assistant into Zeitarchiv.
 </p>
 
 <p align="center">
@@ -22,207 +22,198 @@
   <a href="https://paypal.me/RobertoMartins"><img src="https://img.shields.io/badge/PayPal-donate-00457C?logo=paypal&logoColor=white" alt="PayPal"></a>
 </p>
 
-<p align="center"><em><a href="README.en.md">English version</a></em></p>
+<p align="center"><em><a href="README.de.md">Deutsche Version</a></em></p>
 
-Zeitarchiv ist ein Langzeitarchiv für Home Assistant mit Zeitvergleichen,
-Energie- und Wetterauswertung und CSV-Export, eine einfache Alternative zu
-InfluxDB/Grafana. Diese Integration liefert die Daten dafür.
+Zeitarchiv is a long-term archive for Home Assistant with time comparisons,
+energy and weather reports and CSV export, a simple alternative to
+InfluxDB/Grafana. This integration delivers the data for it.
 
-Die Zeitarchiv-Integration beobachtet ausgewählte Zustandsänderungen und
-überträgt sie gebündelt an die [Zeitarchiv-App](https://github.com/bertel2020/HA-Apps/tree/main/zeitarchiv). Sie
-erzeugt keine Kopien der archivierten Entitäten in Home Assistant: Die
-eigentlichen Zeitreihen, Charts und Tabellen bleiben Aufgabe der App.
+The Zeitarchiv integration watches selected state changes and transmits them
+in batches to the [Zeitarchiv app](https://github.com/bertel2020/HA-Apps/tree/main/zeitarchiv). It
+does not create copies of the archived entities in Home Assistant: the actual
+time series, charts and tables remain the app's job.
 
-## Was die Integration übernimmt
+## What the integration does
 
-| Aufgabe | Verhalten |
+| Task | Behavior |
 | --- | --- |
-| **Auswahl der Entitäten** | Bevorzugt Labels; optional einzelne Entitäten, Bereiche, Geräte und Entity-Muster kombinieren |
-| **Ausschlüsse** | Einzelne Entity-IDs und Ausschlussmuster haben immer Vorrang |
-| **Wertaufbereitung** | Numerische Werte mit einstellbaren Nachkommastellen (0–3, Standard 3) sowie Schalter- (`on`/`off`) und Anwesenheitszustände (`home`/`not_home`) |
-| **Zuverlässiger Transport** | In-Memory-Queue, Batches, Timeout und dauerhafte Retries |
-| **Sichere Verbindung** | Bearer-Token; Reauth-Hinweis bei abgelehntem Token |
-| **Diagnose** | Vier Diagnose-Sensoren und Diagnose-Download |
-| **Filter übertragen** | Als versioniertes YAML exportieren/importieren — praktisch, um dieselbe Auswahl auf ein zweites System zu übernehmen |
+| **Entity selection** | Labels preferred; optionally combine individual entities, areas, devices and entity patterns |
+| **Exclusions** | Individual entity IDs and exclusion patterns always take precedence |
+| **Value processing** | Numeric values with configurable decimal places (0–3, default 3), plus switch (`on`/`off`) and presence (`home`/`not_home`) states |
+| **Reliable transport** | In-memory queue, batches, timeout and persistent retries |
+| **Secure connection** | Bearer token; reauth prompt when the token is rejected |
+| **Diagnostics** | Four diagnostic sensors and a diagnostics download |
+| **Transferring filters** | Export/import as versioned YAML — handy for applying the same selection to a second system |
 
 ## Installation
 
-### Über HACS (empfohlen)
+### Via HACS (recommended)
 
-[![HACS-Repository in My Home Assistant öffnen](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=bertel2020&repository=HA-Zeitarchiv&category=integration)
-[![Zeitarchiv zu My Home Assistant hinzufügen](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=zeitarchiv)
+[![Open the HACS repository in My Home Assistant](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=bertel2020&repository=HA-Zeitarchiv&category=integration)
+[![Add Zeitarchiv to My Home Assistant](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=zeitarchiv)
 
-1. Über den ersten Button das Zeitarchiv-Repository in HACS öffnen. Ab Home Assistant 2026.11 ist HACS als **Marketplace** eingebaut; die Schritte sind dieselben.
-2. **Zeitarchiv** herunterladen und Home Assistant neu starten.
-3. Über den zweiten Button die Integration hinzufügen. Alternativ in Home
-   Assistant **Einstellungen → Geräte & Dienste → Integration hinzufügen →
-   Zeitarchiv** öffnen.
+1. Use the first button to open the Zeitarchiv repository in HACS. From Home Assistant 2026.11, HACS is built in as the **Marketplace**; the steps are the same.
+2. Download **Zeitarchiv** and restart Home Assistant.
+3. Use the second button to add the integration. Alternatively, open **Settings
+   → Devices & services → Add integration → Zeitarchiv** in Home Assistant.
 
-Alternativ in HACS bzw. im Marketplace unter **Integrationen** nach **Zeitarchiv** suchen.
+Alternatively, search for **Zeitarchiv** under **Integrations** in HACS or the Marketplace.
 
-### Manuell
+### Manual
 
-#### 1. Voraussetzung
+#### 1. Prerequisite
 
-Die [Zeitarchiv-App](https://github.com/bertel2020/HA-Apps/tree/main/zeitarchiv) muss laufen. Den API-Token findest
-du dort unter **Einstellungen → Verbindung**.
+The [Zeitarchiv app](https://github.com/bertel2020/HA-Apps/tree/main/zeitarchiv) must be running. You
+can find the API token there under **Settings → Connection**.
 
-App und Integration versionieren unabhängig voneinander, keine bestimmte
-Mindestversion nötig — neuere Funktionen (z. B. der Betriebsmodus-Sensor)
-bleiben gegen eine ältere Gegenseite einfach ungenutzt, statt die
-Verbindung zu stören. Die Karte im Dashboard braucht die App ab Version
-1.12.0, die Dashboard-Bausteine ab 1.30.0; mit einer älteren App zeigt sie „App zu alt“.
+App and integration are versioned independently; no particular minimum
+version is required — newer features (e.g. the operating mode sensor) are
+simply left unused against an older counterpart instead of disrupting the
+connection. The dashboard card needs app version 1.12.0 or later, the dashboard elements 1.30.0; with an older
+app it shows “App too old”.
 
-#### 2. Custom Integration kopieren
+#### 2. Copy the custom integration
 
-Das Verzeichnis `custom_components/zeitarchiv` nach
-`/config/custom_components/zeitarchiv` kopieren und Home Assistant neu
-starten.
+Copy the `custom_components/zeitarchiv` directory to
+`/config/custom_components/zeitarchiv` and restart Home Assistant.
 
-#### 3. Verbindung einrichten
+#### 3. Set up the connection
 
-In Home Assistant **Einstellungen → Geräte & Dienste → Integration hinzufügen
-→ Zeitarchiv** öffnen und eintragen:
+In Home Assistant, open **Settings → Devices & services → Add integration →
+Zeitarchiv** and enter:
 
-| Feld | Bedeutung |
+| Field | Meaning |
 | --- | --- |
-| Verbindungsname | Frei wählbarer Name, z. B. `Produktivsystem` oder `Testsystem` |
-| Host | Erreichbarer Host der Zeitarchiv-App |
-| Port | Standardmäßig `8127` |
-| API-Token | Token aus den App-Einstellungen |
+| Connection name | Freely chosen name, e.g. `Production` or `Test` |
+| Host | Reachable host of the Zeitarchiv app |
+| Port | `8127` by default |
+| API token | Token from the app settings |
 
-Die Verbindung wird vor dem Speichern geprüft. Ein nicht erreichbarer Host und
-ein abgelehnter Token erscheinen als getrennte Fehlermeldungen.
+The connection is tested before saving. An unreachable host and a rejected
+token appear as separate error messages.
 
-Mehrere Verbindungen können parallel eingerichtet werden. Jede Verbindung hat
-eine eigene Warteschlange, eigene Filter und eigene Diagnose-Sensoren. Dadurch
-kann derselbe Home Assistant seine Zustandsänderungen beispielsweise zugleich
-an ein Produktiv- und ein Test-Zeitarchiv senden; auch zwei benannte Einträge
-mit identischem Host und Port sind zulässig. Nur ein zweiter Eintrag mit
-demselben Host, Port **und** Token wird abgelehnt, weil er jeden Wert doppelt
-an dieselbe App schicken würde.
+Multiple connections can be set up in parallel. Each connection has its own
+queue, its own filters and its own diagnostic sensors. This allows the same
+Home Assistant to send its state changes to a production and a test
+Zeitarchiv at the same time, for example; two named entries with identical
+host and port are also allowed. Only a second entry with the same host, port
+**and** token is rejected, because it would send every value twice to the
+same app.
 
-#### 4. Archivfilter wählen
+#### 4. Choose archive filters
 
-Auf der Zeitarchiv-Integrationskachel **Konfigurieren → Archivfilter
-bearbeiten** öffnen.
+On the Zeitarchiv integration tile, open **Configure → Edit archive
+filters**.
 
-| Auswahl | Wirkung |
+| Selection | Effect |
 | --- | --- |
-| Labels (empfohlen) | Direkt gelabelte Entitäten sowie Entitäten gelabelter Geräte und Bereiche; Änderungen gelten ohne erneutes Speichern für folgende Zustandsänderungen |
-| Einzelne Entitäten | Zusätzliche konkrete Entity-IDs |
-| Bereiche | Alle aktuell zugeordneten Entitäten |
-| Geräte | Alle aktuell zugeordneten Entitäten |
-| Ausgeschlossene Entitäten | Werden in jedem Fall verworfen |
-| Entitätsmuster einschließen | `*`-/`?`-Muster; ohne Punkt für Objekt-IDs, mit Punkt für vollständige Entity-IDs |
-| Entitätsmuster ausschließen | Musterbasierte Ausschlüsse mit demselben Vorrang wie einzelne Ausschlüsse |
-| Nachkommastellen | Rundung numerischer Werte vor der Übertragung, 0–3, Standard 3 |
+| Labels (recommended) | Directly labelled entities as well as entities of labelled devices and areas; changes apply to subsequent state changes without saving again |
+| Individual entities | Additional specific entity IDs |
+| Areas | All entities currently assigned |
+| Devices | All entities currently assigned |
+| Excluded entities | Always discarded |
+| Include entity patterns | `*`/`?` patterns; without a dot for object IDs, with a dot for full entity IDs |
+| Exclude entity patterns | Pattern-based exclusions with the same precedence as individual exclusions |
+| Decimal places | Rounding of numeric values before transmission, 0–3, default 3 |
 
-Nach dem Absenden zeigt ein Prüfschritt die tatsächlich aufgelösten
-Entity-IDs. Die Vorschau unterscheidet aktive Entitäten, registrierte
-Entitäten ohne aktuellen Zustand und durch Ausschlüsse entfernte Entitäten.
-Bei Labels, Bereichen und Geräten werden dadurch alle zugehörigen Entitäten
-sichtbar, bevor die Auswahl gespeichert wird. Die Vorschau nennt außerdem die
-eingestellten Nachkommastellen; Schaltzustände werden unabhängig davon als
-`1/0` gespeichert.
+After submitting, a review step shows the entity IDs that were actually
+resolved. The preview distinguishes active entities, registered entities
+without a current state, and entities removed by exclusions. For labels,
+areas and devices this makes all associated entities visible before the
+selection is saved. The preview also states the configured decimal places;
+switch states are stored as `1/0` regardless.
 
-Über **Konfigurieren → Aktuell erfasste Entitäten** lässt sich derselbe Report
-auch später jederzeit für die gespeicherten Filter öffnen, ohne die Auswahl zu
-verändern.
+Via **Configure → Currently included entities** the same report can be opened
+at any later time for the saved filters, without changing the selection.
 
-Domainfilter werden nicht mehr angeboten. Beim Upgrade werden früher
-gespeicherte Domainauswahlen einmalig in die zu diesem Zeitpunkt bekannten
-konkreten Entity-IDs umgewandelt. Für neue und später hinzukommende Entitäten
-sind Labels der bevorzugte Weg.
+Domain filters are no longer offered. On upgrade, previously saved domain
+selections are converted once into the concrete entity IDs known at that
+time. For new entities and those added later, labels are the preferred way.
 
-## Datenfluss
+## Data flow
 
 ```text
-Integration geladen/neu geladen ─► aktueller Zustand
-state_changed                  ───► neue Zustandsänderung
+Integration loaded/reloaded ─► current state
+state_changed               ───► new state change
      │
-     ├─ nur tatsächliche Zustandsänderung?
-     ├─ Filter trifft zu und nicht ausgeschlossen?
-     └─ unterstützter Wert?
+     ├─ actual state change only?
+     ├─ filter matches and not excluded?
+     └─ supported value?
              │
              ▼
-       In-Memory-Queue
-       max. 5.000 Events
+       In-memory queue
+       max. 5,000 events
              │
              ▼
-       Batch bis 100 Events
-       oder spätestens nach 5 s
+       Batch of up to 100 events
+       or after 5 s at the latest
              │
              ▼
-       Zeitarchiv-App :8127
+       Zeitarchiv app :8127
 ```
 
-Eine stabile Event-ID macht wiederholte Übertragungen idempotent. Geht eine
-HTTP-Antwort verloren, kann derselbe Batch erneut gesendet werden, ohne in der
-App denselben Messpunkt doppelt anzulegen.
+A stable event ID makes repeated transmissions idempotent. If an HTTP
+response is lost, the same batch can be sent again without the app creating
+the same data point twice.
 
-Unmittelbar beim Laden oder Neuladen eines Integrationseintrags werden die
-aktuellen Zustände aller passenden Entitäten einmal in die Warteschlange
-gelegt. Dadurch erscheinen neu ausgewählte Entitäten sofort in der App; die
-Integration wartet weder auf die nächste Zustandsänderung noch auf einen
-erneuten Start von Home Assistant.
+Immediately when an integration entry is loaded or reloaded, the current
+states of all matching entities are queued once. Newly selected entities
+therefore appear in the app right away; the integration waits neither for the
+next state change nor for a restart of Home Assistant.
 
-## Welche Werte werden archiviert?
+## Which values are archived?
 
-Die Integration reagiert nur, wenn sich der eigentliche Zustand ändert. Eine
-reine Änderung von Attributen wie Friendly Name oder Einheit erzeugt keinen
-zusätzlichen Archivpunkt.
+The integration only reacts when the actual state changes. A mere change of
+attributes such as friendly name or unit does not create an additional
+archive point.
 
-- Numerische Zustände von `sensor`, `climate`, `input_number`, `counter` und
-  vergleichbaren Domains werden als Zahl mit den im Options-Flow eingestellten
-  Nachkommastellen (0–3, Standard 3) übertragen. Empfohlen ist der Standard;
-  weniger Nachkommastellen verbessern die Komprimierbarkeit der
-  Langzeitspeicherung in der App und können bei sehr vielen Entitäten und
-  langer Aufbewahrung spürbar Speicherplatz sparen, kosten bei kleinteiligen
-  Messwerten (z. B. Strom in A) aber Genauigkeit.
+- Numeric states of `sensor`, `climate`, `input_number`, `counter` and
+  comparable domains are transmitted as numbers with the decimal places set in
+  the options flow (0–3, default 3). The default is recommended; fewer decimal
+  places improve the compressibility of the app's long-term storage and can
+  noticeably save space with very many entities and long retention, but cost
+  precision for fine-grained measurements (e.g. current in A).
 - `binary_sensor`, `switch`, `input_boolean`, `light`, `fan`, `automation`,
-  `script`, `remote`, `siren`, `humidifier`, `update` und `calendar` werden
-  als `on → 1` und `off → 0` übertragen.
-- `device_tracker` und `person` werden als Anwesenheit übertragen:
-  `home → 1`, jeder andere Zustand (`not_home` oder eine benannte Zone
-  ungleich `home`) `→ 0`.
-- Textwerte (z. B. `Heating`/`Idle` eines Thermostats oder das Programm einer
-  Waschmaschine) werden als Zustand übertragen, mit der Übersetzung aus Home
-  Assistant, sofern es eine gibt. Das gilt nur für **einzeln ausgewählte**
-  Entitäten: Über ein Muster oder eine Auswahl nach Bereich, Gerät oder Label
-  kommen Text-Sensoren bewusst nicht mit. Bei solchen Entitäten gehen auch
-  `unknown` und `unavailable` an die App, die sie als „nicht verfügbar“
-  einträgt.
-- Kann die verbundene App noch keine Zustände annehmen (ältere Version),
-  werden Textwerte nicht archiviert. Damit das nicht unbemerkt bleibt, meldet
-  die Integration einzeln ausgewählte Entitäten mit Textwerten dann als
-  Repair-Karte und im Log (siehe
-  [Wartungshinweise](#wartungshinweise-repairs-und-health-sensoren)); nach
-  einem Update der App werden sie automatisch übertragen.
-- `unknown`, `unavailable`, `none` und leere Zustände werden sonst nicht
-  archiviert.
+  `script`, `remote`, `siren`, `humidifier`, `update` and `calendar` are
+  transmitted as `on → 1` and `off → 0`.
+- `device_tracker` and `person` are transmitted as presence: `home → 1`, any
+  other state (`not_home` or a named zone other than `home`) `→ 0`.
+- Text values (e.g. `Heating`/`Idle` of a thermostat or a washing machine's
+  programme) are transmitted as a state, with the translation from Home
+  Assistant where one exists. This only applies to **individually selected**
+  entities: text sensors deliberately do not come along via a pattern or a
+  selection by area, device or label. For such entities `unknown` and
+  `unavailable` are sent to the app as well, which records them as
+  "unavailable".
+- If the connected app cannot accept states yet (older version), text values
+  are not archived. So this does not go unnoticed, the integration then
+  reports individually selected entities with text values as a repair card
+  and in the log (see
+  [Maintenance notices](#maintenance-notices-repairs-and-health-sensors));
+  after an app update they are transmitted automatically.
+- Otherwise `unknown`, `unavailable`, `none` and empty states are not
+  archived.
 
-Auflösung, Aufbewahrung und Bereinigungsschwellen gehören nicht in diesen
-Filter. Sie werden global oder je Entität in der App konfiguriert.
+Resolution, retention and cleanup thresholds do not belong in this filter.
+They are configured globally or per entity in the app.
 
-## Einstellungsmenü
+## Settings menu
 
-**Konfigurieren** öffnet ein kompaktes Menü mit vier Aktionen:
+**Configure** opens a compact menu with four actions:
 
-1. **Archivfilter bearbeiten** – aktive Auswahl ändern.
-2. **Aktuell erfasste Entitäten** – aufgelöste Auswahl und Rundung prüfen.
-3. **Filter als YAML exportieren** – eine portable Kopie anzeigen.
-4. **Filter aus YAML importieren** – alle Filter aus einer Kopie ersetzen.
+1. **Edit archive filters** – change the active selection.
+2. **Currently included entities** – review the resolved selection and rounding.
+3. **Export filters as YAML** – show a portable copy.
+4. **Import filters from YAML** – replace all filters with a copy.
 
-Die Auswahl der Entitäten erfolgt normalerweise direkt in der Oberfläche über
-**Archivfilter bearbeiten**. Der YAML-Export und -Import ist optional und dient
-nur dazu, dieselbe Auswahl auf ein anderes System zu übertragen.
+You normally select entities directly in the UI via **Edit archive filters**.
+The YAML export and import is optional and only serves to transfer the same
+selection to another system.
 
-### YAML-Export für Testsysteme
+### YAML export for test systems
 
-Der Export enthält ausschließlich die Filter und niemals Host, Port oder
-API-Token. Der angezeigte Inhalt kann kopiert und als `.yaml` gespeichert
-werden:
+The export contains only the filters and never host, port or API token. The
+displayed content can be copied and saved as a `.yaml` file:
 
 ```yaml
 format: zeitarchiv-options
@@ -231,357 +222,340 @@ filters:
   labels:
     - zeitarchiv
   entities:
-    - sensor.aussentemperatur
+    - sensor.outdoor_temperature
   areas: []
   devices: []
   exclude_entities:
-    - sensor.testwert
+    - sensor.test_value
   entity_patterns:
-    - sensor.wetter_*
+    - sensor.weather_*
   exclude_entity_patterns:
     - "*_id"
 ```
 
-Der Import verwendet einen sicheren YAML-Loader und prüft Formatversion,
-Struktur, Entity-IDs und Muster. Exporte der vorherigen Formatversionen 1 und 2
-bleiben importierbar; enthaltene Domains werden einmalig in aktuell bekannte
-Entity-IDs umgewandelt. Erst nach erfolgreicher Prüfung ersetzt der Import die
-Optionen und lädt die Integration neu.
+The import uses a safe YAML loader and validates format version, structure,
+entity IDs and patterns. Exports of the previous format versions 1 and 2
+remain importable; any domains they contain are converted once into currently
+known entity IDs. Only after successful validation does the import replace
+the options and reload the integration.
 
 > [!NOTE]
-> Entity-IDs sind zwischen gleich aufgebauten Systemen meist direkt
-> übertragbar. Labels, Bereiche und Geräte referenzieren interne Registry-IDs
-> und funktionieren auf dem Zielsystem nur, wenn diese IDs übereinstimmen.
+> Entity IDs are usually directly transferable between identically structured
+> systems. Labels, areas and devices reference internal registry IDs and only
+> work on the target system if these IDs match.
 
-## Warteschlange und Fehlerverhalten
+## Queue and error behavior
 
-| Eigenschaft | Wert |
+| Property | Value |
 | --- | ---: |
-| Maximale Queue | 5.000 Events |
-| Batchgröße | 100 Events |
-| Batch-Timeout | 5 Sekunden |
-| Retry-Abstände | 1, 2, 4, 8, 15, 30, danach 60 Sekunden |
+| Maximum queue | 5,000 events |
+| Batch size | 100 events |
+| Batch timeout | 5 seconds |
+| Retry intervals | 1, 2, 4, 8, 15, 30, then 60 seconds |
 
-Der Worker läuft in einem eigenen Thread und blockiert den Home-Assistant-
-Event-Loop nicht. Ein fehlgeschlagener Batch bleibt erhalten und wird ohne
-festes Retry-Limit erneut versucht. Beim Entladen versucht die Integration,
-Queue und Teilbatch kontrolliert zu leeren.
+The worker runs in its own thread and does not block the Home Assistant event
+loop. A failed batch is kept and retried without a fixed retry limit. On
+unload, the integration tries to drain the queue and any partial batch in a
+controlled way.
 
-Ist die Queue voll, werden neu eintreffende Events verworfen und gezählt. Die
-Queue ist nicht persistent; ein Neustart verwirft noch nicht übertragene
-Werte.
+If the queue is full, newly arriving events are dropped and counted. The queue
+is not persistent; a restart discards values that have not yet been
+transmitted.
 
-## Diagnose in Home Assistant
+## Diagnostics in Home Assistant
 
-Auf der Geräteseite der Integration erscheinen unter **Diagnose** vier
-Sensoren:
+On the integration's device page, four sensors appear under **Diagnostic**:
 
-| Sensor | Aussage |
+| Sensor | Meaning |
 | --- | --- |
-| Letzte Übertragung | Zeitpunkt des letzten bestätigten Batches |
-| Übertragene Datensätze (seit Start) | Von der App bestätigte Events; Retries zählen nicht doppelt |
-| Warteschlange | Noch wartende Events im Hintergrund-Worker |
-| Verworfene Ereignisse (seit Start) | Wegen voller oder gestoppter Queue verworfene Events |
+| Last transmission | Time of the last acknowledged batch |
+| Transferred records (since start) | Events acknowledged by the app; retries are not counted twice |
+| Queue | Events still waiting in the background worker |
+| Dropped events (since start) | Events dropped because the queue was full or stopped |
 
-Die beiden Zähler beginnen nach jedem Start der Integration bei null.
+Both counters start at zero after each start of the integration.
 
-Über die Integrationskachel kann zusätzlich **Diagnose herunterladen** gewählt
-werden. Der Bericht enthält:
+In addition, **Download diagnostics** can be chosen on the integration tile.
+The report contains:
 
-- einen aktuellen Verbindungstest;
-- Queue-Größe, letzten Fehler und letzten Erfolg;
-- gesendete und verworfene Events seit Start;
-- Zahl der momentan von den Filtern erfassten Entitäten;
-- die gespeicherten Optionen.
+- a current connection test;
+- queue size, last error and last success;
+- events sent and dropped since start;
+- the number of entities currently covered by the filters;
+- the saved options.
 
-Der API-Token wird automatisch geschwärzt.
+The API token is redacted automatically.
 
-## Wartungshinweise: Repairs und Health-Sensoren
+## Maintenance notices: Repairs and health sensors
 
-Beide Wege lesen dieselben Meldungen der App (`/api/notices`, gepollt alle
-60 s), aber für unterschiedliche Zwecke — nur ein Ausschnitt wird zur
-Repair-Karte, ein anderer (überlappender) Ausschnitt zu automatisierbaren
-Entities:
+Both paths read the same notices from the app (`/api/notices`, polled every
+60 s) but serve different purposes — only one subset becomes a repair card,
+another (overlapping) subset becomes automatable entities:
 
-**Drei `binary_sensor`-Health-Entities** am Zeitarchiv-Gerät, bewusst
-**keine** Diagnose-Entities (sollen im normalen Dashboard/für Automationen
-auffindbar bleiben):
+**Three `binary_sensor` health entities** on the Zeitarchiv device, deliberately
+**not** diagnostic entities (so they remain easy to find on the regular
+dashboard and for automations):
 
-| Sensor | Springt an bei |
+| Sensor | Turns on when |
 | --- | --- |
-| Backup fehlgeschlagen | letzter Sicherungslauf fehlgeschlagen, oder das Backup konnte nicht auf das externe Ziel der App übertragen werden |
-| Inaktive Entitäten erkannt | eine oder mehrere Entitäten melden sich seit mehreren Tagen nicht mehr (info/warn/error gebündelt) |
-| Wartungshinweis | Speicherindex-Abgleichsfehler, fehlgeschlagene Aufbewahrung, empfohlene Bereinigung, knapper Host-Speicherplatz, empfohlene Index-Optimierung |
+| Backup failed | the last backup run failed, or the backup could not be transferred to the app's external target |
+| Entities inactive | one or more entities have not reported for several days (info/warn/error combined) |
+| Maintenance notice | storage index reconciliation error, failed retention run, recommended cleanup, low host disk space, recommended index optimization |
 
-Jeder Sensor trägt als Attribut `reasons`/`details` die genauen Meldungs-IDs
-und Texte, die ihn gerade auslösen — praktisch, wenn mehrere Ursachen
-gleichzeitig zutreffen.
+Each sensor carries the exact notice IDs and texts currently triggering it as
+the attribute `reasons`/`details` — useful when several causes apply at once.
 
-**Home-Assistant-Repairs** (Einstellungen → System → Repairs) decken davon
-nur die wirklich kritischen Fälle ab, die einer bewussten Reaktion
-bedürfen: fehlgeschlagenes Backup, fehlgeschlagene Aufbewahrung, lange
-inaktive Entitäten (nur die kritische Stufe), veraltete
-Integrationsversion, sowie kritisch knapper Host-Speicherplatz. Absichtlich
-keine interaktiven Fix-Flows — die eigentliche Behebung (Backup erneut
-anstoßen, Aufbewahrung prüfen, Integration aktualisieren) passiert in der
-Zeitarchiv-App bzw. über HACS, die Repair-Karte dient als Hinweis mit
-Handlungsanweisung im Text.
+**Home Assistant Repairs** (Settings → System → Repairs) cover only the
+genuinely critical cases that call for a deliberate response: failed backup,
+failed retention run, long-inactive entities (critical level only), outdated
+integration version, and critically low host disk space. Deliberately no
+interactive fix flows — the actual remedy (re-running the backup, checking
+retention, updating the integration) happens in the Zeitarchiv app or via
+HACS; the repair card serves as a notice with instructions in its text.
 
-**Eine Ausnahme kommt nicht aus den Meldungen:** Das Repair-Issue „Zeitarchiv-
-Verbindung pausiert" (siehe [Token ändern](#token-ändern)) entsteht
-eigenständig direkt aus dem Schreibpfad, weil der normale, meldungsbasierte
-Weg in genau dem Moment (abgelehnter Token) selbst nicht erreichbar ist.
-Ebenso direkt aus dem Schreibpfad kommt „Zeitarchiv: Entitäten mit
-Textwerten werden noch nicht archiviert": Sie listet einzeln ausgewählte
-Entitäten, deren Zustand Text statt einer Zahl ist, solange die verbundene
-App noch keine Zustände annehmen kann — die App erfährt von ihnen dann nie
-etwas. Die Karte verschwindet nach einem Update der App von selbst, oder
-sobald keine dieser Entitäten mehr Text liefert.
-Dasselbe zeigt der `binary_sensor` **Nicht archivierbare Entitäten** am
-Zeitarchiv-Gerät für Dashboards und Automationen: „OK“, solange alle
-ausgewählten Entitäten archivierbare Werte liefern, sonst „Problem“. Die
-Attribute `entities` (vollständige Liste) und `count` nennen die betroffenen
-Entitäten; der Sensor aktualisiert sich sofort, nicht im 60-s-Takt.
+**One exception does not come from the notices:** the repair issue "Zeitarchiv
+connection paused" (see [Changing the token](#changing-the-token)) arises on
+its own directly from the write path, because the normal notice-based path is
+itself unreachable at exactly that moment (rejected token). Likewise straight
+from the write path comes "Zeitarchiv: entities with text values are not
+archived yet": it lists individually selected entities whose state is text
+instead of a number, as long as the connected app cannot accept states yet —
+the app then never learns about them. The card disappears by itself after an
+app update, or once none of these entities reports text anymore. The `binary_sensor` **Non-archivable entities** on the
+Zeitarchiv device shows the same for dashboards and automations: "OK" as long
+as all selected entities report archivable values, otherwise "Problem". The
+attributes `entities` (full list) and `count` name the affected entities; the
+sensor updates immediately, not on the 60 s cycle.
 
-## Betriebsmodus
+## Operating mode
 
-Der Sensor **Betriebsmodus** am Zeitarchiv-Gerät zeigt, ob die verbundene
-App-Instanz gerade produktiv oder im Demo-Modus läuft (eine synthetische
-Vorführ-/Testinstanz mit eigenem Datenverzeichnis, siehe Zeitarchiv-App-
-Dokumentation). Nützlich, um in Automationen oder per Blick aufs Dashboard
-zu erkennen, ob man gerade auf einer Vorführinstanz statt der echten Anlage
-sitzt. Bewusst keine Diagnose-Entity, aus demselben Grund wie beim
-Backup-Sensor unten. Ist die App gerade nicht erreichbar, zeigt die Entity
-den Home-Assistant-Standardzustand „Nicht verfügbar" statt eines falschen
-Werts.
+The **Operating mode** sensor on the Zeitarchiv device shows whether the
+connected app instance is currently running in production or in demo mode (a
+synthetic showcase/test instance with its own data directory, see the
+Zeitarchiv app documentation). Useful for recognizing, in automations or at a
+glance on the dashboard, that you are on a showcase instance rather than the
+real installation. Deliberately not a diagnostic entity, for the same reason as
+the backup sensor below. If the app is currently unreachable, the entity shows
+the Home Assistant default state "Unavailable" instead of a wrong value.
 
-## Offsite-Backup per Automation
+## Offsite backup via automation
 
-Zeitarchiv kann Backups selbst auf einen Netzwerkspeicher (NFS/SMB) oder
-einen WebDAV-Server kopieren (Seite **Sicherung → Externes Ziel** in der App).
-Dafür brauchst du keine Automation, und die Integration meldet das Ergebnis:
-Der Sensor **Letztes Backup** trägt die Attribute `external_status`
-(`ok`, `failed` oder `running`; leer, wenn kein externes Ziel eingerichtet
-ist), `external_target` und `external_finished_at`, und **Backup
-fehlgeschlagen** springt auch an, wenn nur die externe Kopie fehlt.
+Zeitarchiv can copy backups to a network share (NFS/SMB) or a WebDAV server
+itself (page **Backup → External target** in the app). That needs no
+automation, and the integration reports the result: the **Latest backup**
+sensor carries the attributes `external_status` (`ok`, `failed` or `running`;
+empty if no external target is set up), `external_target` and
+`external_finished_at`, and **Backup failed** also turns on when only the
+external copy is missing.
 
-Für alles, was die App nicht kann (S3, Cloud-Dienste, eigene Skripte), liefert
-die Integration einen Automations-Trigger: den Sensor **Letztes Backup**
-(State = Zeitstempel des letzten ERFOLGREICHEN Backups, Attribute
-`filename`/`size_bytes`) — bewusst keine Diagnose-Entity, damit er in
-Automationen leicht auffindbar bleibt.
+For everything the app cannot do (S3, cloud services, your own scripts), the
+integration provides an automation trigger: the **Latest backup** sensor
+(state = timestamp of the last SUCCESSFUL backup, attributes
+`filename`/`size_bytes`) — deliberately not a diagnostic entity, so it is easy
+to find in automations.
 
-[![Blueprint importieren](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fbertel2020%2FHA-Zeitarchiv%2Fmain%2Fblueprints%2Fautomation%2Fzeitarchiv%2Fbackup_upload.yaml)
+[![Import blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fraw.githubusercontent.com%2Fbertel2020%2FHA-Zeitarchiv%2Fmain%2Fblueprints%2Fautomation%2Fzeitarchiv%2Fbackup_upload.yaml)
 
-Nach dem Import: den Backup-Sensor der gewünschten Verbindung auswählen und
-eine eigene Upload-Aktion eintragen, z. B. ein `shell_command` mit
-`rclone copy`:
+After importing: select the backup sensor of the desired connection and enter
+your own upload action, e.g. a `shell_command` with `rclone copy`:
 
 ```yaml
 shell_command:
   rclone_backup_upload: "rclone copy '/config/zeitarchiv-backups/{{ filename }}' remote:zeitarchiv-backups/"
 ```
 
-In der Blueprint-Aktion stehen Dateiname und Größe per Vorlage zur
-Verfügung: `{{ trigger.to_state.attributes.filename }}` und
+In the blueprint action, file name and size are available via template:
+`{{ trigger.to_state.attributes.filename }}` and
 `{{ trigger.to_state.attributes.size_bytes }}`.
 
-## Token ändern
+## Changing the token
 
-Wird der Token in der App neu generiert, lehnt die App den nächsten Batch ab.
-Die Integration startet daraufhin den Home-Assistant-Reauth-Flow; der
-ausstehende Batch bleibt erhalten. Den neuen Token einfach im angezeigten
-Dialog eintragen.
+If the token is regenerated in the app, the app rejects the next batch. The
+integration then starts the Home Assistant reauth flow; the pending batch is
+kept. Simply enter the new token in the dialog that appears.
 
-**Ausnahme: Demo-Modus.** Schaltet die App auf den [Demo-Modus](#betriebsmodus)
-um, ändert sich ihr Token ebenfalls — löst aber bewusst **keinen** Reauth
-aus: Die Integration erkennt den Grund selbst (kein echtes Tokenproblem) und
-pausiert stattdessen ruhig, erkennbar an einem eigenen Hinweis unter
-Einstellungen → Repairs. Sobald die App zurück auf Produktiv geschaltet
-wird, sendet die Verbindung von selbst wieder — mit dem ursprünglichen
-Token, ohne etwas hier nachzupflegen. Nur wenn sich das nicht eindeutig
-bestimmen lässt, fragt der gewohnte Reauth-Dialog nach — und warnt dann
-zusätzlich, falls der neu eingetragene Token zufällig doch zu einer
-Demo-Instanz gehört.
+**Exception: demo mode.** When the app is switched to [demo mode](#operating-mode),
+its token changes as well — but this deliberately does **not** trigger a
+reauth: the integration recognizes the reason itself (no real token problem)
+and instead pauses quietly, indicated by a dedicated notice under Settings →
+Repairs. As soon as the app is switched back to production, the connection
+resumes sending on its own — with the original token, without anything to
+update here. Only if this cannot be determined unambiguously does the usual
+reauth dialog ask — and then additionally warns if the newly entered token
+happens to belong to a demo instance.
 
-Verbindungsname, Host, Port und Token können außerdem jederzeit über die
-Integrationskachel → **Neu konfigurieren** geändert werden. Die Verbindung wird
-vor der Übernahme erneut getestet.
+Connection name, host, port and token can also be changed at any time via the
+integration tile → **Reconfigure**. The connection is tested again before the
+change is applied.
 
-## Filterlogik im Detail
+## Filter logic in detail
 
-Eine Entität wird archiviert, wenn sie nicht ausdrücklich ausgeschlossen ist
-und mindestens eine Einschlussregel erfüllt:
+An entity is archived if it is not explicitly excluded and satisfies at least
+one inclusion rule:
 
 ```text
-nicht ausgeschlossen
-        UND
-(Domain gewählt ODER Entity-ID gewählt ODER über Bereich/Gerät aufgelöst
- ODER Einschlussmuster trifft)
+not excluded
+        AND
+(domain selected OR entity ID selected OR resolved via area/device
+ OR include pattern matches)
 ```
 
-Muster ohne Punkt werden auf die Objekt-ID hinter der Domain angewendet:
-`*_id` trifft beispielsweise `sensor.device_id` und `input_number.user_id`.
-Muster mit Punkt prüfen die vollständige Entity-ID, sodass `sensor.*_id` nur
-Sensoren erfasst. Unterstützt werden ausschließlich `*` und `?`; reguläre
-Ausdrücke sind bewusst nicht zugelassen.
+Patterns without a dot are applied to the object ID after the domain: `*_id`,
+for example, matches `sensor.device_id` and `input_number.user_id`. Patterns
+with a dot check the full entity ID, so `sensor.*_id` only covers sensors. Only
+`*` and `?` are supported; regular expressions are deliberately not allowed.
 
-Bereiche und Geräte werden beim Speichern der Optionen in konkrete Entity-IDs
-aufgelöst. Entitäten, die später neu zu einem gewählten Bereich oder Gerät
-hinzukommen, werden erst nach erneutem Speichern der Filter berücksichtigt.
+Areas and devices are resolved into concrete entity IDs when the options are
+saved. Entities that are newly added to a selected area or device later are
+only taken into account after the filters are saved again.
 
-## Karte im Dashboard
+## Dashboard card
 
-Die Integration bringt eine Lovelace-Karte mit, die ein gespeichertes Chart aus
-dem Zeitarchiv zeigt. Eine Ressource muss nicht eingetragen werden.
+The integration ships a Lovelace card that shows a saved chart from Zeitarchiv. No
+resource needs to be added.
 
-1. Im Dashboard **Karte hinzufügen → Zeitarchiv** wählen.
-2. Im Editor das Chart auswählen. Titel, Aktualisierung (Standard 60 Sekunden)
-   und Höhe sind optional.
+1. In the dashboard choose **Add card → Zeitarchiv**.
+2. Pick the chart in the editor. Title, refresh (default 60 seconds) and height are
+   optional.
 
 ```yaml
 type: custom:zeitarchiv-card
 chart_id: 12
-title: Stromverbrauch
+title: Power consumption
 refresh: 60
 height: 260
-tap_action:            # optional: Standard-Aktion von Home Assistant beim Tippen
+tap_action:            # optional: Home Assistant's standard action on tap
   action: navigate
   navigation_path: /lovelace/energie
 ```
 
-**Karte fehlt im Kartenwähler oder zeigt nur einen Ladekreis?** Die Karte wird beim Start von Home
-Assistant angemeldet, nach der Installation oder einem Update also zuerst Home Assistant neu starten.
-Danach die Seite im Browser komplett neu laden (Strg+Umschalt+R bzw. Cmd+Umschalt+R); die Companion-App
-unter Einstellungen → Companion-App → Fehlerbehebung → Frontend-Cache zurücksetzen. Bleibt es dabei, hilft
-die Browser-Konsole (F12): Ein Fehler beim Laden von `zeitarchiv-card.js` steht dort.
+**Card missing in the card picker or only a loading spinner?** The card is registered when Home
+Assistant starts, so restart Home Assistant after installing or updating. Then reload the page in the
+browser completely (Ctrl+Shift+R, or Cmd+Shift+R on a Mac); in the companion app use Settings →
+Companion app → Troubleshooting → Reset frontend cache. If it persists, the browser console (F12) shows
+an error loading `zeitarchiv-card.js`.
 
-**Beim Tippen:** Im Editor unter „Beim Tippen“ lässt sich wie bei jeder Home-Assistant-Karte eine Aktion
-wählen (Dashboard öffnen, URL, Aktion ausführen). Ohne Auswahl passiert nichts. Bei „Entitäten direkt“ gilt
-die erste Entität als Ziel von „Mehr Informationen“. Mit Aktion ist die Karte per Tastatur erreichbar.
+**On tap:** In the editor under "On tap" you can choose an action as on any Home Assistant card (open a dashboard,
+URL, perform action). Without a choice nothing happens. With "Entities directly" the first entity is the target
+of "More info". With an action the card can be reached by keyboard.
 
-**Entitäten direkt:** Statt eines gespeicherten Charts lassen sich im Editor Entitäten, Zeitraum und Darstellung
-einstellen (Quelle „Entitäten direkt“). Zur Auswahl stehen nur Entitäten, die das Zeitarchiv archiviert.
+**Entities directly:** Instead of a saved chart, the editor lets you choose entities, period and display (source
+"Entities directly"). Only entities archived by Zeitarchiv are offered.
 
 ```yaml
 type: custom:zeitarchiv-card
 entities:
-  - sensor.netzbezug
-  - sensor.einspeisung
+  - sensor.grid_import
+  - sensor.feed_in
 period: month        # day, week, month, year, 24h, 7d, 30d
-style: stacked       # auto (je Entität), stacked (gestapelt), percent (Anteile in Prozent)
+style: stacked       # auto (per entity), stacked, percent (shares in percent)
 ```
 
-- **Standardmäßig nur für Administratoren.** Home Assistant kennt keine Rechte je Chart, deshalb
-  zeigt die Karte anderen Benutzern nichts. Soll sie auch auf einem Wandtablet oder unter einem
-  Familienkonto laufen, wähle in den Einstellungen der Integration (**Konfigurieren → Karte
-  freigeben**) die Charts und Tabellen aus, die jeder angemeldete Benutzer sehen darf. Nur diese
-  sind dann abrufbar; Entitäten direkt bleiben Administratoren vorbehalten. Die Sparkline unter einer Kachelkarte dürfen alle Benutzer abrufen: wer eine Entität in Home Assistant sieht, liest ihren Verlauf dort ohnehin.
-- **Nur die Integration spricht mit dem Zeitarchiv.** Die Karte spricht nie mit der App,
-  sondern über Home Assistant; der Token bleibt in der Integration. Dafür braucht die
-  App die Fähigkeit „cards“ (App-Update, wenn die Karte darauf hinweist).
-- **Reihenfolge beim Aktualisieren:** erst die Zeitarchiv-App, dann die Integration. Ist die App älter als
-  die Integration, zeigt die Karte „Die Zeitarchiv-App ist zu alt für die Karte“, bis die App aktualisiert ist.
-- **Was die Karte zeichnet:** alle Darstellungen eines gespeicherten Charts: Zahlen als Linie, Balken, gestapelt
-  und als Anteile in Prozent, mit Vorperiode, Vorjahr und Mehrjahresvergleich, dazu Zeitstrahl, Donut und bei
-  Zuständen Anteile, Wechsel und Heatmap. Tooltips, helles und dunkles Thema. Der im Chart gespeicherte Zeitraum
-  gilt. Gespeicherte Vergleichstabellen werden mit denselben Zellen, Formeln und Stilen wie in der Kachel gezeigt
-  (Quelle „Gespeicherte Tabelle“, `table_id`).
-- Bei einem Ausfall der App bleibt das letzte Bild stehen und die Karte nennt sein Alter.
+- **Administrators only by default.** Home Assistant has no per-chart permissions, so the card
+  shows nothing to other users. To run it on a wall tablet or under a family account, choose in
+  the integration settings (**Configure → Share card**) the charts and tables every signed-in
+  user may see. Only those can be fetched; entities directly stay with administrators. All users
+  may fetch the sparkline under a tile card: whoever sees an entity in Home Assistant can read its history there anyway.
+- **Only the integration talks to Zeitarchiv.** The card never contacts the app; it
+  goes through Home Assistant and the token stays in the integration. The app needs
+  the "cards" capability for this (update the app if the card says so).
+- **Update order:** the Zeitarchiv app first, then the integration. If the app is older than the
+  integration, the card shows "The Zeitarchiv app is too old for the card" until the app is updated.
+- **What the card draws:** every view of a saved chart: numbers as line, bars, stacked and as shares in percent,
+  with previous period, previous year and multi-year comparison, plus timeline, donut and, for states, shares,
+  changes and heatmap. Tooltips, light and dark theme. The period saved with the chart applies. Saved comparison tables are shown with the same cells, formulas and
+  styles as in the tile (source "Saved table", `table_id`).
+- If the app is unreachable, the last image stays and the card shows its age.
 
-### Dashboard-Bausteine
+### Dashboard elements
 
-Mit der Quelle **Dashboard-Baustein** zeigt die Karte fertige Ausschnitte der Energie- und Wetterdashboards der App, mit
-deren Zahlen. Rollen, Formeln und Entitäten bleiben in der App eingerichtet; ein Baustein, den die App nicht eingerichtet
-hat, fehlt in der Auswahl. Dafür braucht die App Version 1.30.0 (Fähigkeit „card_elements“) und ein Administratorkonto.
+With the source **Dashboard element** the card shows ready-made parts of the app's energy and weather dashboards, with
+their figures. Roles, formulas and entities stay set up in the app; an element the app has not set up is missing from
+the choice. This needs app version 1.30.0 (capability "card_elements") and an administrator account.
 
 ```yaml
 type: custom:zeitarchiv-card
 element: energie.kennzahlen
-values: [erzeugung, autarkie, speicher]   # nur Abweichungen von der Vorgabe stehen in der YAML
+values: [erzeugung, autarkie, speicher]   # only deviations from the default appear in the YAML
 period: month                             # day, week, month, year
-offset: -1                                # Perioden zurück, 0 = aktuell
+offset: -1                                # periods back, 0 = current
 ```
 
-| Baustein | Zeigt | Optionen |
+| Element | Shows | Options |
 |---|---|---|
-| `energie.zeitraeume`, `wetter.zeitraeume` | Zeiträume im Vergleich (Tabelle) | `columns`, `vorjahr`, `diff`, beim Wetter `group` |
-| `energie.matrix`, `wetter.matrix` | Jahre × Monate (Energie) bzw. Jahresübersicht (Wetter) | `role` bzw. `metric`, `years` |
-| `energie.monatsvergleich`, `wetter.monatsvergleich` | Jahre als Linien mit Mittel und Spanne | `role` bzw. `metric`, `years`, `band` |
-| `energie.anteile` | Verbraucher- oder Versorgungsanteile (Ring) | `side`, `period`, `offset` |
-| `energie.heatmap` | Tageslastprofil | `period`, `offset` |
-| `energie.kennzahlen`, `wetter.kennzahlen` | Kacheln mit Wert, Veränderung und Verlauf; Energie auch Autarkie, Eigenverbrauch und Speicher | `values`, `sparkline`, `period`, `offset` |
-| `energie.speicher` | Speicher mit Batterie, Saldo, Ladung, Entladung und Kurve des Ladestands (Tag) | `period`, `offset`, `sparkline` |
-| `energie.rekorde` | Rekordtage als Kacheln (erst nach einem Jahr Daten) | – |
-| `energie.kenntage` | Kenntage je Jahr | `years`, `mode` (`komplett` = ganze Jahre, sonst bis heute) |
-| `energie.veraenderungen` | Verbraucher mit der größten Änderung zum Vorjahr | `mode`, `limit` (1 bis 20) |
+| `energie.zeitraeume`, `wetter.zeitraeume` | Periods compared (table) | `columns`, `vorjahr`, `diff`, for weather `group` |
+| `energie.matrix`, `wetter.matrix` | Years × months (energy) or year overview (weather) | `role` or `metric`, `years` |
+| `energie.monatsvergleich`, `wetter.monatsvergleich` | Years as lines with average and range | `role` or `metric`, `years`, `band` |
+| `energie.anteile` | Consumption or supply shares (ring) | `side`, `period`, `offset` |
+| `energie.heatmap` | Daily load profile | `period`, `offset` |
+| `energie.kennzahlen`, `wetter.kennzahlen` | Tiles with value, change and trend; energy also self-sufficiency, self-consumption and storage | `values`, `sparkline`, `period`, `offset` |
+| `energie.speicher` | Storage with battery, balance, charge, discharge and the state-of-charge curve (day) | `period`, `offset`, `sparkline` |
+| `energie.rekorde` | Record days as tiles (after a year of data) | – |
+| `energie.kenntage` | Key days per year | `years`, `mode` (`komplett` = whole years, otherwise until today) |
+| `energie.veraenderungen` | Consumers with the biggest change from last year | `mode`, `limit` (1 to 20) |
 
-Mit `follow_energy_date: true` folgen Anteile, Lastprofil, Kennzahlen und Speicher der Datumsauswahl des
-Energie-Dashboards von Home Assistant; sie steht nur zur Verfügung, wenn schon eine Energie-Ansicht sie angelegt hat,
-sonst gilt der Zeitraum der Karte. Die Karte zeichnet mit denselben Funktionen wie die Dashboards der App.
+With `follow_energy_date: true`, shares, load profile, key figures and storage follow the date selection of the Home
+Assistant energy dashboard; it is only available once an energy view has created it, otherwise the period of the card
+applies. The card draws with the same functions as the app's dashboards.
 
-### Verlauf unter einer Kachelkarte
+### History under a tile card
 
-Zusätzlich gibt es eine kleine Verlaufslinie als **Funktion** der Standard-Kachelkarte: In der Kachelkarte
-**Funktion hinzufügen → Zeitarchiv-Verlauf** wählen. Sie zeigt die Entität der Kachel für die letzten 24 Stunden,
-7 oder 30 Tage als Linie, Fläche oder Balken, auf Wunsch mit markiertem Minimum und Maximum und der Änderung.
-Die Entität muss im Zeitarchiv archiviert sein; sonst steht dort „Nicht archiviert“.
+There is also a small history line as a **feature** of the standard tile card: in the tile card choose
+**Add feature → Zeitarchiv history**. It shows the tile's entity for the last 24 hours, 7 or 30 days as line, area or
+bars, optionally with marked minimum and maximum and the change. The entity must be archived by Zeitarchiv; otherwise
+it says "Not archived".
 
 ```yaml
 type: tile
-entity: sensor.aussentemperatur
+entity: sensor.outside_temperature
 features:
   - type: custom:zeitarchiv-sparkline
     range: 24h          # 24h, 7d, 30d
     style: line         # line, area, bars
-    color: accent       # accent oder trend (grün steigend, rot fallend)
+    color: accent       # accent or trend (green rising, red falling)
     min_max: true
     show_change: true
 ```
 
-Die Sparkline ist für alle Benutzer sichtbar, nicht nur für Administratoren.
+Like the card with entities directly, visible to administrators only.
 
-Wie die Karte mit Entitäten direkt nur für Administratoren sichtbar.
+## Known limitations
 
-## Bekannte Grenzen
+- Non-numeric text sensors are not archived; selected ones are reported as a
+  repair card.
+- Area and device assignments are not continuously re-resolved.
+- Queue and transmission counters exist only for the lifetime of the integration.
+- The connection uses a shared static token, not OAuth.
+- The integration is a write path; archived values are not read back as new
+  Home Assistant entities. The card shows saved charts but does not turn them into
+  entities.
 
-- Nichtnumerische Textsensoren werden nicht archiviert; ausgewählte werden
-  als Repair-Karte gemeldet.
-- Bereichs- und Gerätezuordnungen werden nicht laufend neu aufgelöst.
-- Queue und Übertragungszähler bestehen nur für die Laufzeit der Integration.
-- Die Verbindung verwendet einen gemeinsamen statischen Token und kein OAuth.
-- Die Integration ist ein Schreibpfad; archivierte Werte werden nicht als neue
-  Home-Assistant-Entitäten zurückgelesen. Die Karte zeigt gespeicherte Charts,
-  macht daraus aber keine Entitäten.
+## Removal
 
-## Entfernen
+1. Open **Settings → Devices & services → Zeitarchiv** and choose
+   **⋮ → Delete** on the entry. With several connections, delete each one.
+2. If installed via HACS, also remove the integration in HACS; for a manual
+   installation, delete the `/config/custom_components/zeitarchiv` folder.
+3. Restart Home Assistant.
 
-1. **Einstellungen → Geräte & Dienste → Zeitarchiv** öffnen, beim Eintrag
-   **⋮ → Löschen** wählen. Bei mehreren Verbindungen jede einzeln löschen.
-2. Bei Installation über HACS die Integration zusätzlich in HACS entfernen,
-   bei manueller Installation den Ordner `/config/custom_components/zeitarchiv`
-   löschen.
-3. Home Assistant neu starten.
+Deleting a connection removes its service device, its diagnostic and health
+sensors and its repair cards. Values still waiting in the queue at that moment
+are no longer transmitted.
 
-Mit dem Löschen einer Verbindung verschwinden ihr Dienst-Gerät, die Diagnose-
-und Health-Sensoren sowie ihre Repair-Karten. Werte, die zu diesem Zeitpunkt
-noch in der Warteschlange stehen, werden nicht mehr übertragen.
-
-Das Archiv selbst bleibt unberührt: Alle bereits übertragenen Werte liegen in
-der Zeitarchiv-App und bleiben dort erhalten. Wer auch sie entfernen will,
-deinstalliert die App getrennt davon. Der API-Token kann in der App unter
-**Einstellungen → Verbindung** neu generiert werden, damit der alte nicht
-weiter gültig ist.
+The archive itself is left untouched: all values transmitted so far live in
+the Zeitarchiv app and stay there. To remove them as well, uninstall the app
+separately. The API token can be regenerated in the app under
+**Settings → Connection** so the old one is no longer valid.
 
 ---
 
 <p align="center">
-  <a href="https://github.com/bertel2020/HA-Apps/tree/main/zeitarchiv">Zeitarchiv-App</a>
+  <a href="https://github.com/bertel2020/HA-Apps/tree/main/zeitarchiv">Zeitarchiv app</a>
   ·
-  <a href="https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.de.md">App-Changelog</a>
+  <a href="https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.md">App changelog</a>
 </p>
 
-## Lizenz
+## License
 
-Dieses Projekt steht unter der [MIT-Lizenz](LICENSE).
+This project is licensed under the [MIT License](LICENSE).
 Copyright 2026 Roberto / bertel2020.
