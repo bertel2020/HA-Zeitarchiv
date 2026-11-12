@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/hacs/integration"><img src="https://img.shields.io/badge/HACS-Custom-41BDF5.svg" alt="HACS Custom"></a>
+  <a href="https://github.com/hacs/integration"><img src="https://img.shields.io/badge/HACS-Default-41BDF5.svg" alt="HACS Default"></a>
   <a href="https://github.com/bertel2020/HA-Zeitarchiv/releases"><img src="https://img.shields.io/github/v/release/bertel2020/HA-Zeitarchiv?sort=semver" alt="Release"></a>
   <a href="https://github.com/bertel2020/HA-Zeitarchiv/actions/workflows/validate.yml"><img src="https://github.com/bertel2020/HA-Zeitarchiv/actions/workflows/validate.yml/badge.svg" alt="Validate"></a>
   <a href="https://github.com/bertel2020/HA-Zeitarchiv/actions/workflows/tests.yml"><img src="https://github.com/bertel2020/HA-Zeitarchiv/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
@@ -52,16 +52,13 @@ eigentlichen Zeitreihen, Charts und Tabellen bleiben Aufgabe der App.
 [![HACS-Repository in My Home Assistant öffnen](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=bertel2020&repository=HA-Zeitarchiv&category=integration)
 [![Zeitarchiv zu My Home Assistant hinzufügen](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=zeitarchiv)
 
-1. Über den ersten Button das Zeitarchiv-Repository in HACS öffnen.
+1. Über den ersten Button das Zeitarchiv-Repository in HACS öffnen. Ab Home Assistant 2026.11 ist HACS als **Marketplace** eingebaut; die Schritte sind dieselben.
 2. **Zeitarchiv** herunterladen und Home Assistant neu starten.
 3. Über den zweiten Button die Integration hinzufügen. Alternativ in Home
    Assistant **Einstellungen → Geräte & Dienste → Integration hinzufügen →
    Zeitarchiv** öffnen.
 
-Falls der erste Button nicht funktioniert, in HACS unter **Integrationen →
-Benutzerdefinierte Repositories**
-`https://github.com/bertel2020/HA-Zeitarchiv` als Kategorie **Integration**
-eintragen.
+Alternativ in HACS bzw. im Marketplace unter **Integrationen** nach **Zeitarchiv** suchen.
 
 ### Manuell
 
@@ -581,7 +578,7 @@ weiter gültig ist.
 <p align="center">
   <a href="https://github.com/bertel2020/HA-Apps/tree/main/zeitarchiv">Zeitarchiv-App</a>
   ·
-  <a href="https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.md">App-Changelog</a>
+  <a href="https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.de.md">App-Changelog</a>
 </p>
 
 ## Lizenz

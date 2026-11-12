@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/hacs/integration"><img src="https://img.shields.io/badge/HACS-Custom-41BDF5.svg" alt="HACS Custom"></a>
+  <a href="https://github.com/hacs/integration"><img src="https://img.shields.io/badge/HACS-Default-41BDF5.svg" alt="HACS Default"></a>
   <a href="https://github.com/bertel2020/HA-Zeitarchiv/releases"><img src="https://img.shields.io/github/v/release/bertel2020/HA-Zeitarchiv?sort=semver" alt="Release"></a>
   <a href="https://github.com/bertel2020/HA-Zeitarchiv/actions/workflows/validate.yml"><img src="https://github.com/bertel2020/HA-Zeitarchiv/actions/workflows/validate.yml/badge.svg" alt="Validate"></a>
   <a href="https://github.com/bertel2020/HA-Zeitarchiv/actions/workflows/tests.yml"><img src="https://github.com/bertel2020/HA-Zeitarchiv/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
@@ -52,14 +52,12 @@ time series, charts and tables remain the app's job.
 [![Open the HACS repository in My Home Assistant](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=bertel2020&repository=HA-Zeitarchiv&category=integration)
 [![Add Zeitarchiv to My Home Assistant](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=zeitarchiv)
 
-1. Use the first button to open the Zeitarchiv repository in HACS.
+1. Use the first button to open the Zeitarchiv repository in HACS. From Home Assistant 2026.11, HACS is built in as the **Marketplace**; the steps are the same.
 2. Download **Zeitarchiv** and restart Home Assistant.
 3. Use the second button to add the integration. Alternatively, open **Settings
    → Devices & services → Add integration → Zeitarchiv** in Home Assistant.
 
-If the first button does not work, add
-`https://github.com/bertel2020/HA-Zeitarchiv` in HACS under **Integrations →
-Custom repositories** with the category **Integration**.
+Alternatively, search for **Zeitarchiv** under **Integrations** in HACS or the Marketplace.
 
 ### Manual
 
