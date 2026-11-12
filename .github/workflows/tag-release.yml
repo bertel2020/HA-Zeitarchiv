@@ -61,6 +61,7 @@ jobs:
             echo "Kein Abschnitt \"## $VERSION\" in CHANGELOG.md gefunden — Release-Notes blieben leer." >&2
             exit 1
           fi
+          cat .github/release-footer.md >> "$NOTES_FILE"
           echo "notes_file=$NOTES_FILE" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release if new
