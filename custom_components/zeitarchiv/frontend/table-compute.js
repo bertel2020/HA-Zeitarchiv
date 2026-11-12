@@ -197,11 +197,14 @@ window.TableCompute = (() => {
     return `background:color-mix(in srgb, var(--accent-bar) ${pct}%, var(--surface));`;
   }
 
-  // Buchstaben-Kürzel je Datenzeile (A, B, C, … Z, dann wieder von vorn) —
-  // Trennlinien sind rein optisch und verbrauchen deshalb bewusst keinen
-  // Buchstaben. Dieselbe Zuordnung wie rowLetters in table_editor.html, hier
-  // als reine Funktion über ein rows-Array statt eines Alpine-Getters.
+  // Buchstaben-Kürzel je Datenzeile. Jede Zeile trägt ihren festen Buchstaben (row.letter, vergibt der
+  // Editor beim Anlegen, bleibt beim Verschieben; siehe table_letters.py). Trennlinien sind rein optisch
+  // und haben keinen. Ohne gespeicherte Buchstaben (Aufrufer aus der Zeit davor) zählt wie früher die
+  // Position: A, B, C … Z, dann wieder von vorn. Reine Funktion über ein rows-Array.
   function rowLetters(rows) {
+    if (rows.some(r => r.row_type !== 'separator' && r.letter)) {
+      return rows.map(r => (r.row_type === 'separator' || !r.letter) ? null : r.letter);
+    }
     let dataIndex = 0;
     return rows.map(r => {
       if (r.row_type === 'separator') return null;
