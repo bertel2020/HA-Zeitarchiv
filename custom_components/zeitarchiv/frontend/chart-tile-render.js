@@ -769,6 +769,9 @@
     // Mehrere Stapel (saved_charts.stack_groups): {groups: [{id, name}], members: {entity_id: id}}.
     let stackGroups = {};
     try { stackGroups = JSON.parse(ds.stackGroups || '{}') || {}; } catch (e) { stackGroups = {}; }
+    // Darstellung je Serie (saved_charts.series_style): {entity_id: {kind: 'bar'|'line', axis: 'own'}}.
+    let seriesStyle = {};
+    try { seriesStyle = JSON.parse(ds.seriesStyle || '{}') || {}; } catch (e) { seriesStyle = {}; }
     // "Ausrichtung" (Optionen-Menü, nur bei Auflösung "Voll") — siehe
     // horizontalActive in draw() (chart_editor.js-Parität).
     const horizontal = ds.horizontal === 'true';
@@ -778,7 +781,7 @@
     const spec = {
       entityIds, entityNames, colorFor, range, continuous, resolutionPreset, dynamicYAxis, animation,
       chartType, timeline, donut, donutAggregation, effectiveDecimals, showValues, averageLine,
-      averageStyle, areaFill, showPoints, stacked, normalize, stackGroups, horizontal, heatmapStates,
+      averageStyle, areaFill, showPoints, stacked, normalize, stackGroups, seriesStyle, horizontal, heatmapStates,
       periodAnchor: ds.periodAnchor || '',
       compareSettings: ds.compareSettings || '',
     };
@@ -803,6 +806,10 @@
       entity_ids: entityIds.join(','), range, offset: String(offset), continuous: String(continuous),
       raw: String(timeline),
     });
+    // Linie oder Balken je Serie; ohne Eintrag gilt die Entitätsart (Zähler Balken, Messwert Linie).
+    const kinds = entityIds.filter(id => spec.seriesStyle && spec.seriesStyle[id] && spec.seriesStyle[id].kind)
+      .map(id => `${id}:${spec.seriesStyle[id].kind}`);
+    if (kinds.length) params.set('kinds', kinds.join(','));
     // Ein fester Zeitraum bleibt fest, der Stichtag gilt nur für die übrigen.
     if (!spec.periodAnchor && stichtag) params.set('at', stichtag);
     if (compare) {
@@ -881,7 +888,7 @@
     const {
       entityNames, colorFor, range, resolutionPreset, dynamicYAxis, animation, timeline, donut,
       donutAggregation, effectiveDecimals, showValues, averageLine, averageStyle, areaFill,
-      showPoints, stacked, normalize, stackGroups, horizontal, heatmapStates, compare,
+      showPoints, stacked, normalize, stackGroups, seriesStyle, horizontal, heatmapStates, compare,
     } = spec;
     const borderColor = style.getPropertyValue('--border').trim();
     const inkFaint = style.getPropertyValue('--ink-faint').trim();
@@ -939,7 +946,11 @@
     // erschienen dort in rohen Sekunden statt als Dauer (Achse UND Tooltip
     // kannten den Anzeigemodus bisher gar nicht, nur die HTML-Legende oben).
     const isDurationSeries = s => s.aggregation_type === 'switch' && s.display_mode === 'time';
-    const axisKey = s => isDurationSeries(s) ? ' duration' : s.unit;
+    // Eine Linie mit „Eigene Achse“ (saved_charts.series_style) bekommt eine Achse für sich; der Schlüssel
+    // trägt die Entität hinter einem Trennzeichen, die Achse zeigt davon nur die Einheit (axisUnit).
+    const ownAxis = s => s.chart_type === 'line' && !!(seriesStyle && seriesStyle[s.entity_id] && seriesStyle[s.entity_id].axis === 'own');
+    const axisKey = s => isDurationSeries(s) ? ' duration' : (ownAxis(s) ? `${s.unit}\u0001${s.entity_id}` : s.unit);
+    const axisUnitText = u => String(u == null ? '' : u).split('\u0001')[0];
     const units = [...new Set(series.map(axisKey))];
     // Auflösung "Voll" (Tag/Woche/Monat/Jahr) fasst den kompletten Zeitraum
     // zu genau EINEM Wert je Entität zusammen — ein Ranking-Vergleich, kein
@@ -1021,6 +1032,9 @@
       // Prozent-Achse (100%-Normierung) — immer fest 0–100, unabhängig von
       // "Dynamische Y-Achse", siehe chart_editor.js (gleiche Begründung).
       const isPercentAxis = normalizeActive && barOnlyAxis.has(u);
+      // Eigene Achse einer Linie: Beschriftung in der Serienfarbe, damit klar bleibt, zu welcher Linie sie gehört.
+      const ownSeries = series.find(s => ownAxis(s) && axisKey(s) === u);
+      const axisInk = ownSeries ? colorFor(ownSeries.entity_id) : inkFaint;
       return {
         type: 'value',
         position: i % 2 === 0 ? 'left' : 'right',
@@ -1034,11 +1048,11 @@
         scale: isPercentAxis ? false : axisDynamic,
         // Einheit am Achsennamen (oben an der Achse) wie auf der Chart-Seite — die Beschriftung bleibt kurz, damit
         // der Rand der kleinen Kachel nicht wächst.
-        name: isPercentAxis ? '%' : (isDuration ? '' : (u || '')),
+        name: isPercentAxis ? '%' : (isDuration ? '' : axisUnitText(u)),
         nameLocation: 'end',
-        nameTextStyle: {fontSize: scaledFont(10), color: inkFaint, align: i % 2 === 0 ? 'left' : 'right'},
+        nameTextStyle: {fontSize: scaledFont(10), color: axisInk, align: i % 2 === 0 ? 'left' : 'right'},
         axisLabel: {
-          fontSize: scaledFont(10), color: inkFaint,
+          fontSize: scaledFont(10), color: axisInk,
           formatter: v => isPercentAxis ? `${fmtCompactNumber(v, 0)} %` : (isDuration ? NumberFormat.fmtDuration(v) : fmtCompactNumber(v, decimals)),
         },
         axisLine: {show: false},
