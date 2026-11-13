@@ -40,6 +40,45 @@ window.NumberFormat = (() => {
     return parseFloat(normalized);
   }
 
+  // Strenge Variante von parse() für Eingaben, die gespeichert werden (Rohwert hinzufügen):
+  // parse() liest "12abc" als 12 und entfernt im Format de-DE jeden Punkt, "21.5" wird dort 215.
+  // Hier gilt: nur Ziffern, Vorzeichen und Trennzeichen; ein Trennzeichen, das genau einmal vorkommt,
+  // nicht dem Tausendertrenner des Formats entspricht oder nicht von genau drei Ziffern gefolgt wird,
+  // ist ein Dezimaltrenner ("21.5" und "21,5" sind beide 21,5); mehrfach vorkommende sind Tausendergruppen.
+  // Alles andere (Buchstaben, falsch gruppierte Tausender, Mischformen) ergibt NaN.
+  function parseStrict(text) {
+    if (typeof text !== 'string') return NaN;
+    const match = text.trim().replace('\u2212', '-').match(/^([+-]?)(\d[\d.,]*)$/);
+    if (!match) return NaN;
+    const body = match[2];
+    const separators = body.replace(/\d/g, '');
+    let integer = body;
+    let fraction = '';
+    if (separators) {
+      const last = separators[separators.length - 1];
+      const at = body.lastIndexOf(last);
+      const after = body.slice(at + 1);
+      const onlyOnce = body.indexOf(last) === at;
+      const isDecimal = onlyOnce && (last === DECIMAL_SEP || after.length !== 3 || last !== THOUSANDS_SEP);
+      if (isDecimal) {
+        integer = body.slice(0, at);
+        fraction = after;
+        if (!fraction) return NaN;
+      }
+      // Was links des Dezimaltrenners steht bzw. der ganze Wert: nur Tausendergruppen eines einzigen Zeichens.
+      const groups = integer.split(/[.,]/);
+      const groupChars = integer.replace(/\d/g, '');
+      if (groups.length > 1) {
+        if (new Set(groupChars).size !== 1) return NaN;
+        if (groups[0].length > 3 || !groups.slice(1).every(group => group.length === 3)) return NaN;
+        if (isDecimal && groupChars[0] === last) return NaN;
+      }
+      integer = groups.join('');
+    }
+    const value = Number(match[1] + integer + (fraction ? '.' + fraction : ''));
+    return Number.isFinite(value) ? value : NaN;
+  }
+
   // Sekunden als kompakte Dauer ("1h 29m", "45m", "12s") — für Schalter-
   // Entitäten (binary_sensor/switch/input_boolean) im Anzeigemodus "Zeit"
   // (Konzept: Einschaltdauer statt Rohsekunden), z. B. Anwesenheitssensoren.
@@ -100,5 +139,5 @@ window.NumberFormat = (() => {
     });
   }
 
-  return {LOCALE, DECIMAL_SEP, THOUSANDS_SEP, fmt, parse, fmtDuration, harmonizeUnits};
+  return {LOCALE, DECIMAL_SEP, THOUSANDS_SEP, fmt, parse, parseStrict, fmtDuration, harmonizeUnits};
 })();
