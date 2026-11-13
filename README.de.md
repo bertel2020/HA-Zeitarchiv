@@ -47,6 +47,16 @@ eigentlichen Zeitreihen, Charts und Tabellen bleiben Aufgabe der App.
 
 ## Installation
 
+> **Die Integration braucht die Zeitarchiv-App.** Die App speichert die Daten
+> und stellt den API-Token bereit. Sie wird getrennt über den **App-Store** von
+> Home Assistant installiert, nicht über HACS. Zuerst die App installieren:
+>
+> [![App-Repository zu My Home Assistant hinzufügen](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fbertel2020%2FHA-Apps)
+>
+> 1. Über den Button das Repository hinzufügen, dann **Zeitarchiv** im App-Store (**Einstellungen → Apps → App-Store**) installieren und starten.
+> 2. Zeitarchiv öffnen und unter **Einstellungen → Verbindung** den API-Token kopieren.
+> 3. Danach die Integration wie unten beschrieben installieren.
+
 ### Über HACS (empfohlen)
 
 [![HACS-Repository in My Home Assistant öffnen](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=bertel2020&repository=HA-Zeitarchiv&category=integration)

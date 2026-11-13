@@ -2,6 +2,15 @@
 
 > Deutsche Version: [CHANGELOG.de.md](CHANGELOG.de.md)
 
+## Unreleased
+
+### Changed
+
+- **Documentation**: Clearer installation
+  - The README now says up front that the integration needs the Zeitarchiv
+    app, installed separately through the app store and not through HACS
+  - Button to add the app repository and the steps up to the API token
+
 ## 1.5.0 - 2026-11-10
 
 ### New

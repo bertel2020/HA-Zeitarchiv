@@ -2,6 +2,16 @@
 
 > English version: [CHANGELOG.md](CHANGELOG.md)
 
+## Unreleased
+
+### Geändert
+
+- **Dokumentation**: Klarere Installation
+  - Die README sagt jetzt gleich am Anfang, dass die Integration die
+    Zeitarchiv-App braucht, die getrennt über den App-Store und nicht über
+    HACS installiert wird
+  - Button zum Hinzufügen des App-Repositorys und die Schritte bis zum API-Token
+
 ## 1.5.0 - 2026-11-10
 
 ### Neu
