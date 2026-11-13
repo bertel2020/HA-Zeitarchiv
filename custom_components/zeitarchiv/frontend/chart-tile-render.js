@@ -1027,7 +1027,11 @@
     });
     const axisWidths = units.map(u => Math.max(46, Math.round(fmtCompactNumber(axisMaxAbs.get(u) || 0, unitDecimals.get(u)).length * 6.5 + 20)));
     const axisOffset = i => { let sum = 0; for (let j = i - 2; j >= 0; j -= 2) sum += axisWidths[j]; return sum; };
-    const yAxisSideMargin = side => horizontalActive ? 0 : units.reduce((m, _u, i) => ((i % 2 === 0) === (side === 'left') ? Math.max(m, axisOffset(i)) : m), 0);
+    const sideAxes = side => units.map((_u, i) => i).filter(i => (i % 2 === 0) === (side === 'left'));
+    const sideWidth = side => sideAxes(side).reduce((sum, i) => sum + axisWidths[i], 0);
+    // Mehrere Achsen auf einer Seite: containLabel schneidet die äußere ab, dann gilt der geschätzte Platz aller
+    // Achsen der Seite als Rand.
+    const multiAxisSide = !horizontalActive && (sideAxes('left').length > 1 || sideAxes('right').length > 1);
     const yAxis = units.map((u, i) => {
       const decimals = unitDecimals.get(u);
       const isDuration = u === ' duration';
@@ -1407,16 +1411,14 @@
       // Balken, und die Y-Achse endet exakt beim Maximalwert. Ohne Rand würde
       // das Label des höchsten Balkens am Kachelrand abgeschnitten.
       grid: {
-        // Versetzte Achsen (mehrere Einheiten oder „Eigene Achse“) liegen außerhalb des gemessenen Rands: ihr
-        // Abstand kommt je Seite dazu, sonst wird die äußere Beschriftung abgeschnitten.
-        left: 6 + yAxisSideMargin('left'),
-        right: (showValues && horizontalActive ? 36 : 6) + yAxisSideMargin('right'),
+        left: multiAxisSide ? Math.max(6, sideWidth('left')) : 6,
+        right: multiAxisSide ? Math.max(6, sideWidth('right')) : (showValues && horizontalActive ? 36 : 6),
         // Mit Einheit am Achsennamen braucht der Kopf Platz für diese Zeile (bei "Werte anzeigen" teilen sie sich ihn).
         top: Math.max(
           showValues && !horizontalActive && !stackedActive ? 10 + scaledFont(10) + 6 : 10,
           yAxis.some(a => a.name) && !horizontalActive ? 10 + scaledFont(10) + 4 : 10),
         bottom: 20,
-        containLabel: true,
+        containLabel: !multiAxisSide,
       },
       xAxis: singleBucket ? (horizontalActive ? xAxisForHorizontal : categoryAxisObj) : {
         type: 'time',
