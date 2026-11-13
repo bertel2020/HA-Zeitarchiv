@@ -2,10 +2,26 @@
 
 > English version: [CHANGELOG.md](CHANGELOG.md)
 
-## Unreleased
+## 1.6.0 - 2026-11-13
+
+### Neu
+
+- **Karte: Stapel in Charts**: Balken lassen sich in mehrere Stapel gruppieren
+  - Stapelname in der Legende, Summe je Stapel im Tooltip
+  - Vorjahr und Vorperiode je Stapel, Legende nach Stapeln gruppiert
+  - Funktioniert bei Auflösung „Voll“ und horizontal; leere Stapel zeichnen
+    ihre Balken nicht mehr einzeln
+- **Karte: Linie oder Balken je Serie**: Jede Serie kann als Linie oder Balken
+  gezeichnet werden und eine eigene Achse haben
+  - Achsenabstand nach Beschriftungsbreite, Rand bei mehreren Achsen je Seite
+- **Karte: Tabellen**: Leerzeilen werden unterstützt
+- **Karte: Wetterdashboard**: Sonnenstunden-Label im Anteilsmodus
 
 ### Geändert
 
+- **Karte: Legende**: Vergleichs- und Ø-gleitend-Serien werden zusammen mit
+  ihrer Hauptserie ausgeblendet
+- **Karte: Zeitraum**: Die Zeitraumgrenzen folgen der Zeitzone des Servers
 - **Dokumentation**: Klarere Installation
   - Die README sagt jetzt gleich am Anfang, dass die Integration die
     Zeitarchiv-App braucht, die getrennt über den App-Store und nicht über

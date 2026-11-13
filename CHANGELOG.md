@@ -2,10 +2,26 @@
 
 > Deutsche Version: [CHANGELOG.de.md](CHANGELOG.de.md)
 
-## Unreleased
+## 1.6.0 - 2026-11-13
+
+### New
+
+- **Card: stacks in charts**: Bars can be grouped into several stacks
+  - Stack name in the legend, total per stack in the tooltip
+  - Previous year and previous period per stack, legend grouped by stack
+  - Works with resolution "Full" and horizontal bars; empty stacks no longer
+    draw their bars individually
+- **Card: line or bar per series**: Each series can be drawn as line or bar and
+  can have its own axis
+  - Axis spacing follows the label width, margin with several axes per side
+- **Card: tables**: Empty rows are supported
+- **Card: weather dashboard**: Sunshine hours label in share mode
 
 ### Changed
 
+- **Card: legend**: Comparison and moving-average series are hidden together
+  with their main series
+- **Card: time range**: Period boundaries follow the server time zone
 - **Documentation**: Clearer installation
   - The README now says up front that the integration needs the Zeitarchiv
     app, installed separately through the app store and not through HACS
