@@ -800,7 +800,7 @@
     let offset = 0;
     if (spec.periodAnchor) {
       const [y, m, d] = spec.periodAnchor.split('-').map(Number);
-      offset = PeriodNavigation.offsetForRange(range, new Date(y, m - 1, d, 12).getTime());
+      offset = PeriodNavigation.offsetForRange(range, PeriodNavigation.dayAnchor(y, m, d));
     }
     const params = new URLSearchParams({
       entity_ids: entityIds.join(','), range, offset: String(offset), continuous: String(continuous),
