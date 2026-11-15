@@ -563,6 +563,8 @@ separately. The API token can be regenerated in the app under
   <a href="https://github.com/bertel2020/HA-Apps/tree/main/zeitarchiv">Zeitarchiv app</a>
   ·
   <a href="https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.md">App changelog</a>
+  ·
+  <a href="https://github.com/bertel2020/HA-Apps/discussions">Questions &amp; ideas (Discussions)</a>
 </p>
 
 ## License

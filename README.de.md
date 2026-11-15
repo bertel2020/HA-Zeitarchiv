@@ -589,6 +589,8 @@ weiter gültig ist.
   <a href="https://github.com/bertel2020/HA-Apps/tree/main/zeitarchiv">Zeitarchiv-App</a>
   ·
   <a href="https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.de.md">App-Changelog</a>
+  ·
+  <a href="https://github.com/bertel2020/HA-Apps/discussions">Fragen &amp; Ideen (Discussions)</a>
 </p>
 
 ## Lizenz
