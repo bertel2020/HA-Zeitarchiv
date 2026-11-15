@@ -412,10 +412,12 @@
         const list = rooms.get(name);
         const roomClosed = (opts.closedRooms || []).includes(name);
         const roomTitle = escapeHtml(name || t('Ohne Raum'));
+        const roomColor = (opts.roomColors || {})[name] || '';
+        const colorAttrs = roomColor ? ` has-room-color" style="--room-color:${escapeHtml(roomColor)}` : '';
         let block = opts.interactive
-          ? `<tr class="wt-grp wt-room is-toggle${roomClosed ? ' is-closed' : ''}"><th colspan="${span2}" data-room="${escapeHtml(name)}" role="button" tabindex="0" aria-expanded="${!roomClosed}">`
+          ? `<tr class="wt-grp wt-room is-toggle${roomClosed ? ' is-closed' : ''}${colorAttrs}"><th colspan="${span2}" data-room="${escapeHtml(name)}" role="button" tabindex="0" aria-expanded="${!roomClosed}">`
             + `<span class="wt-floor-chev" aria-hidden="true">▾</span> ${roomTitle}</th></tr>`
-          : `<tr class="wt-grp"><th colspan="${span2}">${roomTitle}</th></tr>`;
+          : `<tr class="wt-grp${colorAttrs}"><th colspan="${span2}">${roomTitle}</th></tr>`;
         if (roomClosed) return block;
         // Zwei Sensoren gleicher Art im Raum: der Name des Eintrags unterscheidet sie.
         const kinds = list.map(kind);
