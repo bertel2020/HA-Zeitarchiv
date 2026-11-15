@@ -400,7 +400,13 @@
         if (!rooms.has(name)) rooms.set(name, []);
         rooms.get(name).push(row);
       }
-      const names = [...rooms.keys()].filter(Boolean).concat(rooms.has('') ? [''] : []);
+      // Eigene Reihenfolge aus dem Setup: die genannten Räume zuerst, die übrigen danach, „Ohne Raum“ zuletzt.
+      const orderBy = (list, order) => {
+        const wanted = Array.isArray(order) ? order : [];
+        const rank = (name) => { const i = wanted.indexOf(name); return i < 0 ? wanted.length : i; };
+        return list.map((name, index) => ({name, index})).sort((a, b) => rank(a.name) - rank(b.name) || a.index - b.index).map((entry) => entry.name);
+      };
+      const names = orderBy([...rooms.keys()].filter(Boolean), opts.roomOrder).concat(rooms.has('') ? [''] : []);
       const kind = (row) => (row.unit === '%' ? t('Feuchte') : t('Temperatur'));
       const roomBlock = (name) => {
         const list = rooms.get(name);
@@ -433,8 +439,9 @@
         for (const name of names) html += roomBlock(name);
         return html + '</tbody>';
       }
-      const floors = [];
+      let floors = [];
       for (const name of names) if (floorOf(name) && !floors.includes(floorOf(name))) floors.push(floorOf(name));
+      floors = orderBy(floors, opts.floorOrder);
       if (names.some((name) => !floorOf(name))) floors.push('');
       const closed = opts.closedFloors || [];
       for (const floor of floors) {
@@ -443,7 +450,8 @@
         const attrs = opts.interactive
           ? ` data-floor="${escapeHtml(floor)}" role="button" tabindex="0" aria-expanded="${!isClosed}"` : '';
         html += `<tr class="wt-floor${isClosed ? ' is-closed' : ''}${opts.interactive ? ' is-toggle' : ''}"><th colspan="${span2}"${attrs}>`
-          + `<span class="wt-floor-chev" aria-hidden="true">▾</span> ${escapeHtml(floor || t('Ohne Etage'))}</th></tr>`;
+          + `<span class="wt-floor-chev" aria-hidden="true">▾</span> ${escapeHtml(floor || t('Ohne Etage'))}`
+          + `<span class="wt-floor-count">${inFloor.length === 1 ? t('1 Raum') : t('{count} Räume', {count: inFloor.length})}</span></th></tr>`;
         if (!isClosed) for (const name of inFloor) html += roomBlock(name);
       }
       return html + '</tbody>';
