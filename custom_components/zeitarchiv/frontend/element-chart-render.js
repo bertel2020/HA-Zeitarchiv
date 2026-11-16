@@ -222,6 +222,64 @@
     };
   }
 
+  // ECharts-Optionen des Tagesverlaufs im Wetter (Roadmap 1.59). d: Antwort von tagesverlauf. Temperatur als Linie, Niederschlag
+  // und Sonnenstunden als Balken; der Vergleichszeitraum immer als graue gestrichelte Linie, Tag k über Tag k.
+  // options: colors (cur, sun, text, grid, ink, surface), narrow, font, compareName (Legendentext des Vergleichs).
+  function weatherCourse(d, options) {
+    const {colors} = options;
+    const font = options.font || ((size) => size);
+    const decimals = d.unit === 'min' ? 0 : 1;
+    const weekly = d.granularity === 'week';
+    const dayFormat = new Intl.DateTimeFormat(LOCALE, weekly
+      ? {day: '2-digit', month: '2-digit', year: '2-digit', timeZone: 'UTC'}
+      : {day: '2-digit', month: '2-digit', timeZone: 'UTC'});
+    const longFormat = new Intl.DateTimeFormat(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC'});
+    const when = (iso, format) => format.format(new Date(`${iso}T12:00:00Z`));
+    const isLine = d.metric === 'temperature';
+    const tone = d.metric === 'sun' ? colors.sun : colors.cur;
+    const series = [];
+    const legend = [];
+    const lastIndex = d.values.length - 1;
+    series.push(isLine ? {
+      name: 'now', type: 'line', data: d.values, symbol: 'circle', symbolSize: d.values.length > 40 ? 0 : 6, connectNulls: false, z: 5,
+      lineStyle: {color: tone, width: 2.5}, itemStyle: {color: tone},
+      markPoint: lastIndex >= 0 && d.values[lastIndex] != null
+        ? {symbol: 'circle', symbolSize: 9, itemStyle: {color: colors.ink}, label: {show: false}, data: [{coord: [lastIndex, d.values[lastIndex]]}]}
+        : undefined,
+    } : {
+      name: 'now', type: 'bar', data: d.values, itemStyle: {color: tone, opacity: 0.85}, barMaxWidth: 28, z: 3,
+    });
+    legend.push({name: 'now', itemStyle: {color: tone}, lineStyle: {color: tone}});
+    if (d.compare) {
+      series.push({
+        name: 'compare', type: 'line', data: d.compare.values, symbol: 'none', connectNulls: false, z: 6,
+        lineStyle: {color: colors.text, width: 1.6, type: 'dashed'}, itemStyle: {color: colors.text},
+      });
+      legend.push({name: 'compare', itemStyle: {color: colors.text}, lineStyle: {color: colors.text, type: 'dashed'}});
+    }
+    const names = {now: options.nowName || '', compare: options.compareName || ''};
+    return {
+      animation: false, grid: gridFor(options.narrow),
+      legend: {...legendBox(colors, legend.map((entry) => entry.name), font), formatter: (name) => names[name] || name},
+      xAxis: {
+        type: 'category', data: d.dates.map((iso) => when(iso, dayFormat)), boundaryGap: !isLine,
+        ...axisStyle(colors, font), axisLabel: {color: colors.text, fontSize: font(11), hideOverlap: true},
+      },
+      yAxis: {type: 'value', scale: isLine, name: d.unit, nameTextStyle: {color: colors.text}, ...axisStyle(colors, font)},
+      tooltip: tooltipBox(colors, font, (params) => {
+        const i = params[0].dataIndex;
+        const cell = (value) => (value == null ? '–' : `${num(value, decimals)} ${escapeHtml(d.unit)}`);
+        const range = (iso, span) => (weekly
+          ? `${when(iso, longFormat)}–${when(new Date(Date.parse(`${iso}T12:00:00Z`) + (span - 1) * 86400000).toISOString().slice(0, 10), longFormat)}`
+          : when(iso, longFormat));
+        let html = `<b>${escapeHtml(range(d.dates[i], weekly ? 7 : 1))}</b><br>${cell(d.values[i])}`;
+        if (d.compare) html += `<br>${escapeHtml(names.compare)} (${escapeHtml(range(d.compare.dates[i], weekly ? 7 : 1))}): ${cell(d.compare.values[i])}`;
+        return html;
+      }),
+      series,
+    };
+  }
+
   // ECharts-Optionen der Jahresübersicht des Wetters (Jahre × 366 Tage als Heatmap). m: Antwort von matrix.
   // options: colors (cur, prev, cold, text, grid, ink, surface, sun, sunSoft, overcast), narrow, font; sequential: Farbverlauf von
   // surface nach cold wie beim Niederschlag (für Größen ohne Vorzeichen, etwa Energie je Tag); missingLabel: Text für Felder ohne Wert.
@@ -373,5 +431,5 @@
   }
 
   window.ElementChartRender = {
-    energyHeatmap, energyShares,energyMonthly, weatherMonthly, weatherMatrix, pastOpacity, legendEntry};
+    energyHeatmap, energyShares,energyMonthly, weatherMonthly, weatherCourse, weatherMatrix, pastOpacity, legendEntry};
 })();
