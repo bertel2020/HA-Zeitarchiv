@@ -1203,8 +1203,10 @@
       // Gleitender Durchschnitt nur für Linien-Serien — dieselbe Begründung
       // wie chart_editor.js (eine Balken-Bucket-SUMME gleitend zu mitteln
       // ergäbe keine klar lesbare Aussage).
-      const showRollingAverage = averageLine && !isStackedBar && averageStyle === 'rolling'
+      const showRollingAverage = averageLine && !isStackedBar && (averageStyle === 'rolling' || averageStyle === 'rolling_only')
         && s.chart_type === 'line' && prepared[i].rawPoints.length >= 3;
+      // „Nur gleitend“: die Rohlinie bleibt für den Tooltip in den Daten, wird aber nicht gezeichnet.
+      const rollingOnly = showRollingAverage && averageStyle === 'rolling_only';
       const cfg = {
         // Angepasster Anzeigename (chart_editor.html, "Angezeigte Namen") hat
         // Vorrang vor dem Entität-eigenen friendly_name — dieselbe Regel wie
@@ -1227,7 +1229,7 @@
         stack: stackKeys[i] || undefined,
         // Bei aktiver Trendlinie tritt die rohe Kurve zurück, bleibt aber
         // sichtbar — dieselbe Ergänzung-statt-Ersatz-Logik wie im Editor.
-        lineStyle: {width: 2, color, opacity: showRollingAverage ? 0.45 : 1},
+        lineStyle: {width: 2, color, opacity: rollingOnly ? 0 : (showRollingAverage ? 0.45 : 1)},
         itemStyle: {color},
         // "Werte anzeigen" (Optionen-Menü) — Zahl direkt über jedem Balken/
         // Punkt, dieselbe Konvention wie entity_detail.html (ohne Einheit,
@@ -1256,12 +1258,12 @@
       };
       if (s.chart_type === 'line') {
         cfg.smooth = true;
-        if (!showPoints) cfg.symbol = 'none';
+        if (!showPoints || rollingOnly) cfg.symbol = 'none';
         // Dezente Füllfläche unter der Linie — macht eine einzelne Kurve auf
         // den ersten Blick lesbarer, stört bei mehreren überlagerten Serien
         // dank der niedrigen Deckkraft nicht. Abschaltbar (Optionen-Menü,
         // "Fläche"), Default an — siehe chart_editor.js.
-        if (areaFill) cfg.areaStyle = {color, opacity: 0.08};
+        if (areaFill && !rollingOnly) cfg.areaStyle = {color, opacity: 0.08};
       } else if (!isStackedBar) {
         cfg.itemStyle.borderRadius = [3, 3, 0, 0];
       } else if (lastBarIndexForStack.get(stackKeys[i]) === i) {
