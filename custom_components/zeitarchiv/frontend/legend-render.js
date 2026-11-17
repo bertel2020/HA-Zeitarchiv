@@ -190,6 +190,7 @@
     const {entityNames, colorFor, timeline, effectiveDecimals, compare} = spec;
     const ctx = {windowEnd: data.window_end, timeline, effectiveDecimals};
     const statsItem = (s, points, name, color) => buildStatsItem(s, points, name, color, ctx);
+    const inLegend = s => !(spec.seriesStyle && spec.seriesStyle[s.entity_id] && spec.seriesStyle[s.entity_id].legend === false);
     if (multiYear) {
       // Entschieden: nur das angezeigte Jahr und der Ø, die übrigen Jahre als
       // "+N Jahre" (die Tabellen-Legende zeigt nur die beiden Zeilen).
@@ -213,7 +214,7 @@
       const currentYear = window.ServerTime.parts(data.window_start || Date.now() / 1000).year;
       const items = [];
       series.forEach(s => {
-        if (!s.compare_points) return;
+        if (!s.compare_points || !inLegend(s)) return;
         const color = colorFor(s.entity_id);
         const displayName = entityNames[s.entity_id] || s.friendly_name;
         if (s.entity_id === compare.target) { items.push(statsItem(s, s.points, displayName, color)); return; }
@@ -227,7 +228,7 @@
     const stackNames = window.ChartTileRender.stackLabels(series, spec);
     const stackMembers = (spec.stackGroups && spec.stackGroups.members) || {};
     const axisOf = s => (s.aggregation_type === 'switch' && s.display_mode === 'time') ? ' duration' : s.unit;
-    return series.map(s => ({
+    return series.filter(inLegend).map(s => ({
       ...statsItem(s, s.points, entityNames[s.entity_id] || s.friendly_name, colorFor(s.entity_id)),
       stack: stackNames[s.entity_id] || '',
       stackKey: stackNames[s.entity_id] ? `${stackMembers[s.entity_id]}|${axisOf(s)}` : '',
