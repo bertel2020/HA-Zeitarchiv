@@ -139,6 +139,7 @@ table.dt tbody tr.has-pending-purge:hover td {background:var(--warning-soft);}
 table.dt.dt-cards tr.has-pending-purge {background:color-mix(in srgb, var(--warning-soft) 55%, var(--surface));}
 table.dt.dt-cards tr.has-pending-purge td, table.dt.dt-cards tbody tr.has-pending-purge:hover td {background:transparent;}
 }
+.tbl-wrap), .settings-panel.is-raised .tbl-wrap:not(.settings-section .tbl-wrap, .card .tbl-wrap) {box-shadow:var(--shadow),var(--tile-lift);}
 .tbl-wrap {box-shadow:var(--shadow);}
 .card .tbl-wrap, .settings-section .tbl-wrap, .detail-dialog .tbl-wrap {box-shadow:none;}
 .state-dot {display:inline-block;width:10px;height:10px;border-radius:3px;flex:none;vertical-align:-1px;}
@@ -239,6 +240,8 @@ table.dt.dt-cards tr.has-pending-purge td, table.dt.dt-cards tbody tr.has-pendin
 /* css/pages/dashboard_detail.css */
 .dtile-legend {display:none;flex-wrap:wrap;gap:8px;padding-top:10px;flex:none;}
 .dtile-legend.is-visible {display:flex;}
+.dashboard-grid.is-aligned .dtile-legend {align-content:flex-start;}
+.dashboard-grid.is-aligned .dtile-legend:has(> .tbl-wrap) {align-content:stretch;}
 .dtile-legend .tbl-wrap {width:100%;}
 .dtile-legend .dash {width:14px;height:0;border-top:2px dashed;flex:none;align-self:center;}
 .dtile-legend .chart-legend-item.is-more {background:transparent;border-style:dashed;color:var(--ink-muted);cursor:default;}
