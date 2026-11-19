@@ -1009,6 +1009,11 @@
     const barOnlyAxis = new Set(
       units.filter(u => series.every((s, i) => axisKey(s) !== u || (s.chart_type === 'bar' && stackKeys[i])))
     );
+    // Trägt eine Achse neben gestapelten Balken auch Balken ohne Stapel oder Linien, bleibt sie absolut
+    // ("Balkenhöhe nach der Summe"): die Segmente zeigen ihren Anteil in %, die Summe steht über dem Balken.
+    const shareAxis = new Set(normalizeActive
+      ? units.filter(u => !barOnlyAxis.has(u) && series.some((s, i) => axisKey(s) === u && s.chart_type === 'bar' && stackKeys[i]))
+      : []);
     // Strengste (kleinste) Nachkommastellen-Einstellung aller Entitäten einer
     // gemeinsamen Achse — dieselbe Regel wie in chart_editor.html.
     const unitDecimals = new Map();
@@ -1156,11 +1161,14 @@
     // x (ms-Zeitstempel bzw. 0 bei singleBucket) -> Summe je Stapel, nur für
     // tatsächlich normierte reine Balken-Achsen (barOnlyAxis, s. o.).
     const axisTotals = new Map();
+    // Stapel auf einer absoluten Achse (shareAxis): ihre Summen beschriften nur, die Höhe bleibt.
+    const shareTotals = new Map();
     if (normalizeActive) {
       series.forEach((s, i) => {
         const u = axisKey(s);
-        if (!barOnlyAxis.has(u)) return;
+        if (!stackKeys[i] || s.chart_type !== 'bar' || !(barOnlyAxis.has(u) || shareAxis.has(u))) return;
         if (!axisTotals.has(stackKeys[i])) axisTotals.set(stackKeys[i], new Map());
+        if (shareAxis.has(u)) shareTotals.set(stackKeys[i], axisTotals.get(stackKeys[i]));
         const totals = axisTotals.get(stackKeys[i]);
         prepared[i].lineData.forEach(p => totals.set(p[0], (totals.get(p[0]) || 0) + p[1]));
       });
@@ -1187,6 +1195,15 @@
       // in Absolutwerten (barOnlyAxis enthält ihre Achse dann nicht).
       const axisNormalized = normalizeActive && isStackedBar && barOnlyAxis.has(axisKey(s));
       let lineData = prepared[i].lineData;
+      const shareStack = normalizeActive && isStackedBar && shareAxis.has(axisKey(s));
+      if (shareStack) {
+        // Höhe bleibt absolut; Feld 8 trägt den Anteil am Stapel für Beschriftung und Tooltip.
+        const totals = axisTotals.get(stackKeys[i]);
+        lineData = lineData.map(p => {
+          const total = totals.get(p[0]) || 0;
+          return [p[0], p[1], p[2], p[3], p[4], null, null, null, total ? (p[1] / total) * 100 : 0];
+        });
+      }
       if (axisNormalized) {
         const totals = axisTotals.get(stackKeys[i]);
         // Felder 6/7 (Originaleinheit/-Nachkommastellen) stehen schon an
@@ -1236,13 +1253,19 @@
         // die steht schon an der Y-Achse). Gestapelt liegt das Label
         // INNERHALB des Segments (weiß) statt darüber — siehe chart_editor.js.
         label: {
-          show: showValues,
+          show: showValues || shareStack,
           position: isStackedBar ? 'inside' : (horizontalActive ? 'right' : 'top'),
           fontSize: scaledFont(10),
           color: isStackedBar ? '#fff' : inkMuted,
-          formatter: params => params.value[4]
-            ? NumberFormat.fmtDuration(params.value[1])
-            : fmtCompactNumber(params.value[1], params.value[3]),
+          // Schmale Balken: die Zahl ragt über den Rand, die Umrandung in der Segmentfarbe hält sie lesbar.
+          textBorderColor: shareStack ? color : undefined,
+          textBorderWidth: shareStack ? 2 : 0,
+          formatter: params => params.value[8] != null
+            // Anteil am Stapel; sehr schmale Segmente bleiben ohne Zahl, sie passt nicht hinein.
+            ? (params.value[8] < 4 ? '' : `${fmtCompactNumber(params.value[8], 0)} %`)
+            : (params.value[4]
+              ? NumberFormat.fmtDuration(params.value[1])
+              : fmtCompactNumber(params.value[1], params.value[3])),
         },
         // Gilt jetzt auch für singleBucket: seit jede Entität ihre eigene
         // Kategorie hat, ist das der Normalfall eines Kategorie-Achsen-
@@ -1390,6 +1413,35 @@
         echartsSeries.push(cmp);
       });
     }
+    // Summe über jedem Stapel einer absoluten Achse: ein unsichtbares, leeres Segment obenauf, dessen
+    // Beschriftung die Summe zeigt. Es liegt im selben Stapel und sitzt deshalb genau über dem Balken.
+    shareTotals.forEach((totals, key) => {
+      const last = series[lastBarIndexForStack.get(key)];
+      echartsSeries.push({
+        name: `Σ ${stackNameByKey.get(key) || ''}`.trim(),
+        type: 'bar',
+        isTotalHelper: true,
+        silent: true,
+        tooltip: {show: false},
+        stack: key,
+        xAxisIndex: horizontalActive ? units.indexOf(axisKey(last)) : undefined,
+        yAxisIndex: horizontalActive ? 0 : units.indexOf(axisKey(last)),
+        encode: horizontalActive ? {x: 1, y: 0} : undefined,
+        data: [...totals.entries()].sort((a, b) => a[0] - b[0])
+          .map(([x, total]) => [x, 0, last.unit, effectiveDecimals(last), isDurationSeries(last), null, null, null, null, total]),
+        barMaxWidth: 28,
+        itemStyle: {color: 'transparent'},
+        label: {
+          show: true,
+          position: horizontalActive ? 'right' : 'top',
+          fontSize: scaledFont(10),
+          color: inkMuted,
+          formatter: params => params.value[4]
+            ? NumberFormat.fmtDuration(params.value[9])
+            : fmtCompactNumber(params.value[9], params.value[3]),
+        },
+      });
+    });
     padStackedSeries(echartsSeries);
 
     // ECharts' eigene Legende bleibt unsichtbar (show:false, wie in
@@ -1414,10 +1466,11 @@
       // das Label des höchsten Balkens am Kachelrand abgeschnitten.
       grid: {
         left: multiAxisSide ? Math.max(6, sideWidth('left')) : 6,
-        right: multiAxisSide ? Math.max(6, sideWidth('right')) : (showValues && horizontalActive ? 36 : 6),
+        right: multiAxisSide ? Math.max(6, sideWidth('right')) : Math.max((showValues && horizontalActive ? 36 : 6), shareAxis.size > 0 && horizontalActive ? 36 : 6),
         // Mit Einheit am Achsennamen braucht der Kopf Platz für diese Zeile (bei "Werte anzeigen" teilen sie sich ihn).
         top: Math.max(
           showValues && !horizontalActive && !stackedActive ? 10 + scaledFont(10) + 6 : 10,
+          shareAxis.size > 0 && !horizontalActive ? 10 + scaledFont(10) + 6 : 10,
           yAxis.some(a => a.name) && !horizontalActive ? 10 + scaledFont(10) + 4 : 10),
         bottom: 20,
         containLabel: !multiAxisSide,
@@ -1473,7 +1526,7 @@
           // bekannten Wert (tooltip-hold.js), auch ohne eigenen Punkt am Cursor.
           const legendState = chart.getOption().legend?.[0]?.selected || {};
           const params = TooltipHold.complete(
-            allParams.filter(p => p.data[1] != null),
+            allParams.filter(p => p.data[1] != null && !(echartsSeries[p.seriesIndex] || {}).isTotalHelper),
             holdSeries,
             name => legendState[name] !== false
           );
@@ -1496,9 +1549,10 @@
             // — sonst verliert der Tooltip genau die Zahl, die die
             // Normierung aus dem Balken selbst entfernt.
             const absValue = p.data[5];
+            // Absolute Achse mit Anteilen (Feld 8): der Wert steht vorn, der Anteil in Klammern.
             const extra = absValue != null
               ? ` <span style="color:${inkFaint};">(${fmtCompactNumber(absValue, p.data[7])}${p.data[6] ? ' ' + escapeHtml(p.data[6]) : ''})</span>`
-              : '';
+              : (p.data[8] != null ? ` <span style="color:${inkFaint};">(${fmtCompactNumber(p.data[8], 0)} %)</span>` : '');
             return `<div style="display:flex;justify-content:space-between;gap:14px;">`
                  + `<span>${p.marker}${escapeHtml(p.seriesName)}</span>`
                  + `<span style="margin-left:8px;text-align:right;"><strong>${value}${extra}</strong>`
