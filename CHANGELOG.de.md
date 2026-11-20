@@ -2,6 +2,22 @@
 
 > English version: [CHANGELOG.md](CHANGELOG.md)
 
+## Unreleased
+
+### Neu
+
+- **Karte**
+  - Wetterdashboard: Tagesverlauf als Chart-Baustein; die Wetter-Tabelle zeigt die Raumzahl in den Etagenköpfen und Raumfarben in der Raumzeile
+  - Charts: Linienstil „Nur gleitend“ (nur die geglättete Linie)
+  - Anteile (%): Bei Balken ohne Stapel auf derselben Achse bleibt die Achse absolut; die Segmente zeigen ihren Anteil, über dem Balken steht die Summe
+
+### Geändert
+
+- **Karte**
+  - Farben: die Standardpalette der App im hellen und dunklen Thema statt der Home-Assistant-Farben
+  - Legende: Serien, die aus der Legende genommen sind, bleiben auch aus dem Chart und der Statistik draußen
+  - Tabellen und Legenden: Schattenregel und Legendenangleichung folgen der App
+
 ## 1.6.0 - 2026-11-13
 
 ### Neu

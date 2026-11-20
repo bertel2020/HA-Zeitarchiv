@@ -2,6 +2,22 @@
 
 > Deutsche Version: [CHANGELOG.de.md](CHANGELOG.de.md)
 
+## Unreleased
+
+### New
+
+- **Card**
+  - Weather dashboard: daily course as a chart module; the weather table shows the room count in the floor headers and room colours in the room row
+  - Charts: line style “Rolling only” (only the smoothed line)
+  - Shares (%): with bars without a stack on the same axis the axis stays absolute; segments show their share, the total stands above the bar
+
+### Changed
+
+- **Card**
+  - Colours: the default palette of the app in light and dark theme instead of the Home Assistant colours
+  - Legend: series taken out of the legend stay out of the chart and the statistics
+  - Tables and legends: shadow rule and legend alignment follow the app
+
 ## 1.6.0 - 2026-11-13
 
 ### New
