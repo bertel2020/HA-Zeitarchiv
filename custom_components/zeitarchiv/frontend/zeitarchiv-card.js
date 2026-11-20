@@ -230,11 +230,9 @@ const ELEMENT_FIELDS = new Set(['role', 'years', 'mode', 'limit', 'metric', 'ban
 // Die Fassung des Vertrags mit der App (card_routes.SPEC_VERSION).
 const SPEC_VERSION = 1;
 
-// Home-Assistant-Farbschema der App (--chart-1 bis --chart-8, hell und dunkel).
-const PALETTES = {
-  light: ['#009AC7', '#C94E00', '#00883C', '#8A5FC7', '#DC3146', '#18BCF2', '#B77A00', '#5E5E5E'],
-  dark: ['#37C8FD', '#FF9342', '#5DC36F', '#B99AF0', '#FD8F90', '#7BD4FB', '#FFD166', '#B1B1B1'],
-};
+// Standardpalette der App (--chart-1 bis --chart-8), in hellem und dunklem Thema gleich.
+const APP_PALETTE = ['#0C6B5D', '#B15E1B', '#3B6FA0', '#8B5FBF', '#C4472B', '#4C8C4A', '#B0932A', '#5C6B73'];
+const PALETTES = {light: APP_PALETTE, dark: APP_PALETTE};
 
 const text = (hass, key, values) => {
   const table = (hass?.locale?.language || hass?.language || 'en').startsWith('de') ? TEXTS.de : TEXTS.en;
