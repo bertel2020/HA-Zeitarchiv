@@ -296,9 +296,9 @@
       ];
     }
     return [
-      {label: t('Regenminuten'), field: 'minutes', decimals: 0, unit: 'min', delta: true, percent: true},
+      {label: t('Regenminuten'), field: 'minutes', decimals: 0, unit: 'min', delta: true, percent: true, duration: true},
       {label: t('Regentage (ab {n} min)', {n: num(data.rain_day_minutes, 0)}), field: 'days', decimals: 0, unit: ''},
-      {label: t('Regenreichster Tag'), field: 'top', decimals: 0, unit: 'min', when: 'day'},
+      {label: t('Regenreichster Tag'), field: 'top', decimals: 0, unit: 'min', when: 'day', duration: true},
     ];
   }
 
@@ -322,6 +322,14 @@
     return fmtDate(formats.dm, ts);
   }
 
+  // Dauer in Minuten als lesbare zweite Zeile: unter einem Tag „1 h 16 min“, darüber „2 Tage 4 Std.“.
+  function durationText(minutes) {
+    const total = Math.round(minutes);
+    if (total < 60) return '';
+    if (total < 1440) return t('{h} h {m} min', {h: Math.floor(total / 60), m: String(total % 60).padStart(2, '0')});
+    return t('{d} d {h} h', {d: Math.floor(total / 1440), h: Math.floor(total % 1440 / 60)});
+  }
+
   function weatherCell(summary, fromTs, metric, row, col, vjCell, deltaHtml) {
     const cls = (vjCell ? 'wt-vj' : 'wt-sep');
     if (!summary || summary[metric.field] == null) {
@@ -336,6 +344,7 @@
     const inline = col.range !== 'day' && when;
     const tip = when && !inline ? ` data-tooltip-fixed="${escapeHtml(when)}"` : '';
     return `<td class="${cls}"${tip}><span class="wt-v">${escapeHtml(num(summary[metric.field], decimals))}${unit ? '&nbsp;' + escapeHtml(unit) : ''}</span>`
+      + (metric.duration && durationText(summary[metric.field]) ? `<span class="wt-when">${escapeHtml(durationText(summary[metric.field]))}</span>` : '')
       + (inline ? `<span class="wt-when">${escapeHtml(when)}</span>` : '') + (deltaHtml || '') + '</td>';
   }
 
