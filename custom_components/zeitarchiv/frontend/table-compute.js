@@ -251,7 +251,7 @@ window.TableCompute = (() => {
       const vals = pts.map(p => p.value).filter(v => v != null);
       return vals.length ? vals[vals.length - 1] : null;
     }
-    if (!pts.length) return 0;
+    if (!pts.length) return null;
     const total = pts.reduce((a, p) => a + (p.value || 0), 0);
     if (aggregation === 'sum') return total;
     if (aggregation === 'avg') return total / pts.length;
@@ -398,6 +398,9 @@ window.TableCompute = (() => {
         } else {
           // Wie bisher: eine Gruppen-Zeile summiert die (je nach Modus schon
           // aggregierten) Mitglieder-Werte zusätzlich noch einmal auf.
+          // Ohne einen einzigen Wert bleibt die Zelle leer statt 0 — Formeln
+          // rechnen sonst mit einem Scheinwert weiter.
+          if (memberValues.every(v => v == null)) { values[ci][ri] = null; return; }
           value = memberValues.reduce((a, v) => a + (v || 0), 0);
           comparisonValue = memberComparisonValues.every(v => v == null)
             ? null
@@ -423,6 +426,13 @@ window.TableCompute = (() => {
             unitScope[letters[j]] = cell ? (cell.unit || '') : '';
           }
           const unit = (row.formula_unit || '').trim() || inheritedFormulaUnit(row.formula, unitScope);
+          // Fehlt der Wert einer referenzierten Zeile, fehlt auch das Ergebnis ("–"),
+          // statt als Formelfehler zu erscheinen — dieselbe Regel wie in computeRowSums().
+          const refs = [...new Set((row.formula || '').toUpperCase().match(/[A-Z]/g) || [])];
+          if (refs.some(l => l in scope && scope[l] == null)) {
+            values[ci][ri] = {value: null, unit};
+            return;
+          }
           try {
             values[ci][ri] = {value: evalFormula(row.formula, scope), unit};
           } catch (e) {
@@ -475,6 +485,9 @@ window.TableCompute = (() => {
   // - Formel: dieselbe Formel noch einmal auf den Σ-Werten ihrer Zeilen —
   //   bei A/B*100 ergibt das ΣA/ΣB statt einer Summe von Quotienten. Ist eine
   //   referenzierte Zeile null, ist es die Formel auch.
+  // - row.sum_mode übersteuert das je Zeile: "yes" addiert die Zellwerte der
+  //   Zeile (bei Formeln also die Formelergebnisse je Spalte, nicht die Formel
+  //   auf Σ-Werten), "no" lässt die Σ-Zelle leer, "auto"/fehlend = wie oben.
   // - Summenzeile: Summe (bzw. Ø) der Σ ihrer Abschnitts-Mitglieder, null,
   //   sobald eines davon null ist (eine Teilsumme sähe vollständig aus).
   // - % Anteil: Σ der Zeile im Verhältnis zur Σ des ganzen Abschnitts.
@@ -496,13 +509,20 @@ window.TableCompute = (() => {
         return {start: sectionStart, end: sectionEnd};
       }
     };
+    // Σ der Zellwerte einer Zeile über die einbezogenen Spalten (sum_mode "yes").
+    const sumOfCells = (ri) => {
+      const cells = included.map(ci => values[ci][ri]).filter(c => c && !c.error && c.value != null);
+      if (!cells.length) return null;
+      const units = [...new Set(cells.map(c => c.unit || ''))];
+      return {value: cells.reduce((a, c) => a + c.value, 0), unit: units.length === 1 ? units[0] : ''};
+    };
     rows.forEach((row, ri) => {
-      if (isMember(row)) {
+      if ((isMember(row) || row.row_type === 'formula') && row.sum_mode === 'no') return;
+      if ((isMember(row) || row.row_type === 'formula') && row.sum_mode === 'yes') {
+        raw[ri] = sumOfCells(ri);
+      } else if (isMember(row)) {
         if (!summable || !summable[ri]) return;
-        const cells = included.map(ci => values[ci][ri]).filter(c => c && !c.error && c.value != null);
-        if (!cells.length) return;
-        const units = [...new Set(cells.map(c => c.unit || ''))];
-        raw[ri] = {value: cells.reduce((a, c) => a + c.value, 0), unit: units.length === 1 ? units[0] : ''};
+        raw[ri] = sumOfCells(ri);
       } else if (row.row_type === 'formula') {
         if (!included.length) return;
         const refs = [...new Set((row.formula || '').toUpperCase().match(/[A-Z]/g) || [])];
@@ -524,7 +544,7 @@ window.TableCompute = (() => {
       } else if (row.row_type === 'summary') {
         const {start, end} = sectionOf(ri);
         const members = [];
-        for (let j = start; j < end; j++) if (isMember(rows[j])) members.push(raw[j]);
+        for (let j = start; j < end; j++) if (isMember(rows[j]) && rows[j].sum_mode !== 'no') members.push(raw[j]);
         if (!members.length || members.some(m => m == null)) return;
         const total = members.reduce((a, m) => a + m.value, 0);
         const units = [...new Set(members.map(m => m.unit || ''))];
