@@ -2,6 +2,13 @@
 
 > Deutsche Version: [CHANGELOG.de.md](CHANGELOG.de.md)
 
+## Unreleased
+
+### Fixed
+
+- **Start**: Values are only sent once Home Assistant has fully started
+  - Right after a restart, entities could briefly report raw or unavailable values (for example Wh before a changed unit applied) that ended up in the archive
+
 ## 1.7.0 - 2026-11-20
 
 ### New

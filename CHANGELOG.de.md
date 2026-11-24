@@ -2,6 +2,13 @@
 
 > English version: [CHANGELOG.md](CHANGELOG.md)
 
+## Unreleased
+
+### Behoben
+
+- **Start**: Werte werden erst gesendet, wenn Home Assistant vollständig gestartet ist
+  - Direkt nach einem Neustart konnten Entitäten kurz Rohwerte oder „nicht verfügbar“ melden (z. B. Wh, bevor eine geänderte Einheit greift), die im Archiv landeten
+
 ## 1.7.0 - 2026-11-20
 
 ### Neu
