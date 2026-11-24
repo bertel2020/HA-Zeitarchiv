@@ -376,7 +376,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
             watermark.get(state.entity_id),
         )
 
+    @callback
     def _initial_snapshot(_hass: HomeAssistant | None = None) -> None:
+        # @callback: läuft im Event-Loop. Ohne die Markierung schickte async_at_started die Funktion in einen
+        # Executor-Thread, und Zustands-, Queue- und Timer-Zugriffe wären nicht thread-sicher.
         nonlocal snapshot_done, hass_started
         hass_started = True
         all_states = list(hass.states.async_all())
