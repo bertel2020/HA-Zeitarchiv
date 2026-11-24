@@ -2,10 +2,13 @@
 
 > English version: [CHANGELOG.md](CHANGELOG.md)
 
-## Unreleased
+## 1.8.0 - 2026-11-24
 
 ### Neu
 
+- **Karte**
+  - Tabellen: neue Zeilenoption „In Σ-Spalte“ (Automatisch, Ja, Nein); ein Zeitraum ohne Daten zeigt „–“ statt 0
+  - Wetterdashboard: die Regendauer steht in einer zweiten Zeile als Stunden bzw. Tage
 - **Reparaturen**
   - Eine Reparaturmeldung weist darauf hin, wenn eine Entität eine Einheit meldet, die sich nicht auf die gespeicherte umrechnen lässt (z. B. °C statt °F)
 

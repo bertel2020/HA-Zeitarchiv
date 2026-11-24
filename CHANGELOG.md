@@ -2,10 +2,13 @@
 
 > Deutsche Version: [CHANGELOG.de.md](CHANGELOG.de.md)
 
-## Unreleased
+## 1.8.0 - 2026-11-24
 
 ### New
 
+- **Card**
+  - Tables: new row option “In Σ column” (Automatic, Yes, No); a period without data shows “–” instead of 0
+  - Weather dashboard: the rain duration is shown in a second line as hours or days
 - **Repairs**
   - A repair notice appears when an entity reports a unit that cannot be converted to the stored one (for example °C instead of °F)
 
