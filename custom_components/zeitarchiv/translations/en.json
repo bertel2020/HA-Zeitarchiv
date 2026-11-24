@@ -254,6 +254,10 @@
     "entities_state_limit_reached": {
       "title": "Zeitarchiv: states discarded, limit reached",
       "description": "\"{connection}\" discards new states: {detail}\n\nFree-text sensors should not be archived — deselect the entity in the integration."
+    },
+    "entities_unit_mismatch": {
+      "title": "Zeitarchiv: unit changed, cannot be converted",
+      "description": "\"{connection}\" receives a different unit than the stored one for entities, and it cannot be converted: {detail}\n\nThe values are stored unchanged, so the series then contains both units. Please check the entity in the Zeitarchiv app."
     }
   }
 }

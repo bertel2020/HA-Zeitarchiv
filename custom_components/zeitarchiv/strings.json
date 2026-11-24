@@ -254,6 +254,10 @@
     "entities_state_limit_reached": {
       "title": "Zeitarchiv: Zustände verworfen, Obergrenze erreicht",
       "description": "„{connection}\" verwirft neue Zustände: {detail}\n\nFreitext-Sensoren sollten nicht archiviert werden — die Entität in der Integration abwählen."
+    },
+    "entities_unit_mismatch": {
+      "title": "Zeitarchiv: Einheit gewechselt, nicht umrechenbar",
+      "description": "„{connection}\" erhält für Entitäten eine andere Einheit als gespeichert, die sich nicht umrechnen lässt: {detail}\n\nDie Werte werden unverändert gespeichert, die Reihe enthält danach beide Einheiten. Bitte die Entität in der Zeitarchiv-App prüfen."
     }
   }
 }

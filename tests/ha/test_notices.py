@@ -87,6 +87,7 @@ async def test_discarded_state_values_become_warning_repairs(
         "notices": [
             {"id": "entities.state_type_mismatch", "severity": "warn", "detail": "sensor.a"},
             {"id": "entities.state_limit_reached", "severity": "warn", "detail": "sensor.b"},
+            {"id": "entities.unit_mismatch", "severity": "warn", "detail": "sensor.c"},
         ],
     }
     await _refresh(hass, loaded_entry)
@@ -95,6 +96,7 @@ async def test_discarded_state_values_become_warning_repairs(
     for notice_id, detail in (
         ("entities.state_type_mismatch", "sensor.a"),
         ("entities.state_limit_reached", "sensor.b"),
+        ("entities.unit_mismatch", "sensor.c"),
     ):
         issue = registry.async_get_issue(DOMAIN, f"{loaded_entry.entry_id}_{notice_id}")
         assert issue.severity is ir.IssueSeverity.WARNING

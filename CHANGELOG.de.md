@@ -4,6 +4,11 @@
 
 ## Unreleased
 
+### Neu
+
+- **Reparaturen**
+  - Eine Reparaturmeldung weist darauf hin, wenn eine Entität eine Einheit meldet, die sich nicht auf die gespeicherte umrechnen lässt (z. B. °C statt °F)
+
 ### Behoben
 
 - **Start**: Werte werden erst gesendet, wenn Home Assistant vollständig gestartet ist

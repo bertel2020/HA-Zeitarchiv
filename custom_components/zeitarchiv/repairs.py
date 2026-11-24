@@ -37,6 +37,10 @@ _ALWAYS_IDS = frozenset({
     # Ohne Karte gingen diese Werte unbemerkt verloren.
     "entities.state_type_mismatch",
     "entities.state_limit_reached",
+    # Einheiten-Schutz (App-Roadmap 1.3): eine Entität meldet eine andere Einheit, die sich nicht
+    # umrechnen lässt (z. B. °C statt °F); die Reihe enthält danach beide Einheiten. Die
+    # Umrechnung umrechenbarer Paare (entities.unit_converted, info) bleibt bewusst in der App.
+    "entities.unit_mismatch",
 })
 
 

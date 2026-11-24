@@ -4,6 +4,11 @@
 
 ## Unreleased
 
+### New
+
+- **Repairs**
+  - A repair notice appears when an entity reports a unit that cannot be converted to the stored one (for example °C instead of °F)
+
 ### Fixed
 
 - **Start**: Values are only sent once Home Assistant has fully started
