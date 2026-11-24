@@ -41,6 +41,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.start import async_at_started
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.translation import async_get_cached_translations
 from homeassistant.helpers.typing import ConfigType
@@ -253,6 +254,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
     # und danach einmal aktualisiert, statt je Entität.
     text_state_entities: set[str] = set()
     snapshot_done = False
+    hass_started = False
     # Zuletzt veröffentlichter Stand, nur auf dem Event-Loop geschrieben —
     # der Binärsensor liest ihn beim Anlegen, danach kommt jede Änderung per
     # Dispatcher-Signal.
@@ -300,6 +302,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
 
     def _enqueue_state(state: State) -> bool:
         """Filtert und uebergibt einen aktuellen oder geaenderten Zustand."""
+        if not hass_started:
+            return False
         entity_id = state.entity_id
         domain = entity_id.split(".", 1)[0]
         if not filters.matches(entity_id):
@@ -340,6 +344,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
         # Entität konnten die Queue in falscher Reihenfolge erreichen, und text_state_entities wurde aus mehreren
         # Threads verändert. Die Arbeit hier ist reine Speicherarbeit (Filter, Registry-Lesezugriffe,
         # put_nowait) und blockiert nichts.
+        if not hass_started:
+            return
         new_state: State | None = event.data.get("new_state")
         if new_state is None:
             return
@@ -370,16 +376,32 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
             watermark.get(state.entity_id),
         )
 
-    all_states = list(hass.states.async_all())
-    already_sent_count = sum(1 for state in all_states if _already_sent(state))
-    initial_events = sum(
-        _enqueue_state(state) for state in all_states if not _already_sent(state)
-    )
-    snapshot_done = True
-    if text_state_entities:
-        _publish_text_states()
-    if _prune_watermark(hass, watermark):
-        _save_watermark_later()
+    def _initial_snapshot(_hass: HomeAssistant | None = None) -> None:
+        nonlocal snapshot_done, hass_started
+        hass_started = True
+        all_states = list(hass.states.async_all())
+        already_sent_count = sum(1 for state in all_states if _already_sent(state))
+        initial_events = sum(
+            _enqueue_state(state) for state in all_states if not _already_sent(state)
+        )
+        snapshot_done = True
+        if text_state_entities:
+            _publish_text_states()
+        if _prune_watermark(hass, watermark):
+            _save_watermark_later()
+        _LOGGER.info(
+            "Zeitarchiv-Initialzustand beim Laden vorgemerkt · Ziel=%s · Events=%d · "
+            "bereits gesendet (übersprungen)=%d",
+            entry.title,
+            initial_events,
+            already_sent_count,
+        )
+
+    # Erst nach vollständigem HA-Start senden: Beim Neustart liefern Entitäten
+    # kurz Rohwerte (z. B. Wh, bevor eine umgestellte Einheit greift) oder
+    # "unavailable". Läuft HA schon (Neuladen der Integration), geschieht der
+    # Snapshot sofort wie bisher.
+    entry.async_on_unload(async_at_started(hass, _initial_snapshot))
 
     # Nachsenden für den Auswahl-Assistenten und Registry-Ereignisse (ROADMAP
     # 1.33): derselbe Weg wie state_changed, aber mit Wasserstand-Schutz wie
@@ -388,6 +410,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
     resent_ts: dict[str, float] = {}
 
     def _resend_state(state: State) -> bool:
+        if not hass_started:
+            return False
         ts = state.last_updated.timestamp() if state.last_updated else None
         if _already_sent(state) or (ts is not None and resent_ts.get(state.entity_id) == ts):
             return False
@@ -396,13 +420,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZeitarchivConfigEntry) -
         if ts is not None:
             resent_ts[state.entity_id] = ts
         return True
-    _LOGGER.info(
-        "Zeitarchiv-Initialzustand beim Laden vorgemerkt · Ziel=%s · Events=%d · "
-        "bereits gesendet (übersprungen)=%d",
-        entry.title,
-        initial_events,
-        already_sent_count,
-    )
 
     entry.runtime_data = ZeitarchivRuntimeData(
         client=client,
