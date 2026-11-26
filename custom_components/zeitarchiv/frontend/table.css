@@ -182,6 +182,10 @@ table.dt.dt-cards tr.has-pending-purge td, table.dt.dt-cards tbody tr.has-pendin
 .wt-table td.wt-na .wt-v {color:var(--ink-faint);font-weight:400;}
 .wt-table td .wt-dl.wt-dl-good {color:var(--positive);}
 .wt-table td .wt-dl.wt-dl-bad {color:var(--danger);}
+.wt-table[data-col-hl="pairs"]:has(thead th.wt-vj) :is(thead th, .wt-table[data-col-hl="pairs"]:not(:has(thead th.wt-vj)) :is(thead th {background:color-mix(in srgb,var(--ink) 5%,var(--surface));}
+.wt-table[data-col-hl="pairs"]:has(thead th.wt-vj) .wt-sep {border-left:1.5px solid var(--border-strong);}
+.wt-table[data-col-hl="main"]:has(thead th.wt-vj) :is(thead th.wt-cur, .wt-table[data-col-hl="custom"] :is(thead th {background:color-mix(in srgb,var(--accent-line-soft) 60%,var(--surface));}
+.wt-table[data-col-hl="custom"] thead tr:first-child th.wt-hl {box-shadow:inset 0 2px 0 var(--accent-line);}
 .wt-table tr.wt-floor th {font-size:calc(12px * var(--font-scale, 1));font-weight:600;color:var(--ink);text-align:left;padding:8px 10px;background:var(--surface-alt);border-bottom:1px solid var(--border-strong);white-space:nowrap;}
 .wt-table tr.is-toggle th {cursor:pointer;}
 .wt-table tr.is-toggle th:focus-visible {outline:2px solid var(--accent-line);outline-offset:-2px;}

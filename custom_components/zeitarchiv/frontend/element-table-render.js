@@ -585,8 +585,27 @@
     return `<div class="kpi-sub">${escapeHtml(changesRange(c))}</div><div class="wt-chg">${energyChanges(c, {links: false})}</div>`;
   }
 
+  // Spaltenhervorhebung (Einstellung „Spaltenhervorhebung“): setzt data-col-hl an der Tabelle; „pairs“ und „main“ regelt das CSS,
+  // bei „custom“ bekommen alle Zellen der gewählten Zeiträume (Spalte und, mit Vorjahr, deren Vorjahr) die Klasse wt-hl.
+  // keys sind die Spaltenschlüssel in Anzeigereihenfolge, selected die markierten. Zeilen mit colspan (Gruppen, Etagen) bleiben leer.
+  function applyColumnHighlight(table, {mode = 'off', keys = [], selected = [], vorjahr = false} = {}) {
+    if (!table) return;
+    table.dataset.colHl = mode;
+    table.querySelectorAll('.wt-hl').forEach((el) => el.classList.remove('wt-hl'));
+    if (mode !== 'custom') return;
+    const span = vorjahr ? 2 : 1;
+    const picked = keys.map((key, i) => (selected.includes(key) ? i : -1)).filter((i) => i >= 0);
+    if (!picked.length) return;
+    for (const tr of table.querySelectorAll('tr')) {
+      if (tr.children.length !== 1 + keys.length * span) continue;
+      for (const i of picked) {
+        for (let k = 0; k < span; k++) tr.children[1 + i * span + k].classList.add('wt-hl');
+      }
+    }
+  }
+
   window.ElementTableRender = {
-    weatherComparison, WIND_KEYS, groupOf, inGroup,
+    applyColumnHighlight, weatherComparison, WIND_KEYS, groupOf, inGroup,
     formats, fmtDate, rangeText, energy, columnName, delta, comparisonHead, cellHtml, energyComparison: renderTable,
     monthName, mean, present, monthKey, isPartialStart, monthStats, yearSum, energyMatrix,
     kenntagRule, kenntagLabels: KENNTAG_LABELS, energyKenntage, energyChanges, changesRange, kenntageRange, energyKenntageBlock, energyChangesBlock,
