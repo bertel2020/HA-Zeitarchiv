@@ -94,6 +94,7 @@ window.TableCompute = (() => {
     if (!cell) return explicitMissing ? t('Keine Daten') : '–';
     if (cell.error) return t('Fehler');
     if (cell.value == null) return explicitMissing ? t('Keine Daten') : '–';
+    if (cell.durationText) return cell.durationText;
     // Spalte auf "Auto": die Nachkommastellen der Entität (Entitäten-Seite) gelten, sonst die Standardformatierung.
     const decimalsInt = decimals && decimals !== 'auto' ? parseInt(decimals, 10)
       : (Number.isInteger(cell.decimals) ? cell.decimals : null);
@@ -101,7 +102,26 @@ window.TableCompute = (() => {
   }
 
   function cellUnit(cell) {
-    return cell && !cell.error && cell.value != null ? (cell.unit || '') : '';
+    return cell && !cell.error && cell.value != null && !cell.durationText ? (cell.unit || '') : '';
+  }
+
+  // row.display_format "duration": Stunden als "TT hh:mm" (volle Minuten,
+  // abgeschnitten). Rein Anzeige — Zellwerte und Summen bleiben in Stunden.
+  function durationText(hours) {
+    let minutes = Math.floor(hours * 60 + 1e-6);
+    const days = Math.floor(minutes / 1440);
+    minutes -= days * 1440;
+    const pad = n => String(n).padStart(2, '0');
+    return `${pad(days)} ${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`;
+  }
+
+  // Gilt nur bei Einheit h und endlichem, nicht negativem Wert; sonst bleibt
+  // die Zelle unverändert (Zahl + Einheit).
+  function durationCell(cell, row) {
+    if (!row || row.display_format !== 'duration') return cell;
+    if (!cell || cell.error || cell.value == null || cell.unit !== 'h') return cell;
+    if (!Number.isFinite(cell.value) || cell.value < 0) return cell;
+    return {...cell, durationText: durationText(cell.value)};
   }
 
   function cellNumberParts(cell, decimals, explicitMissing = false) {
@@ -129,9 +149,9 @@ window.TableCompute = (() => {
   // sondern auch "womit genau" verglichen wird sichtbar ist. Leerstring,
   // wenn kein fairer Vergleich vorliegt (Formel-/Summenzeilen, oder kein
   // same_elapsed angefordert) — dieselbe Bedingung wie in deviationText().
-  function comparisonValueText(comparisonCell, decimals) {
+  function comparisonValueText(comparisonCell, decimals, row) {
     if (!comparisonCell || comparisonCell.comparisonValue == null) return '';
-    return cellText({value: comparisonCell.comparisonValue, unit: comparisonCell.unit}, decimals);
+    return cellText(durationCell({value: comparisonCell.comparisonValue, unit: comparisonCell.unit}, row), decimals);
   }
 
   // Zugehörige Vergleichsspalte für Tag/Monat/Jahr: gleicher Zeitraum,
@@ -788,7 +808,7 @@ window.TableCompute = (() => {
   }
 
   return {
-    evalFormula, inheritedFormulaUnit, fmtNum, cellValueText, cellUnit, cellNumberParts, cellText,
+    evalFormula, inheritedFormulaUnit, fmtNum, cellValueText, cellUnit, cellNumberParts, cellText, durationText, durationCell,
     isComparisonColumn, comparisonIndexForBase, deviationText, comparisonValueText, comparisonElapsedTimeText, percentOfTotalCell, heatmapStyle,
     rowLetters, computeValues, queryBody, computeRowSums, sumOverlap, styleClasses, currentPeriodNote, currentPeriodShortSuffix,
     resolveLabel, LABEL_VARIABLES,

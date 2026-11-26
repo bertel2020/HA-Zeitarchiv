@@ -141,6 +141,7 @@
           if (row.row_type === 'separator' || isRowEmpty(row, ri)) return;
           let cell = values[ci] && values[ci][ri];
           if (row.percent_of_total) cell = TableCompute.percentOfTotalCell(cell, sectionMemberCells(ci, ri));
+          cell = TableCompute.durationCell(cell, row);
           const decimals = row.percent_of_total ? '1' : col.decimals;
           const numberParts = TableCompute.cellNumberParts(cell, decimals, !!style.explicit_missing);
           const unit = style.show_units === false ? '' : TableCompute.cellUnit(cell);
@@ -181,7 +182,7 @@
       return `<th class="tbl-sum-col tbl-sum-head"${tip}>${escapeHtml(sumLabel)}${sumOverlapping ? '<span class="tbl-sum-warn" aria-hidden="true">!</span>' : ''}</th>`;
     };
     const sumTd = (row, ri) => {
-      const cell = rowSums[visibleRowIndexes[ri]];
+      const cell = TableCompute.durationCell(rowSums[visibleRowIndexes[ri]], row);
       const numberParts = TableCompute.cellNumberParts(cell, row.percent_of_total ? '1' : (visibleCols[0] ? (visibleCols.find(c => c.in_sum !== false) || visibleCols[0]).decimals : 'auto'), !!style.explicit_missing);
       const unit = style.show_units === false ? '' : TableCompute.cellUnit(cell);
       return `<td class="tbl-sum-col tbl-num${cell ? '' : ' tbl-sum-empty'}"><span class="tbl-cell"><span class="tbl-cell-number"><span class="tbl-number-whole">${escapeHtml(numberParts.whole)}</span><span class="tbl-number-separator">${escapeHtml(numberParts.separator)}</span><span class="tbl-number-fraction">${escapeHtml(numberParts.fraction)}</span></span>${unit ? `<span class="tbl-cell-unit">${escapeHtml(unit)}</span>` : ''}</span></td>`;
@@ -242,6 +243,7 @@
       visibleCols.forEach((col, ci) => {
         let cell = values[ci] && values[ci][ri];
         if (row.percent_of_total) cell = TableCompute.percentOfTotalCell(cell, sectionMemberCells(ci, ri));
+        cell = TableCompute.durationCell(cell, row);
         const cellClasses = ['tbl-num'];
         if (cell && cell.error) cellClasses.push('tbl-error');
         if (TableCompute.isComparisonColumn(col)) cellClasses.push('tbl-comparison-col');
@@ -260,7 +262,7 @@
         const comparisonLabel = comparisonIndex >= 0
           ? TableCompute.resolveLabel(visibleCols[comparisonIndex].label, windowStarts[comparisonIndex]) : '';
         const comparisonValueStr = comparisonIndex >= 0
-          ? TableCompute.comparisonValueText(comparisonCell, visibleCols[comparisonIndex].decimals) : '';
+          ? TableCompute.comparisonValueText(comparisonCell, visibleCols[comparisonIndex].decimals, row) : '';
         const comparisonTimeStr = comparisonIndex >= 0
           ? TableCompute.comparisonElapsedTimeText(
               windowStarts[comparisonIndex], elapsedSeconds[comparisonIndex], visibleCols[comparisonIndex].range_key)
