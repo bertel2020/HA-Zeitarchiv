@@ -1118,7 +1118,9 @@
       // nur für Achsen, auf denen ausschließlich Linien-Serien liegen —
       // je Achse geprüft, da eine Kachel mehrere Einheiten/Achsen mischen kann.
       const axisHasBar = series.some(s => axisKey(s) === u && s.chart_type === 'bar');
-      const axisDynamic = dynamicYAxis && !axisHasBar;
+      // Eine Anzahl beginnt immer bei 0, siehe chart_editor.js.
+      const isCountAxis = series.some(s => s.source_type && axisKey(s) === u);
+      const axisDynamic = dynamicYAxis && !axisHasBar && !isCountAxis;
       // Prozent-Achse (100%-Normierung) — immer fest 0–100, unabhängig von
       // "Dynamische Y-Achse", siehe chart_editor.js (gleiche Begründung).
       const isPercentAxis = normalizeActive && barOnlyAxis.has(u);
@@ -1136,6 +1138,8 @@
         // undefined min/max — "Dynamische Y-Achse" hätte sonst keine
         // sichtbare Wirkung.
         scale: isPercentAxis ? false : axisDynamic,
+        // Achse der Einschaltungen: nur ganze Zahlen als Teilung.
+        ...(isCountAxis ? {minInterval: 1} : {}),
         // Einheit am Achsennamen (oben an der Achse) wie auf der Chart-Seite — die Beschriftung bleibt kurz, damit
         // der Rand der kleinen Kachel nicht wächst.
         name: isPercentAxis ? '%' : (isDuration ? '' : axisUnitText(u)),
@@ -1219,7 +1223,8 @@
       }
       const lineData = displayPoints.map(p => [p.ts * 1000, p.value, s.unit, effectiveDecimals(s), isDurationSeries(s)]);
       const averageValues = displayPoints.map(p => p.value);
-      if (s.chart_type === 'line' && lineData.length && data.window_end != null
+      // Kein Haltepunkt bis zum Fensterende bei der Anzahl (source_type): sie gilt nur je Zeitfenster.
+      if (s.chart_type === 'line' && !s.source_type && lineData.length && data.window_end != null
           && lineData[lineData.length - 1][0] < data.window_end * 1000) {
         const last = lineData[lineData.length - 1];
         lineData.push([data.window_end * 1000, last[1], last[2], last[3], last[4]]);
@@ -1351,13 +1356,14 @@
         clip: singleBucket ? undefined : s.chart_type !== 'bar',
       };
       if (s.chart_type === 'line') {
-        cfg.smooth = true;
-        if (!showPoints || rollingOnly) cfg.symbol = 'none';
+        // Die Anzahl der Einschaltungen (source_type): Punkte statt Glättung und Fläche, siehe chart_editor.js.
+        cfg.smooth = !s.source_type;
+        if ((!showPoints && !s.source_type) || rollingOnly) cfg.symbol = 'none';
         // Dezente Füllfläche unter der Linie — macht eine einzelne Kurve auf
         // den ersten Blick lesbarer, stört bei mehreren überlagerten Serien
         // dank der niedrigen Deckkraft nicht. Abschaltbar (Optionen-Menü,
         // "Fläche"), Default an — siehe chart_editor.js.
-        if (areaFill && !rollingOnly) cfg.areaStyle = {color, opacity: 0.08};
+        if (areaFill && !rollingOnly && !s.source_type) cfg.areaStyle = {color, opacity: 0.08};
       } else if (!isStackedBar) {
         cfg.itemStyle.borderRadius = [3, 3, 0, 0];
       } else if (lastBarIndexForStack.get(stackKeys[i]) === i) {
@@ -1452,7 +1458,7 @@
           const total = compareTotals.get(cmpStackKey).get(x) || 0;
           return [x, total ? (p.value / total) * 100 : 0, '%', 0, false, p.value, s.unit, effectiveDecimals(s)];
         });
-        if (s.chart_type === 'line' && compareData.length && data.window_end != null
+        if (s.chart_type === 'line' && !s.source_type && compareData.length && data.window_end != null
             && compareData[compareData.length - 1][0] < data.window_end * 1000) {
           const last = compareData[compareData.length - 1];
           compareData.push([data.window_end * 1000, last[1], last[2], last[3], last[4]]);
