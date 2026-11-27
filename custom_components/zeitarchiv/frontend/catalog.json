@@ -32,6 +32,7 @@
     "Donnerstag": "Thursday",
     "Eigenversorgung": "Self-supply",
     "Einige Spalten überschneiden sich zeitlich (z. B. Woche und Tag). Ihre Werte zählen in der Summe doppelt.": "Some columns overlap in time (e.g. week and day). Their values are counted twice in the sum.",
+    "Einschaltungen": "switch-ons",
     "Eistage": "Ice days",
     "Erzeugung": "Generation",
     "Fast autark": "Almost self-sufficient",

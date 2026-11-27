@@ -260,6 +260,9 @@ window.TableCompute = (() => {
     if (series.aggregates && Object.prototype.hasOwnProperty.call(series.aggregates, aggregation)) {
       return series.aggregates[aggregation];
     }
+    // Einschaltungen gibt es nur bei Schaltern (der Server liefert count_sum dort mit); bei allem anderen keinen Wert,
+    // nicht den Durchschnitt der Punkte.
+    if (aggregation === 'count_sum') return null;
     const pts = series.points || [];
     if (aggregation === 'min' || aggregation === 'max') {
       if (!pts.length) return null;
@@ -395,7 +398,7 @@ window.TableCompute = (() => {
         // Summierbar: ausdrücklich "Σ Summe", oder "Automatisch" bei lauter
         // Zählern/Schaltern. Ø/Min/Max und Zustände sind es nie — selbst ein
         // Zähler mit Zeilen-Aggregation "max" darf nicht addiert werden.
-        summable[ri] = row.entity_ids.length === members.length && (aggregation === 'sum'
+        summable[ri] = row.entity_ids.length === members.length && (aggregation === 'sum' || aggregation === 'count_sum'
           || (aggregation === 'auto' && members.every(s => s.aggregation_type === 'counter' || s.aggregation_type === 'switch')));
         const memberValues = members.map(s => memberValueFor(s, aggregation));
         const memberComparisonValues = members.map(s => memberComparisonValueFor(s, aggregation));
@@ -430,7 +433,10 @@ window.TableCompute = (() => {
         // Nachkommastellen der Entität(en), wenn die Spalte auf "Auto" steht (siehe cellValueText()).
         const memberDecimals = [...new Set(members.map(member => member.decimals))];
         const entityDecimals = memberDecimals.length === 1 && Number.isInteger(memberDecimals[0]) ? memberDecimals[0] : null;
-        values[ci][ri] = {value, unit: memberUnits.length === 1 ? memberUnits[0] : '', comparisonValue, decimals: entityDecimals};
+        // Einschaltungen sind ganze Zahlen mit eigener Einheit, unabhängig von Einheit und Stellen des Schalters.
+        values[ci][ri] = aggregation === 'count_sum'
+          ? {value, unit: t('Einschaltungen'), comparisonValue, decimals: 0}
+          : {value, unit: memberUnits.length === 1 ? memberUnits[0] : '', comparisonValue, decimals: entityDecimals};
       });
     });
 
