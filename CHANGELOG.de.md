@@ -2,7 +2,7 @@
 
 > English version: [CHANGELOG.md](CHANGELOG.md)
 
-## Unreleased
+## 1.9.0 - 2026-11-27
 
 ### Neu
 
@@ -10,12 +10,15 @@
   - Tabellen: Dauerformat „TT hh:mm“ pro Zeile (Einstellung „Dauer“)
   - Donut: Eine einzelne An/Aus-Entität teilt den Zeitraum in „An“ und „Aus“ auf
   - Donut: ein Wert in der Mitte (die Summe bzw. der größte Zustand, beim Überfahren einer Scheibe deren Wert), wenn genug Platz ist
+  - Schalter: neue Tabellenzeile „Σ Einschaltungen“
+  - Schalter: die Anzahl der Einschaltungen erscheint als Punkte auf einer Achse mit ganzen Zahlen
 
 ### Geändert
 
 - **Karte**
   - Tabellen: Zusätze in Klammern hinter dem Zeilennamen stehen in einer zweiten Zeile
   - Schalter-Entitäten: Balken und Linien zeigen Dauern (z. B. „2h 7m“) statt nackter Zahlen; in der Legende der An/Aus-Rohwerte entfallen Min, Max und Ø
+  - Editor: Das Feld „Stil“ erscheint nur, wo es Balken zu stapeln gibt; beim Stil „Aus“ entfallen Legendengröße und Kennzahlen
 
 ## 1.8.0 - 2026-11-24
 

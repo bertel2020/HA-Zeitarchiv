@@ -2,7 +2,7 @@
 
 > Deutsche Version: [CHANGELOG.de.md](CHANGELOG.de.md)
 
-## Unreleased
+## 1.9.0 - 2026-11-27
 
 ### New
 
@@ -10,12 +10,15 @@
   - Tables: duration format “DD hh:mm” per row (setting “Duration”)
   - Donut: a single on/off entity splits the period into “On” and “Off”
   - Donut: a value in the middle (the total or the largest state, and the value of a slice while hovering it), when there is room for it
+  - Switches: new table row “Σ switch-ons”
+  - Switches: the number of switch-ons is shown as points on a whole-number axis
 
 ### Changed
 
 - **Card**
   - Tables: notes in brackets after the row name appear in a second line
   - On/off entities: bars and lines show durations (e.g. “2h 7m”) instead of bare numbers; in the legend of the raw on/off values Min, Max, and Ø are no longer shown
+  - Editor: the field “Style” only appears where there are bars to stack; with style “Off”, legend size and key figures are hidden
 
 ## 1.8.0 - 2026-11-24
 
