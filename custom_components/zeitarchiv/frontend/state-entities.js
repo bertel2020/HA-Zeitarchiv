@@ -627,7 +627,42 @@ window.StateEntities = (() => {
     return `${share.toLocaleString(window.ZA_FORMAT, {minimumFractionDigits: digits, maximumFractionDigits: digits})} %`;
   }
 
+  // Ein einzelner Schalter im Donut: Anteil „An“ und „Aus“ am Zeitraum — mit einem einzigen Wert
+  // wäre der Ring sonst voll und ohne Aussage. onSeconds ist die Summe der Einschaltsekunden der
+  // Buckets, windowStart/windowEnd der tatsächlich gelaufene Zeitraum (bei laufender Periode bis jetzt).
+  function onOffRows(onSeconds, windowStart, windowEnd) {
+    const elapsed = windowStart != null && windowEnd != null ? Math.max(0, windowEnd - windowStart) : 0;
+    const on = Math.max(0, onSeconds);
+    return [
+      {on: true, label: t('An'), seconds: on},
+      {on: false, label: t('Aus'), seconds: Math.max(0, elapsed - on)},
+    ];
+  }
+
+  // „An“ in der Farbe der Entität, „Aus“ blass in der Hilfsfarbe.
+  function onOffSeries(rows, color, surface, inkFaint) {
+    return {
+      type: 'pie',
+      radius: ['52%', '85%'],
+      center: ['50%', '50%'],
+      avoidLabelOverlap: true,
+      label: {show: false},
+      labelLine: {show: false},
+      itemStyle: {borderColor: surface, borderWidth: 2},
+      emphasis: {scaleSize: 6, itemStyle: {shadowBlur: 12, shadowColor: 'rgba(0,0,0,0.25)'}},
+      data: rows.map(row => ({
+        name: row.label, value: row.seconds,
+        itemStyle: {color: row.on ? color : inkFaint, opacity: row.on ? 1 : 0.35},
+      })),
+    };
+  }
+
+  function onOffTooltip(p) {
+    return `${p.marker} ${escapeHtml(p.name)}: <strong>${NumberFormat.fmtDuration(p.value)}</strong> (${fmtShare(p.percent)})`;
+  }
+
   return {
+    onOffRows, onOffSeries, onOffTooltip,
     UNAVAILABLE, color, swatchStyle, unavailablePattern, fill, label, raw,
     segments, bucketsFromSegments, bucketsFromShares, bucketsForSeries, barPanels, bucketFns, totals, fmtShare,
     RANGE_BUCKETS, SERVER_SHARE_RANGES, bucketStarts, defaultMode,

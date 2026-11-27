@@ -650,6 +650,23 @@
     }, true);
   }
 
+  // Ein einzelner Schalter: „An“/„Aus“ statt eines vollen Rings (Parität zu chart_editor.js, singleSwitch).
+  function renderTileOnOffDonut(chart, s, colorFor, windowStart, windowEnd, style, surface, inkFaint) {
+    const on = (s.points || []).map(p => p.value).filter(Number.isFinite).reduce((sum, v) => sum + v, 0);
+    const rows = StateEntities.onOffRows(on, windowStart, windowEnd);
+    chart.setOption({
+      legend: {show: false},
+      tooltip: {
+        trigger: 'item',
+        backgroundColor: surface,
+        textStyle: {color: style.getPropertyValue('--ink-muted').trim(), fontFamily: style.getPropertyValue('--font-mono'), fontSize: scaledFont(12)},
+        formatter: StateEntities.onOffTooltip,
+        appendToBody: true,
+      },
+      series: [StateEntities.onOffSeries(rows, colorFor(s.entity_id), surface, inkFaint)],
+    }, true);
+  }
+
   function renderTileDonut(chart, series, entityNames, colorFor, aggregation, effectiveDecimals, style, surface, hiddenSet) {
     const data = series.map(s => {
       const values = (s.points || []).map(p => p.value).filter(Number.isFinite);
@@ -947,6 +964,10 @@
     }
     if (donut && series.some(s => s.aggregation_type === 'state')) {
       renderTileStateDonuts(chart, series, entityNames, data.window_end, style, surface);
+      return;
+    }
+    if (donut && series.length === 1 && series[0].aggregation_type === 'switch') {
+      renderTileOnOffDonut(chart, series[0], colorFor, data.window_start, data.window_end, style, surface, inkFaint);
       return;
     }
     if (donut) {
