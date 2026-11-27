@@ -281,8 +281,18 @@
     };
   }
 
+  // Dauer-Serie: Schalter, deren Werte Einschaltsekunden sind. Die Bucket-Werte (Balken/Linie
+  // ohne Rohwerte) sind es immer, gleich welcher Anzeigemodus gewählt ist — ohne Einheit wären
+  // es unlesbare Zahlen (266 = 4 Min. 26 s). Der Anzeigemodus gilt nur für die 0/1-Rohwerte
+  // (raw = Zeitstrahl). Dieselbe Regel wie isDurationSeries() in chart_editor.js und
+  // entity_detail.js.
+  function durationSeries(s, raw) {
+    return s.aggregation_type === 'switch' && (s.display_mode === 'time' || !raw);
+  }
+
+  // Nur für die Vergleichs- und Mehrjahres-Pfade (nie Rohwerte), daher immer ohne raw.
   function tileValueFormatter(s, decimals) {
-    const isDuration = s.aggregation_type === 'switch' && s.display_mode === 'time';
+    const isDuration = durationSeries(s, false);
     return v => v == null ? '—' : (isDuration ? NumberFormat.fmtDuration(v) : `${fmtCompactNumber(v, decimals)}${s.unit ? ' ' + escapeHtml(s.unit) : ''}`);
   }
 
@@ -371,7 +381,7 @@
   // Achsennamen: dafür ist in der Kachel kein Platz.
   function renderTileYearsCompare(chart, series, compare, data, opts) {
     const {entityNames, colorFor, effectiveDecimals} = opts;
-    const isDurationSeries = s => s.aggregation_type === 'switch' && s.display_mode === 'time';
+    const isDurationSeries = s => durationSeries(s, false);
     const axisUnit = s => isDurationSeries(s) ? ' duration' : s.unit;
     const hasCompare = s => !!s.compare_points;
     const isSoll = s => !!compare.target && s.entity_id === compare.target;
@@ -712,6 +722,8 @@
     let seriesColors = {};
     try { seriesColors = JSON.parse(ds.seriesColors || '{}') || {}; } catch (e) { seriesColors = {}; }
     const colorFor = (entityId) => {
+      // Die Anzahl-Linie neben der Dauer ("Beides") hat keinen eigenen Eintrag in der Liste: feste Linienfarbe.
+      if (entityId.endsWith('#count')) return getComputedStyle(document.body).getPropertyValue('--accent-line').trim() || '#006787';
       const own = seriesColors[entityId];
       if (typeof own === 'string') {
         if (own.startsWith('palette:') && PALETTE[+own.slice(8)]) return PALETTE[+own.slice(8)];
@@ -810,6 +822,10 @@
     const kinds = entityIds.filter(id => spec.seriesStyle && spec.seriesStyle[id] && spec.seriesStyle[id].kind)
       .map(id => `${id}:${spec.seriesStyle[id].kind}`);
     if (kinds.length) params.set('kinds', kinds.join(','));
+    // Schalter als Dauer, Anzahl oder beides; ohne Eintrag gilt der Anzeigemodus der Entität (ROADMAP 1.74).
+    const metrics = entityIds.filter(id => spec.seriesStyle && spec.seriesStyle[id] && spec.seriesStyle[id].metric)
+      .map(id => `${id}:${spec.seriesStyle[id].metric}`);
+    if (metrics.length) params.set('metrics', metrics.join(','));
     // Ein fester Zeitraum bleibt fest, der Stichtag gilt nur für die übrigen.
     if (!spec.periodAnchor && stichtag) params.set('at', stichtag);
     if (compare) {
@@ -852,6 +868,10 @@
         const cols = colsById.get(entry.entity_id);
         if (cols) { entry.columns = cols.columns; entry.dt = cols.dt; }
       }
+    }
+    // Name der Anzahl-Linie neben der Dauer folgt dem (umbenennbaren) Namen der Dauer-Serie.
+    for (const entry of data.series || []) {
+      if (entry.base_entity_id) entry.friendly_name = `${(spec.entityNames && spec.entityNames[entry.base_entity_id]) || entry.base_name} · ${t('Anzahl')}`;
     }
     return data;
   }
@@ -945,7 +965,7 @@
     // sich fälschlich eine Achse mit unitlosen Standard-Entitäten und
     // erschienen dort in rohen Sekunden statt als Dauer (Achse UND Tooltip
     // kannten den Anzeigemodus bisher gar nicht, nur die HTML-Legende oben).
-    const isDurationSeries = s => s.aggregation_type === 'switch' && s.display_mode === 'time';
+    const isDurationSeries = s => durationSeries(s, timeline);
     // Eine Linie mit „Eigene Achse“ (saved_charts.series_style) bekommt eine Achse für sich; der Schlüssel
     // trägt die Entität hinter einem Trennzeichen, die Achse zeigt davon nur die Einheit (axisUnit).
     const ownAxis = s => s.chart_type === 'line' && !!(seriesStyle && seriesStyle[s.entity_id] && seriesStyle[s.entity_id].axis === 'own');
@@ -1620,7 +1640,7 @@
     const out = {};
     const members = (spec.stackGroups && spec.stackGroups.members) || {};
     if (!spec.stacked || !Object.keys(members).length) return out;
-    const axisOf = s => (s.aggregation_type === 'switch' && s.display_mode === 'time') ? ' duration' : s.unit;
+    const axisOf = s => durationSeries(s, spec.timeline) ? ' duration' : s.unit;
     const bars = series.filter(s => s.chart_type === 'bar' && members[s.entity_id]);
     const counts = new Map();
     bars.forEach(s => { const k = axisOf(s) + '|' + members[s.entity_id]; counts.set(k, (counts.get(k) || 0) + 1); });
@@ -1634,6 +1654,7 @@
 
   window.ChartTileRender = {
     stackLabels,
+    durationSeries,
     PALETTE,
     LOCALE,
     scaledFont,

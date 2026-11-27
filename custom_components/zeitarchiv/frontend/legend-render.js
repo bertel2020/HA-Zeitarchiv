@@ -27,7 +27,7 @@
     const values = (points || []).map(p => p.value).filter(Number.isFinite);
     const minima = (points || []).map(p => Number.isFinite(p.min) ? p.min : p.value).filter(Number.isFinite);
     const maxima = (points || []).map(p => Number.isFinite(p.max) ? p.max : p.value).filter(Number.isFinite);
-    const isDuration = s.aggregation_type === 'switch' && s.display_mode === 'time';
+    const isDuration = window.ChartTileRender.durationSeries(s, ctx.timeline);
     const unit = s.unit ? ` ${s.unit}` : '';
     const formatted = value => isDuration ? NumberFormat.fmtDuration(value) : `${fmtCompactNumber(value, ctx.effectiveDecimals(s))}${unit}`;
     // Summe bei Zählern UND bei Schaltern sinnvoll (Bucket-Werte sind dort
@@ -227,7 +227,7 @@
     }
     const stackNames = window.ChartTileRender.stackLabels(series, spec);
     const stackMembers = (spec.stackGroups && spec.stackGroups.members) || {};
-    const axisOf = s => (s.aggregation_type === 'switch' && s.display_mode === 'time') ? ' duration' : s.unit;
+    const axisOf = s => window.ChartTileRender.durationSeries(s, spec.timeline) ? ' duration' : s.unit;
     return series.filter(inLegend).map(s => ({
       ...statsItem(s, s.points, entityNames[s.entity_id] || s.friendly_name, colorFor(s.entity_id)),
       stack: stackNames[s.entity_id] || '',
