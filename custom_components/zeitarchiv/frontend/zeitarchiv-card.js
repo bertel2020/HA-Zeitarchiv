@@ -1305,8 +1305,12 @@ class ZeitarchivCardEditor extends HTMLElement {
           expanded: Boolean(this._config.legend_style || this._config.legend_size || (this._config.legend_metrics || []).length),
           schema: [
             select('legend_style', ['chart', 'chips', 'table', 'off'].map((value) => ({value, label: label(`legendStyle_${value}`)}))),
-            select('legend_size', ['chart', 'normal', 'small'].map((value) => ({value, label: label(`legendSize_${value}`)}))),
-            {name: 'legend_metrics', selector: {select: {multiple: true, mode: 'list', options: LEGEND_KEYS.map((value) => ({value, label: label(`metric_${value}`)}))}}},
+            // Mit dem Stil "Aus" zeichnet die Karte keine Legende (_renderLegend): Größe und Kennzahlen hätten keine Wirkung. Ihre Werte
+            // bleiben in der YAML stehen (_changed lässt sie unberührt) und gelten wieder, sobald ein anderer Stil gewählt ist.
+            ...(this._config.legend_style === 'off' ? [] : [
+              select('legend_size', ['chart', 'normal', 'small'].map((value) => ({value, label: label(`legendSize_${value}`)}))),
+              {name: 'legend_metrics', selector: {select: {multiple: true, mode: 'list', options: LEGEND_KEYS.map((value) => ({value, label: label(`metric_${value}`)}))}}},
+            ]),
           ],
         });
       }
