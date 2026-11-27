@@ -662,41 +662,70 @@ window.StateEntities = (() => {
   }
 
   // Text in der Ringmitte eines Donuts (Mockup „Donut“): in Ruhe die Summe bzw. die Einschaltdauer, beim
-  // Überfahren einer Scheibe deren Wert. text = {main, sub} oder null; sizes = {main, sub} in px.
-  function centerGraphic(text, ink, inkMuted, sizes) {
+  // Überfahren einer Scheibe deren Wert. Ein Text je Ring: positions[k] = {left, top} oder {x, y}, texts[k] = {main, sub}
+  // oder null; sizes = {main, sub} in px.
+  function centerGraphicAt(positions, texts, ink, inkMuted, sizes) {
     const main = sizes?.main || 22, sub = sizes?.sub || 12;
     return {
       id: 'donut-center', silent: true,
-      elements: [{
-        id: 'donut-center-text', type: 'text', left: 'center', top: 'middle', silent: true,
+      elements: positions.map((pos, k) => ({
+        // {left, top} (Schlüsselwörter oder Prozent der Kante) oder {x, y} in Pixeln, dann als Mittelpunkt des Textes.
+        id: `donut-center-text-${k}`, type: 'text', silent: true, ...(pos.x !== undefined ? {x: pos.x, y: pos.y} : {left: pos.left, top: pos.top}),
         style: {
-          text: text ? `{m|${text.main}}\n{s|${text.sub}}` : '',
+          text: texts[k] ? `{m|${texts[k].main}}\n{s|${texts[k].sub}}` : '',
           textAlign: 'center', textVerticalAlign: 'middle',
           rich: {
             m: {fontSize: main, fontWeight: 600, fill: ink, lineHeight: Math.round(main * 1.27), align: 'center'},
             s: {fontSize: sub, fill: inkMuted, lineHeight: Math.round(sub * 1.33), align: 'center'},
           },
         },
-      }],
+      })),
     };
   }
 
-  // Hover: items[i] = {main, sub} je Scheibe, resting = Text in Ruhe. Die Handler hängen an der Instanz, damit sie
-  // sich beim erneuten Zeichnen nicht stapeln.
-  function bindCenter(chart, items, resting) {
-    const set = text => chart.setOption({graphic: [{id: 'donut-center', elements: [{id: 'donut-center-text', style: {
+  // Hover: items[k][i] = {main, sub} für Scheibe i des Rings k, resting[k] = Text in Ruhe. Die Handler hängen an
+  // der Instanz, damit sie sich beim erneuten Zeichnen nicht stapeln.
+  function bindCenterAt(chart, items, resting) {
+    const set = (k, text) => chart.setOption({graphic: [{id: 'donut-center', elements: [{id: `donut-center-text-${k}`, style: {
       text: text ? `{m|${text.main}}\n{s|${text.sub}}` : '',
     }}]}]});
     if (chart.__donutOver) chart.off('mouseover', chart.__donutOver);
     if (chart.__donutOut) chart.off('globalout', chart.__donutOut);
-    chart.__donutOver = params => { if (params.seriesType === 'pie' && items[params.dataIndex]) set(items[params.dataIndex]); };
-    chart.__donutOut = () => set(resting);
+    chart.__donutOver = params => {
+      const text = params.seriesType === 'pie' && items[params.seriesIndex] && items[params.seriesIndex][params.dataIndex];
+      if (text) set(params.seriesIndex, text);
+    };
+    chart.__donutOut = () => resting.forEach((text, k) => set(k, text));
     chart.on('mouseover', chart.__donutOver);
     chart.on('globalout', chart.__donutOut);
   }
 
+  // Ein Ring in der Mitte der Fläche (alle Donuts mit einer Serie).
+  function centerGraphic(text, ink, inkMuted, sizes) {
+    return centerGraphicAt([{left: 'center', top: 'middle'}], [text], ink, inkMuted, sizes);
+  }
+  function bindCenter(chart, items, resting) { bindCenterAt(chart, [items], [resting]); }
+
+  // Zustands-Donut: je Zustand Dauer und Anteil; in Ruhe steht der größte Zustand in der Mitte.
+  // rows = [{label, seconds, share}] (share in Prozent).
+  function stateCenter(rows) {
+    const items = rows.map(r => ({
+      main: NumberFormat.fmtDuration(r.seconds),
+      sub: `${r.label.length > 14 ? r.label.slice(0, 13) + '…' : r.label} · ${fmtShare(r.share)}`,
+    }));
+    let best = 0;
+    rows.forEach((r, i) => { if (r.seconds > rows[best].seconds) best = i; });
+    return {items, resting: items[best] || null};
+  }
+
+  // Der Text passt nur in einen Ring mit genug Innendurchmesser; innerFraction = innerer Radius in Prozent
+  // (ECharts rechnet ihn von der halben kürzeren Seite).
+  function centerFits(chart, innerFraction) {
+    return Math.min(chart.getWidth(), chart.getHeight()) * innerFraction / 100 >= 110;
+  }
+
   return {
-    centerGraphic, bindCenter,
+    centerGraphic, bindCenter, centerGraphicAt, bindCenterAt, stateCenter, centerFits,
     onOffRows, onOffSeries, onOffTooltip,
     UNAVAILABLE, color, swatchStyle, unavailablePattern, fill, label, raw,
     segments, bucketsFromSegments, bucketsFromShares, bucketsForSeries, barPanels, bucketFns, totals, fmtShare,

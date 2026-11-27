@@ -625,7 +625,16 @@
     const rows = series.filter(s => s.aggregation_type === 'state');
     const width = 100 / Math.max(rows.length, 1);
     const pattern = StateEntities.unavailablePattern();
+    // Mitte: größter Zustand in Ruhe, beim Überfahren der Wert der Scheibe; nur wenn der Ring innen genug Platz hat.
+    const innerPct = rows.length > 1 ? 36 : 52;
+    const centers = rows.map(s => StateEntities.stateCenter(stateRows(s, windowEnd)));
+    const showCenter = StateEntities.centerFits(chart, innerPct);
     chart.setOption({
+      graphic: StateEntities.centerGraphicAt(
+        rows.map((s, k) => ({x: chart.getWidth() * (width * k + width / 2) / 100, y: chart.getHeight() / 2})),
+        centers.map(c => showCenter ? c.resting : null),
+        style.getPropertyValue('--ink').trim(), style.getPropertyValue('--ink-muted').trim(),
+        {main: scaledFont(rows.length > 1 ? 15 : 20), sub: scaledFont(11)}),
       tooltip: {
         trigger: 'item',
         backgroundColor: surface,
@@ -648,6 +657,7 @@
         })),
       })),
     }, true);
+    StateEntities.bindCenterAt(chart, showCenter ? centers.map(c => c.items) : [], showCenter ? centers.map(c => c.resting) : []);
   }
 
   // Ein einzelner Schalter: „An“/„Aus“ statt eines vollen Rings (Parität zu chart_editor.js, singleSwitch).

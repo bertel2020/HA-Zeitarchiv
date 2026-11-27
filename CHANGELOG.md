@@ -9,7 +9,7 @@
 - **Card**
   - Tables: duration format “DD hh:mm” per row (setting “Duration”)
   - Donut: a single on/off entity splits the period into “On” and “Off”
-  - Donut: a value in the middle (the total, or the value of a slice while hovering it), when there is room for it
+  - Donut: a value in the middle (the total or the largest state, and the value of a slice while hovering it), when there is room for it
 
 ### Changed
 
