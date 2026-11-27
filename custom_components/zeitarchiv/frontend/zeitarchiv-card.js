@@ -1218,6 +1218,18 @@ class ZeitarchivCardEditor extends HTMLElement {
     this._render();
   }
 
+  // Ob "Stil" (gestapelt, Prozent) bei den gewählten Entitäten etwas bewirkt: mindestens zwei Balken-Serien (Zähler und
+  // Schalter), und nicht nur Schalter und Zustände (das ist ein Zeitstrahl). Solange die Liste der Entitäten fehlt oder eine
+  // gewählte Entität nicht darin steht, bleibt das Feld sichtbar.
+  _stackable() {
+    const types = new Map((this._entities || []).map((entity) => [entity.entity_id, entity.aggregation_type]));
+    const picked = this._config.entities || [];
+    if (!types.size || picked.some((id) => !types.has(id))) return true;
+    const kinds = picked.map((id) => types.get(id));
+    if (kinds.every((kind) => kind === 'switch' || kind === 'state')) return false;
+    return kinds.filter((kind) => kind === 'counter' || kind === 'switch').length >= 2;
+  }
+
   _schema() {
     const label = (key) => text(this._hass, key);
     const chartOptions = (this._items || []).map((item) => ({
@@ -1237,7 +1249,9 @@ class ZeitarchivCardEditor extends HTMLElement {
         {name: 'entities', required: true, selector: {entity: {multiple: true, include_entities: [...new Set([
           ...(this._config.entities || []), ...(this._entities || []).map((e) => e.entity_id)])]}}},
         select('period', PERIODS.map((value) => ({value, label: label(`period_${value}`)}))),
-        select('style', ['auto', 'stacked', 'percent'].map((value) => ({value, label: label(`style_${value}`)}))),
+        // Stapeln und Prozent gibt es nur, wo es Balken zu stapeln gibt (draw(): stackedActive); sonst bleibt der Wert in der YAML,
+        // das Feld fehlt im Formular.
+        ...(this._stackable() ? [select('style', ['auto', 'stacked', 'percent'].map((value) => ({value, label: label(`style_${value}`)})))] : []),
       );
     } else if (this._source === 'element') {
       // Die gewählte Fassung gehört immer in die Liste, auch solange die der App noch lädt.
