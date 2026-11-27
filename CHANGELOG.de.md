@@ -9,6 +9,7 @@
 - **Karte**
   - Tabellen: Dauerformat „TT hh:mm“ pro Zeile (Einstellung „Dauer“)
   - Donut: Eine einzelne An/Aus-Entität teilt den Zeitraum in „An“ und „Aus“ auf
+  - Donut: ein Wert in der Mitte (die Summe, beim Überfahren einer Scheibe deren Wert), wenn genug Platz ist
 
 ### Geändert
 

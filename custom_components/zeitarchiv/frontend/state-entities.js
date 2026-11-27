@@ -661,7 +661,42 @@ window.StateEntities = (() => {
     return `${p.marker} ${escapeHtml(p.name)}: <strong>${NumberFormat.fmtDuration(p.value)}</strong> (${fmtShare(p.percent)})`;
   }
 
+  // Text in der Ringmitte eines Donuts (Mockup „Donut“): in Ruhe die Summe bzw. die Einschaltdauer, beim
+  // Überfahren einer Scheibe deren Wert. text = {main, sub} oder null; sizes = {main, sub} in px.
+  function centerGraphic(text, ink, inkMuted, sizes) {
+    const main = sizes?.main || 22, sub = sizes?.sub || 12;
+    return {
+      id: 'donut-center', silent: true,
+      elements: [{
+        id: 'donut-center-text', type: 'text', left: 'center', top: 'middle', silent: true,
+        style: {
+          text: text ? `{m|${text.main}}\n{s|${text.sub}}` : '',
+          textAlign: 'center', textVerticalAlign: 'middle',
+          rich: {
+            m: {fontSize: main, fontWeight: 600, fill: ink, lineHeight: Math.round(main * 1.27), align: 'center'},
+            s: {fontSize: sub, fill: inkMuted, lineHeight: Math.round(sub * 1.33), align: 'center'},
+          },
+        },
+      }],
+    };
+  }
+
+  // Hover: items[i] = {main, sub} je Scheibe, resting = Text in Ruhe. Die Handler hängen an der Instanz, damit sie
+  // sich beim erneuten Zeichnen nicht stapeln.
+  function bindCenter(chart, items, resting) {
+    const set = text => chart.setOption({graphic: [{id: 'donut-center', elements: [{id: 'donut-center-text', style: {
+      text: text ? `{m|${text.main}}\n{s|${text.sub}}` : '',
+    }}]}]});
+    if (chart.__donutOver) chart.off('mouseover', chart.__donutOver);
+    if (chart.__donutOut) chart.off('globalout', chart.__donutOut);
+    chart.__donutOver = params => { if (params.seriesType === 'pie' && items[params.dataIndex]) set(items[params.dataIndex]); };
+    chart.__donutOut = () => set(resting);
+    chart.on('mouseover', chart.__donutOver);
+    chart.on('globalout', chart.__donutOut);
+  }
+
   return {
+    centerGraphic, bindCenter,
     onOffRows, onOffSeries, onOffTooltip,
     UNAVAILABLE, color, swatchStyle, unavailablePattern, fill, label, raw,
     segments, bucketsFromSegments, bucketsFromShares, bucketsForSeries, barPanels, bucketFns, totals, fmtShare,

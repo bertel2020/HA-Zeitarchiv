@@ -654,6 +654,8 @@
   function renderTileOnOffDonut(chart, s, colorFor, windowStart, windowEnd, style, surface, inkFaint) {
     const on = (s.points || []).map(p => p.value).filter(Number.isFinite).reduce((sum, v) => sum + v, 0);
     const rows = StateEntities.onOffRows(on, windowStart, windowEnd);
+    const total = rows.reduce((sum, row) => sum + row.seconds, 0);
+    const items = rows.map(row => ({main: NumberFormat.fmtDuration(row.seconds), sub: `${row.label} · ${fmtCompactNumber(total ? row.seconds / total * 100 : 0, 1)} %`}));
     chart.setOption({
       legend: {show: false},
       tooltip: {
@@ -664,7 +666,17 @@
         appendToBody: true,
       },
       series: [StateEntities.onOffSeries(rows, colorFor(s.entity_id), surface, inkFaint)],
+      graphic: tileDonutCenter(chart, style, items[0]),
     }, true);
+    StateEntities.bindCenter(chart, tileDonutCenterFits(chart) ? items : [], tileDonutCenterFits(chart) ? items[0] : null);
+  }
+
+  // Text in der Ringmitte nur, wenn die Kachel groß genug ist: darunter bliebe im schmalen Ring kein Platz dafür.
+  const TILE_DONUT_CENTER_MIN = 190;
+  function tileDonutCenterFits(chart) { return Math.min(chart.getWidth(), chart.getHeight()) >= TILE_DONUT_CENTER_MIN; }
+  function tileDonutCenter(chart, style, text) {
+    return StateEntities.centerGraphic(tileDonutCenterFits(chart) ? text : null, style.getPropertyValue('--ink').trim(), style.getPropertyValue('--ink-muted').trim(),
+      {main: scaledFont(20), sub: scaledFont(11)});
   }
 
   function renderTileDonut(chart, series, entityNames, colorFor, aggregation, effectiveDecimals, style, surface, hiddenSet) {
@@ -682,6 +694,12 @@
         itemStyle: {color: colorFor(s.entity_id)},
       };
     });
+    // Mitte: wie im Chart-Editor (donut-Zweig in chart_editor.js renderDonut()).
+    const valueText = (s, v) => durationSeries(s, false) ? NumberFormat.fmtDuration(v) : `${fmtCompactNumber(v, effectiveDecimals(s))}${s.unit ? ' ' + s.unit : ''}`;
+    const sum = data.reduce((acc, d) => acc + d.value, 0);
+    const items = data.map((d, i) => ({main: valueText(series[i], d.value), sub: `${d.name} · ${fmtCompactNumber(sum ? d.value / sum * 100 : 0, 1)} %`}));
+    const sameUnit = series.every(s => durationSeries(s, false)) || (series.every(s => !durationSeries(s, false)) && new Set(series.map(s => s.unit || '')).size === 1);
+    const resting = aggregation === 'sum' && sameUnit ? {main: valueText(series[0], sum), sub: t('Summe')} : null;
     // Serien-Umschalter der Legende (toggleTileLegendItem()) wirkt bei
     // type:'pie' auf einzelne DATENPUNKTE statt auf ganze Serien — ECharts
     // behandelt jeden data-Eintrag wie einen eigenen Legendeneintrag (per
@@ -691,6 +709,7 @@
     const legendSelected = {};
     data.forEach(d => { legendSelected[d.name] = !hiddenSet || !hiddenSet.has(d.name); });
     chart.setOption({
+      graphic: tileDonutCenter(chart, style, resting),
       legend: {show: false, data: data.map(d => d.name), selected: legendSelected},
       tooltip: {
         trigger: 'item',
@@ -715,6 +734,7 @@
         data,
       }],
     }, true);
+    StateEntities.bindCenter(chart, tileDonutCenterFits(chart) ? items : [], tileDonutCenterFits(chart) ? resting : null);
   }
 
   // Alle Einstellungen eines Charts als reine Daten. ds ist ein DOMStringMap
