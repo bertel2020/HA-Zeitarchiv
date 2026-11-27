@@ -2,6 +2,20 @@
 
 > Deutsche Version: [CHANGELOG.de.md](CHANGELOG.de.md)
 
+## Unreleased
+
+### New
+
+- **Card**
+  - Tables: duration format “DD hh:mm” per row (setting “Duration”)
+  - Donut: a single on/off entity splits the period into “On” and “Off”
+
+### Changed
+
+- **Card**
+  - Tables: notes in brackets after the row name appear in a second line
+  - On/off entities: bars and lines show durations (e.g. “2h 7m”) instead of bare numbers; in the legend of the raw on/off values Min, Max, and Ø are no longer shown
+
 ## 1.8.0 - 2026-11-24
 
 ### New

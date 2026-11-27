@@ -2,6 +2,20 @@
 
 > English version: [CHANGELOG.md](CHANGELOG.md)
 
+## Unreleased
+
+### Neu
+
+- **Karte**
+  - Tabellen: Dauerformat „TT hh:mm“ pro Zeile (Einstellung „Dauer“)
+  - Donut: Eine einzelne An/Aus-Entität teilt den Zeitraum in „An“ und „Aus“ auf
+
+### Geändert
+
+- **Karte**
+  - Tabellen: Zusätze in Klammern hinter dem Zeilennamen stehen in einer zweiten Zeile
+  - Schalter-Entitäten: Balken und Linien zeigen Dauern (z. B. „2h 7m“) statt nackter Zahlen; in der Legende der An/Aus-Rohwerte entfallen Min, Max und Ø
+
 ## 1.8.0 - 2026-11-24
 
 ### Neu
