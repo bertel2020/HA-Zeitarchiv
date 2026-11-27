@@ -38,6 +38,8 @@
     const isSwitch = s.aggregation_type === 'switch';
     const hasSum = s.aggregation_type === 'counter' || isSwitch;
     const sumValue = ctx.timeline && isSwitch ? switchOnDuration(points, ctx.windowEnd) : values.reduce((sum, v) => sum + v, 0);
+    // Schalter-Rohwerte (Zeitstrahl) sind 0/1: Min, Max und Ø sagen nichts, daher null (wie die Summe "nicht angeboten").
+    const noSpread = ctx.timeline && isSwitch;
     // Summe bei Schaltern ist immer eine Dauer in Sekunden — unabhängig
     // vom Anzeigemodus immer als h/m/s formatiert statt über
     // fmtCompactNumber()s generische 4-signifikante-Stellen-Rundung, die
@@ -53,9 +55,9 @@
       fmtValue: formatted,
       fmtSum: isSwitch ? NumberFormat.fmtDuration : formatted,
       last: values.length ? formatted(values[values.length - 1]) : '—',
-      min: minima.length ? formatted(Math.min(...minima)) : '—',
-      max: maxima.length ? formatted(Math.max(...maxima)) : '—',
-      average: values.length ? formatted(values.reduce((sum, v) => sum + v, 0) / values.length) : '—',
+      min: noSpread ? null : (minima.length ? formatted(Math.min(...minima)) : '—'),
+      max: noSpread ? null : (maxima.length ? formatted(Math.max(...maxima)) : '—'),
+      average: noSpread ? null : (values.length ? formatted(values.reduce((sum, v) => sum + v, 0) / values.length) : '—'),
       sum: hasSum ? (values.length ? sumFormatted : '—') : null,
     };
   }
@@ -117,7 +119,7 @@
         const parts = [];
         for (const key of METRIC_ORDER) {
           if (!legendMetrics.includes(key)) continue;
-          if (key === 'sum' && item.sum === null) continue;
+          if (item[key] === null) continue;
           parts.push(`<span>${LEGEND_METRIC_LABELS[key]} <strong>${escapeHtml(item[key])}</strong></span>`);
         }
         if (parts.length) values = `<span class="values">${parts.join('')}</span>`;
@@ -145,7 +147,7 @@
     const cols = showStats ? METRIC_ORDER.filter(k => legendMetrics.includes(k)) : [];
     const headerCells = cols.map(key => `<th>${LEGEND_METRIC_LABELS[key]}</th>`).join('');
     const row = (item, member) => {
-      const cells = cols.map(key => `<td>${escapeHtml(key === 'sum' && item.sum === null ? '—' : item[key])}</td>`).join('');
+      const cells = cols.map(key => `<td>${escapeHtml(item[key] === null ? '—' : item[key])}</td>`).join('');
       const inactive = hiddenSet.has(item.name) ? ' inactive' : '';
       if (item.states) {
         return `<tr class="chart-legend-table-row static"><td class="legend-name-col"><span class="name">${escapeHtml(item.name)}</span>`
